@@ -4,9 +4,9 @@ import * as React from "react";
 import Image from "next/image";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { navLinks } from "@/constants/navLinks";
+// import Link from "next/link";
 
-import { IconDashboard, IconChartBar, IconFolder } from "@tabler/icons-react";
 
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
@@ -19,30 +19,6 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-export const data = {
-  user: {
-    name: "Vanness Lao",
-    email: "vannesslao01@gmail.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
-  navMain: [
-    {
-      title: "Dashboard",
-      url: "/dashboard",
-      icon: IconDashboard,
-    },
-    {
-      title: "Analytics",
-      url: "/analytics",
-      icon: IconChartBar,
-    },
-    {
-      title: "Lessons",
-      url: "/lessons",
-      icon: IconFolder,
-    },
-  ],
-};
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { resolvedTheme } = useTheme();
@@ -69,10 +45,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={navLinks.navMain} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={navLinks.user} />
       </SidebarFooter>
     </Sidebar>
   );

@@ -24,6 +24,9 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { logout } from "@/app/login/action";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export function NavUser({
   user,
@@ -35,6 +38,18 @@ export function NavUser({
   };
 }) {
   const { isMobile } = useSidebar();
+
+  // Logout function
+  const router = useRouter();
+  async function handleLogOut() {
+    const result = await logout();
+    if (result?.error) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success("You have been logout.");
+    router.push("/login");
+  }
 
   return (
     <SidebarMenu>
@@ -68,7 +83,7 @@ export function NavUser({
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
                   <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="rounded-lg">VL</AvatarFallback>
+                  <AvatarFallback className="rounded-lg">{user.name}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{user.name}</span>
@@ -94,7 +109,10 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={handleLogOut}
+
+            >
               <IconLogout />
               Log out
             </DropdownMenuItem>

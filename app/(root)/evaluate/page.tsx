@@ -8,7 +8,7 @@ export default function Evaluate() {
       </div>
       <div className="w-full px-4 p-10 py-10 flex flex-col items-center justify-center bg-accent rounded-xl">
         <div className="mb-5 flex items-center justify-center">
-          <p>Paste your design's Figma link below.</p>
+          <p>Paste your design&apos;s Figma link below.</p>
         </div>
         <UploadWithLink />
       </div>

@@ -10,15 +10,20 @@ export default function FigmaLinkUploader() {
   const [age, setAge] = useState("");
   const [occupation, setOccupation] = useState("");
 
+
+  // TODO: Link Validator
   const handleUpload = () => {
+    // TODO: Expand the following link
     if (!link || !link.includes("figma.com")) {
       alert("Please enter a valid Figma link.");
       return;
     }
 
+    // TODO: Loading screen
     setLoading(true);
     setProgress(0);
 
+    // Replace with real ones
     const fakeUpload = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
@@ -27,8 +32,10 @@ export default function FigmaLinkUploader() {
           setUploadedLink(link);
           return 100;
         }
+        // TODO: Return with real loading part of the screen
         return prev + 20;
       });
+      // TODO: Add later for optimization
     }, 200);
   };
 
@@ -42,7 +49,7 @@ export default function FigmaLinkUploader() {
           type="text"
           value={link}
           onChange={(e) => setLink(e.target.value)}
-          placeholder="https://www.figma.com/file/..."
+          placeholder="https://www.figma.com/design/"
           className="w-[400px] p-2 rounded-md bg-white dark:bg-[#120F12] border"
         />
 
@@ -55,6 +62,7 @@ export default function FigmaLinkUploader() {
         </button>
       </div>
 
+    {/* TODO: Replace with dynamic loading percentage according to the speed of data fetching of the client  */}
       {/* Loading Bar */}
       {loading && (
         <div className="w-full max-w-xl bg-white dark:bg-[#120F12] rounded-xl h-10 flex items-center px-4 space-x-4">
@@ -68,6 +76,7 @@ export default function FigmaLinkUploader() {
         </div>
       )}
 
+      {/* TODO: Separate in another file/component */}
       {/* Form after upload */}
       {uploadedLink && !loading && (
         <div className="w-full max-w-xl flex flex-col space-y-4">
