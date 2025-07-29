@@ -110,11 +110,9 @@ export default function RegistrationForm() {
         toast.error("User ID is undefined. Email confirmation must be disabled");
         return;
       }
-
-
       console.log(values)
       toast.success('Registered successfully!');
-      router.push('/login');
+      router.push('/auth/login');
       // toast(
       //   <pre className="mt-2 w-[340px] rounded-md bg-slate-950 p-4">
       //     <code className="text-white">{JSON.stringify(values, null, 2)}</code>
@@ -128,7 +126,7 @@ export default function RegistrationForm() {
 
   return (
     <>
-      <MiddleHeaderIcon href="/signup" />
+      <MiddleHeaderIcon href="/auth/signup" />
       <div className="flex flex-col-reverse lg:flex-row min-h-[50vh] w-full items-center justify-center px-4 py-8 lg:justify-end lg:px-70 lg:py-10">
 
         {/* Image  */}
@@ -154,11 +152,11 @@ export default function RegistrationForm() {
         <div className="flex flex-col w-full max-w-full lg:max-w-[513px]">
           <h2
             className=" title-regsiter-login text-5xl text-center lg:text-left lg:text-[60px] 
-                         w-full flex justify-center lg:justify-start dark"
+                         w-full flex justify-center lg:justify-start dark mb-4"
           >
             Get Started
           </h2>
-          <p className="text-lg mb-4 text-[#1E1E1E]/50 dark:text-[#F5F5F5]/60 text-center lg:text-left lg:pb-10">
+          <p className="text-lg mb-4 text-[#1E1E1E]/50 dark:text-[#F5F5F5]/60 text-[24px] text-center lg:text-left lg:pb-10">
             Welcome to Uxhibit - Let&apos;s get started
           </p>
 
@@ -281,7 +279,7 @@ export default function RegistrationForm() {
           </Form>
           <div className="mt-4 text-center text-[18px] text-[#1E1E1E]/50 dark:text-[#F5F5F5]/40">
             Already have an account? {''}
-            <Link href="/login" className="text-[#ff7f3f] hover:text-[#ED5E20] transition-colors duration-200 hover:underline">
+            <Link href="/auth/login" className="text-[#ff7f3f] hover:text-[#ED5E20] transition-colors duration-200 hover:underline">
               Login
             </Link>
           </div>

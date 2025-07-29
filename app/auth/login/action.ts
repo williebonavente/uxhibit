@@ -3,13 +3,10 @@
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { createClient } from "@/utils/supabase/server";
-// import { nullable } from "zod";
 
 export async function login(formData: FormData) {
     const supabase = await createClient()
 
-    // type casting here for convience
-    // in practice, you should validate your inputs
     const data = {
         email: formData.get('email') as string,
         password: formData.get('password') as string,

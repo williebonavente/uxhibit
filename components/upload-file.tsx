@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 
 export default function FigmaLinkUploader() {
   const [link, setLink] = useState("");
@@ -15,7 +16,7 @@ export default function FigmaLinkUploader() {
   const handleUpload = () => {
     // TODO: Expand the following link
     if (!link || !link.includes("figma.com")) {
-      alert("Please enter a valid Figma link.");
+      toast.error("Please enter a valid Figma link.")
       return;
     }
 
@@ -42,6 +43,7 @@ export default function FigmaLinkUploader() {
   const isParamsComplete = age.trim() !== "" && occupation.trim() !== "";
 
   return (
+    // Limit only to maximum of 10 design per user
     <div className="flex flex-col items-center justify-center space-y-6">
       {/* Upload Inputs */}
       <div className="flex space-x-4">

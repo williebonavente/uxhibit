@@ -24,10 +24,12 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { logout } from "@/app/login/action";
+import { logout } from "@/app/auth/login/action";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-
+import { getInitials } from "@/app/(root)/page";
+import { useEffect, useState } from "react";
+import { createClient } from "@/utils/supabase/client";
 export function NavUser({
   user,
 }: {
@@ -39,6 +41,27 @@ export function NavUser({
 }) {
   const { isMobile } = useSidebar();
 
+  const [dbName, setDbName] = useState<string>("");
+  const [dbEmail, setDbEmail] = useState<string>("");
+
+  useEffect(() => {
+    async function fetchData() {
+      const supabase = createClient();
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData?.user?.id) {
+        const { data } = await supabase
+          .from("learner_profile")
+          .select("name, email")
+          .eq("id", authData.user.id)
+          .single();
+        if (data?.name) setDbName(data.name);
+        if (data?.email) setDbEmail(data.email);
+      }
+    }
+    fetchData();
+  }, []);
+
+
   // Logout function
   const router = useRouter();
   async function handleLogOut() {
@@ -48,7 +71,7 @@ export function NavUser({
       return;
     }
     toast.success("You have been logout.");
-    router.push("/login");
+    router.push("/auth/login");
   }
 
   return (
@@ -62,12 +85,17 @@ export function NavUser({
             >
               <Avatar className="h-8 w-8 rounded-lg grayscale">
                 <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback className="rounded-lg">VL</AvatarFallback>
+                <AvatarFallback className="rounded-lg">{getInitials(dbName)}</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{user.name}</span>
+                {/* Getting the name from the database */}
+                <span className="truncate font-medium">{dbName}</span>
+
+                {/* <span className="truncate font-medium">{dbName}</span> */}
                 <span className="text-muted-foreground truncate text-xs">
-                  {user.email}
+                  {/* Getting the email from the database */}
+                  <span className="truncate font-medium">{dbName}</span>
+
                 </span>
               </div>
               <IconDotsVertical className="ml-auto size-4" />
@@ -79,16 +107,18 @@ export function NavUser({
             align="end"
             sideOffset={4}
           >
+            {/* TODO:  */}
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="rounded-lg">{user.name}</AvatarFallback>
+                  {/* TODO: To be implemented */}
+                  {/* <AvatarImage src={user.avatar} alt={user.name} />
+                  <AvatarFallback className="rounded-lg">{user.name}</AvatarFallback> */}
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{user.name}</span>
+                  <span className="truncate font-medium">{dbName}</span>
                   <span className="text-muted-foreground truncate text-xs">
-                    {user.email}
+                    <span className="truncate font-medium">{dbEmail}</span>
                   </span>
                 </div>
               </div>
@@ -97,6 +127,7 @@ export function NavUser({
             <DropdownMenuGroup>
               <DropdownMenuItem>
                 <IconUserCircle />
+                {/* TODO: make the functional button here */}
                 Account
               </DropdownMenuItem>
               <DropdownMenuItem>
@@ -109,10 +140,7 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={handleLogOut}
-
-            >
+            <DropdownMenuItem onClick={handleLogOut}>
               <IconLogout />
               Log out
             </DropdownMenuItem>

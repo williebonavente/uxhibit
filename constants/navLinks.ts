@@ -3,8 +3,8 @@ import { IconDashboard, IconChartBar, IconFolder } from "@tabler/icons-react";
 
 export const navLinks = {
   user: {
-    name: "Vanness Lao",
-    email: "vannesslao01@gmail.com",
+    name: "John Doe",
+    email: "JohnDoe@gmail.com",
     avatar: "/avatars/shadcn.jpg",
   },
   navMain: [

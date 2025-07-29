@@ -27,7 +27,7 @@ export default function MiddleHeaderIcon({ href = "/", ariaLabel = "Go to homepa
   );
 
   return (
-    <div className="w-full flex justify-center items-center mt-5 mb-8">
+    <div className="w-full flex justify-center items-center mt-5 mb-7">
       {href ? (
         <Link href={href} aria-label={ariaLabel}>
           {iconContent}

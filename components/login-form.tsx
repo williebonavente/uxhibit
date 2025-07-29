@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
-import { login } from "@/app/login/action";
+import { login } from "@/app/auth/login/action";
 
 import {
   Form,
@@ -49,9 +49,11 @@ export default function LoginForm() {
         toast.error(
           result.error === "Invalid login credentials"
             ? "Incorrect email or password. Please try again."
-            : result.error === "Email not confirmed"
-            ? "Please Confirm Your Email!"
-            : result.error
+            : result.error === "User not found"
+              ? "No account found with this email."
+              : result.error === "Email not confirmed"
+                ? "Please Confirm Your Email!"
+                : result.error
         );
         return;
       }
@@ -65,7 +67,7 @@ export default function LoginForm() {
 
   return (
     <>
-      <MiddleHeaderIcon href="/login" />
+      <MiddleHeaderIcon href="/auth/login" />
       <div className="flex flex-col-reverse lg:flex-row min-h-[50vh] w-full items-center justify-center px-4 py-8 lg:justify-end lg:px-70 lg:py-10">
         {/* Image  */}
         <div className="hidden 2xl:block mr-[116px] w-full 2xl:w-[640px] 2xl:h-[857px] flex-shrink-0 relative">
@@ -93,7 +95,7 @@ export default function LoginForm() {
           >
             Log In
           </h2>
-          <p className="text-lg mb-4 text-[#1E1E1E]/50 dark:text-[#F5F5F5]/60 text-center pb-8 lg:text-left lg:pb-10">
+          <p className="text-lg mb-4 text-[24px] text-[#1E1E1E]/50 dark:text-[#F5F5F5]/60 text-center pb-8 lg:text-left lg:pb-10">
             Welcome back to UXhibit — Xhibit your edge!
           </p>
 
@@ -105,7 +107,6 @@ export default function LoginForm() {
                   name="email"
                   render={({ field }) => (
                     <FormItem className="grid gap-2">
-                      {/* <FormLabel htmlFor="email">Email</FormLabel> */}
                       <FormControl>
                         <Input
                           id="email"
@@ -126,12 +127,6 @@ export default function LoginForm() {
                   render={({ field }) => (
                     <FormItem className="grid gap-2">
                       <div className="flex justify-between items-center">
-                        {/* <FormLabel htmlFor="password">Password</FormLabel> */}
-                        <Link
-                          href="#"
-                          // TODO: forgot password feature
-                          className="ml-auto inline-block text-sm underline">
-                        </Link>
                       </div>
                       <FormControl>
                         <PasswordInput
@@ -149,15 +144,40 @@ export default function LoginForm() {
                 <Button type="submit" className="w-full h-12 text-xl btn-login btn-login:hover cursor-pointer lg:w-[513px] lg:h-[62px]">
                   Log In
                 </Button>
+                <div className="text-[16px] text-[#1E1E1E]/50 text-right ">
+                  <Link href="/auth/forgot-password"
+                    className="text-[#ED5E20]/100 hover:text-[ED5E20] transition-colors duration-200 hover:underline">
+                    Forgot Password
+                  </Link>
+                </div>
+
+                {/* Service Provider */}
+                {/* <Button variant="outline" className="w-full h-12 text-xl cursor-pointer lg:w-[513px] lg:h-[62px]">
+                  <Image
+                    src="/google_logo.png"
+                    alt="Google Logo"
+                    width={24}
+                    height={24}
+                    className="mr-2"
+                  />
+                  Continue with Google
+                </Button> */}
                 <Button variant="outline" className="w-full h-12 text-xl cursor-pointer lg:w-[513px] lg:h-[62px]">
-                  Login with Google
+                  <Image
+                    src="/figma_logo.png"
+                    alt="Google Logo"
+                    width={22}
+                    height={22}
+                    className="mr-2"
+                  />
+                  Continue with Figma
                 </Button>
               </div>
             </form>
           </Form>
           <div className="mt-4 text-center text-[18px] text-[#1E1E1E]/50 dark:text-[#F5F5F5]/40">
             Don&apos;t have an account?{' '}
-            <Link href="/signup"
+            <Link href="/auth/signup"
               className="text-[#ff7f3f] hover:text-[#ED5E20] transition-colors duration-200 hover:underline">
               Sign Up
             </Link>

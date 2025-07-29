@@ -1,14 +1,21 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
+import { AUTH_PATH} from "@/constants/common";
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  })
-
+  let supabaseResponse = NextResponse.next(
+    {
+    // request: {
+    //   headers: request.headers,
+    // },
+    request
+  }
+);
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
+    supabaseUrl!,
+    supabaseKey!,
     {
       cookies: {
         getAll() {
@@ -16,32 +23,41 @@ export async function updateSession(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({
-            request,
-          })
+          supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           )
-        }
+        },
       },
-    },
-  )
+    }
+  );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
 
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/signup') &&
-    !request.nextUrl.pathname.startsWith('/auth')
-  ) {
-    // No user, potentially respond by directing the user to the login page
-    const url = request.nextUrl.clone()
-    url.pathname = '/login' 
-    return NextResponse.redirect(url)
-  }// IMPORTANT: You *must* return the supabaseResponse object as it is.
+  const path = request.nextUrl.pathname;
+
+  // Redirect unauthenticated users to login, except for auth routes
+  if (!user && !path.startsWith("/auth"))
+  {
+    const url =  request.nextUrl.clone();
+    url.pathname = AUTH_PATH;
+    // url.searchParams.set('next', path);
+    return NextResponse.redirect(url);
+  }
+
+  // if (
+  //   !user &&
+  //   !request.nextUrl.pathname.startsWith('/login') &&
+  //   !request.nextUrl.pathname.startsWith('/forgot-password') &&
+  //   !request.nextUrl.pathname.startsWith('/reset-password') &&
+  //   !request.nextUrl.pathname.startsWith('/signup') &&
+  //   !request.nextUrl.pathname.startsWith('/auth')
+  // ) {
+  //   // No user, potentially respond by directing the user to the login page
+  //   const url = request.nextUrl.clone()
+  //   url.pathname = '/login'
+  //   return NextResponse.redirect(url)
+  // }// IMPORTANT: You *must* return the supabaseResponse object as it is.
   // If you're creating a new response object with NextResponse.next() make sure to:
   // 1. Pass the request in it, like so:
   //    const myNewResponse = NextResponse.next({ request })
@@ -54,5 +70,12 @@ export async function updateSession(request: NextRequest) {
   // If this is not done, you may be causing the browser and server to go out
   // of sync and terminate the user's session prematurely!
 
+
+  // Preventing authenticated users from accessing the login page
+  if (user && path.startsWith(AUTH_PATH)) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/';
+    return NextResponse.redirect(url);
+  }
   return supabaseResponse;
 }

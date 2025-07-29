@@ -24,8 +24,6 @@ export async function GET(request: NextRequest) {
             redirect(next)
         }
     }
-
-
     // Redirect the user to an error page with some instructions
     redirect('/error')
 }
