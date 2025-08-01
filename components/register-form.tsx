@@ -147,7 +147,6 @@ export default function RegistrationForm() {
         </div>
         {/* End of Image */}
 
-
         {/* Register Form Cotent */}
         <div className="flex flex-col w-full max-w-full lg:max-w-[513px]">
           <h2

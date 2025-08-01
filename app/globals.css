@@ -251,4 +251,8 @@
   gap: 0.5rem; /* space-x- 2 gap between children, 0.5rem*/
 }
 
-
+/* for modal  */
+/* Example for shadcn/ui or Tailwind */
+[data-state="open"] > .dialog-overlay {
+  @apply backdrop-blur-sm bg-black/40;
+}
