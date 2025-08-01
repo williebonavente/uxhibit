@@ -52,7 +52,7 @@ export default function ResetPasswordPage() {
               )}
             />
             <Button type="submit" className="w-full h-12 text-xl btn-login btn-login:hover cursor-pointer">
-              Send Email
+             Set New Password 
             </Button>
             <div className="mt-5 text-[18px] text-[#1E1E1E]/50 text-center">
               <Link
