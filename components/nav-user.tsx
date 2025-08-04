@@ -28,71 +28,104 @@ import { logout } from "@/app/auth/login/action";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { getInitials } from "@/app/(root)/page";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
-// import { Dialog, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogTitle } from "@radix-ui/react-dialog";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
-import { useUserStore } from "@/utils/supabase/store/user";
-export function NavUser({
-  user,
-}: {
-  user: {
-    name: string;
-    email: string;
-    avatar: string;
-  };
-}) {
+// import { useUserStore } from "@/utils/supabase/store/user";
+import { type User } from "@supabase/supabase-js";
+// import { Avatar } from "@/components/avatar-upload";
+
+
+export function NavUser({ user }: { user: User | null }) {
   const { isMobile } = useSidebar();
-  const [dbName, setDbName] = useState<string>("");
-  const [dbEmail, setDbEmail] = useState<string>("");
+
+  const [loading, setLoading] = useState(true)
+  const [fullname, setFullName] = useState<string | null>(null)
+  const [email, setEmail] = useState<string | null>(null)
+  const [username, setUsername] = useState<string | null>(null)
+  const [website, setWebsite] = useState<string | null>(null)
+  const [age, setAge] = useState<string | null>(null)
+  const [avatar_url, setAvatarUrl] = useState<string | null>(null)
+
   const [open, setOpen] = useState(false);
-  // const [profile, setProfile] = useState<{ name: string; email: string; age: number; image_url?: string } | null>(null);
-  const [profile, setProfile] = useState<{ 
-    id: string, 
-    name: string; 
-    email: string; 
-    age: number; 
-    image_url?: string;
-    newAvatarFile?: File;
-} | null>(null);
+  const [profile, setProfile] = useState<{
+    id: string,
+    username: string,
+    fullname: string;
+    // email: string;
+    avatar_url?: string;
+    age: number;
+    gender: string;
+  } | null>(null);
 
-  // const { setUser } = useUserStore();
-  useEffect(() => {
-    async function fetchNameAndEmail() {
-      const supabase = createClient();
-      const { data: authData } = await supabase.auth.getUser();
-      if (authData?.user?.id) {
-        const { data } = await supabase
-          .from("learner_profile")
-          .select("name, email")
-          .eq("id", authData.user.id)
-          .single();
-        if (data?.name) setDbName(data.name);
-        if (data?.email) setDbEmail(data.email);
+  console.log("Fetching profile for user Id: ", user?.id);
+  const getProfile = useCallback(async () => {
+    try {
+      setLoading(true)
+      const supabase = createClient()
+      const { data, error, status } = await supabase
+        .from('profiles')
+        .select(`id, username, full_name, website, avatar_url, age, gender`)
+        .eq('id', user?.id)
+        .single()
+      if (error && status !== 406) {
+        console.log(error)
+        throw error;
       }
-    }
-    fetchNameAndEmail();
-  }, []);
 
-  // Fetch full profile for modal only when needed
+      if (data) {
+        setProfile({
+          id: data.id,
+          username: data.username,
+          fullname: data.full_name,
+          avatar_url: data.avatar_url,
+          age: data.age,
+          gender: data.gender
+        });
+        setFullName(data.full_name);
+      }
+    } catch (error) {
+      console.error(error)
+      toast.error("Error loading user data.");
+    } finally {
+      setLoading(false);
+    }
+
+  }, [user])
+
+  useEffect(() => {
+    if (user?.email) {
+      setEmail(user.email);
+    }
+    getProfile()
+  }, [user, getProfile])
+
   const handleAccountClick = async () => {
     const supabase = createClient();
-
     const { data: authData } = await supabase.auth.getUser();
 
     if (authData?.user?.id) {
       const { data } = await supabase
-        .from("learner_profile")
-        .select("id, name, email, age, image_url")
+        .from("profiles")
+        .select("id, username, full_name, website, avatar_url, age, gender")
         .eq("id", authData.user.id)
         .single();
-      setProfile(data);
-      setOpen(true);
+      if (data) {
+        setProfile({
+          id: data.id,
+          username: data.username,
+          fullname: data.full_name,
+          avatar_url: data.avatar_url,
+          age: data.age,
+          gender: data.gender,
+        });
+        setOpen(true);
+      }
     }
-  }
+  };
 
-
+  // Modal functionality
   // Logout function
   const router = useRouter();
   async function handleLogOut() {
@@ -104,7 +137,6 @@ export function NavUser({
     toast.success("You have been logout.");
     router.push("/auth/login");
   }
-
   return (
     <>
       <SidebarMenu>
@@ -116,20 +148,16 @@ export function NavUser({
                 className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
               >
                 <Avatar className="h-8 w-8 rounded-lg grayscale">
-                  {/* <AvatarImage src={user.avatar} alt={user.name} /> */}
-                  <AvatarImage src={profile?.image_url || user.avatar} alt={profile?.name || user.name} />
-                  {/* Display the avatar */}
-                  <AvatarFallback className="rounded-lg">{getInitials(dbName)}</AvatarFallback>
+                  <AvatarImage src={profile?.avatar_url} alt={profile?.fullname} />
+                  {/* Display the the initial if the user does not have avatar */}
+                  <AvatarFallback className="rounded-lg">{getInitials(fullname)}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   {/* Getting the name from the database */}
-                  <span className="truncate font-medium">{dbName}</span>
-
-                  {/* <span className="truncate font-medium">{dbName}</span> */}
+                  <span className="truncate font-medium">{fullname}</span>
                   <span className="text-muted-foreground truncate text-xs">
                     {/* Getting the email from the database */}
-                    <span className="truncate font-medium">{dbName}</span>
-
+                    <span className="truncate font-medium">{fullname}</span>
                   </span>
                 </div>
                 <IconDotsVertical className="ml-auto size-4" />
@@ -146,13 +174,14 @@ export function NavUser({
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                   <Avatar className="h-8 w-8 rounded-lg">
                     {/* TODO: To be implemented */}
-                    {/* <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="rounded-lg">{user.name}</AvatarFallback> */}
+                    <AvatarImage src={profile?.avatar_url ?? undefined} alt={profile?.fullname ?? email ?? "User"} />
+                    <AvatarFallback className="rounded-lg">{profile?.fullname ?? email ?? "User"}</AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">{dbName}</span>
+                    <span className="truncate font-medium">{fullname}</span>
                     <span className="text-muted-foreground truncate text-xs">
-                      <span className="truncate font-medium">{dbEmail}</span>
+                      {/* Watchout for the entity that email does not exists or something */}
+                      <span className="truncate font-medium">{email}</span>
                     </span>
                   </div>
                 </div>
@@ -174,10 +203,7 @@ export function NavUser({
                 </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogOut}>
-                <IconLogout />
-                Log out
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogOut}> <IconLogout /> Log out</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </SidebarMenuItem>
@@ -200,51 +226,47 @@ export function NavUser({
                 onSubmit={async (e) => {
                   e.preventDefault();
                   const supabase = createClient();
-                  // Image url for avatar
-                  let imageUrl = profile.image_url;
-                  // Uploading avatar profile
-                  if (profile.newAvatarFile) {
-                    const { data: uploadData, error: uploadError }  = await supabase.storage 
-                    .from("avatars")
-                    .upload(`public/${profile.id}`, profile.newAvatarFile, {
-                      cacheControl: "3600",
-                      upsert: true,
-                    });
+                  let imageUrl = profile.avatar_url;
 
+                  // Upload avatar if changed
+                  if (profile.avatar_url) {
+                    const { data, error: uploadError } = await supabase.storage
+                      .from("avatars")
+                      .upload(`${profile.id}`, profile.avatar_url, {
+                        cacheControl: "3600",
+                        upsert: true,
+                      });
+
+                    // Get the public URL
+                    const { data: publicUrlData } = supabase.storage
+                      .from("avatars")
+                      .getPublicUrl(`${profile.id}`);
+                    imageUrl = publicUrlData.publicUrl;
                     if (uploadError) {
                       console.error("Upload error: ", uploadError);
                       toast.error(uploadError.message);
                       return;
                     }
-                    // Get the public URL
-                    const { data: publicUrlData } = supabase.storage
-                      .from("avatars")
-                      .getPublicUrl(`public/${profile.id}`);
-                    imageUrl = publicUrlData.publicUrl;
                   }
+
+                  // Update profile (ignore email)
                   const { error } = await supabase
-                    .from("learner_profile")
+                    .from("profiles")
                     .update({
-                      name: profile.name,
-                      email: profile.email,
-                      // Insert validation about the age no negative and over 100
+                      username: profile.username,
+                      full_name: profile.fullname,
                       age: profile.age,
-                      image_url: imageUrl,
+                      avatar_url: profile.avatar_url,
                     })
                     .eq("id", profile.id);
+
                   if (!error) {
                     toast.success("Profile Updated!");
-                    setDbName(profile.name);
-                    setDbEmail(profile.email);
+                    setFullName(profile.fullname);
+                    setAvatarUrl(profile.avatar_url ?? null)
                     setOpen(false);
-                    // {Watch this code carefully}
-                    // setUser({
-                    //   id: profile.id,
-                    //   name: profile.name,
-                    //   email: profile.email,
-                    //   age: profile.age,
-                    // });
                     router.refresh();
+                    getProfile();
                   } else {
                     toast.error("Failed to update profile");
                   }
@@ -252,17 +274,17 @@ export function NavUser({
                 className="space-y-4"
               >
                 <div>
-                  <label>Name</label>
+                  <label>Username</label>
                   <Input
-                    value={profile.name}
-                    onChange={e => setProfile({ ...profile, name: e.target.value })}
+                    value={profile.username ?? "User"}
+                    onChange={e => setProfile({ ...profile, username: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label>Email</label>
+                  <label>Full Name</label>
                   <Input
-                    value={profile.email}
-                    onChange={e => setProfile({ ...profile, email: e.target.value })}
+                    value={profile.fullname}
+                    onChange={e => setProfile({ ...profile, fullname: e.target.value })}
                   />
                 </div>
                 <div>
@@ -273,30 +295,91 @@ export function NavUser({
                     onChange={e => setProfile({ ...profile, age: Number(e.target.value) })}
                   />
                 </div>
+
                 <div>
-                  <label>Avatar</label>
-                  <Input 
-                  type="file"
-                  accept="image/*"
-                  onChange={e => {
-                    if (e.target.files && e.target.files[0]) {
-                      setProfile({ ...profile, newAvatarFile: e.target.files[0]})
-                    }
-                  }}
+                  <label >Gender</label>
+                  <Input
+                    value={profile.gender}
+                    onChange={e => setProfile({ ...profile, gender: e.target.value })}
                   />
                 </div>
-                {/* Upload  Avata here! */}
-                <footer className="flex justify-end gap-2">
-                  <Button type="button" 
+
+
+                {/* UU Be careful */}
+                <div>
+
+                  <div className="flex flex-col items-center gap-2">
+                    <label className="font-semibold mb-2">Avatar</label>
+                    <div
+                      className="relative cursor-pointer group"
+                      onClick={() => document.getElementById("avatar-upload")?.click()}
+                    >
+                      <Avatar className="h-32 w-32 rounded-full border-4 border-gray-300 group-hover:border-blue-500 transition shadow-xl">
+                        <AvatarImage src={profile?.avatar_url} alt={profile?.fullname} />
+                        <AvatarFallback className="rounded-full text-4xl bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
+                          {getInitials(profile?.fullname)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition rounded-full">
+                        <span className="text-white text-lg font-semibold">Change</span>
+                      </div>
+                    </div>
+                    <input
+                      id="avatar-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async e => {
+                        if (e.target.files && e.target.files[0]) {
+                          const file = e.target.files[0];
+                          const supabase = createClient();
+                          const { data, error: uploadError } = await supabase.storage
+                            .from("avatars")
+                            .upload(`${profile?.id}-${file.name}`, file, {
+                              cacheControl: "3600",
+                              upsert: true,
+                            });
+                          if (uploadError) {
+                            toast.error(uploadError.message);
+                            return;
+                          }
+                          const { data: publicUrlData } = supabase.storage
+                            .from("avatars")
+                            .getPublicUrl(`${profile?.id}-${file.name}`);
+                          const newAvatarUrl = publicUrlData.publicUrl;
+                          setProfile({ ...profile, avatar_url: newAvatarUrl });
+                          const { error } = await supabase
+                            .from("profiles")
+                            .update({
+                              avatar_url: newAvatarUrl,
+                            })
+                            .eq("id", profile.id);
+                          if (!error) {
+                            toast.success("Avatar updated!");
+                            setAvatarUrl(newAvatarUrl);
+                            getProfile(); // Refresh profile data
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <footer className="flex justify-center gap-4 mt-16">
+                  <Button
+                    type="button"
                     variant="outline"
                     onClick={() => setOpen(false)}
-                    className="cursor-pointer" 
-                    >
+                    className="cursor-pointer"
+                  >
                     Cancel
                   </Button>
-                  <Button type="submit"
+                  <Button
+                    type="submit"
                     className="cursor-pointer"
-                  >Save Changes</Button>
+                  >
+                    Save Changes
+                  </Button>
                 </footer>
               </form>
             )}

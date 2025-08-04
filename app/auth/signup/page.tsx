@@ -1,8 +1,11 @@
 import RegistrationForm from "@/components/register-form";
-
-export default function RegistrationPage() {
+import { createClient } from "@/utils/supabase/server"
+export default async function RegistrationPage() {
+    const supabase = await createClient()
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
     return (
-
-        <RegistrationForm />
+        <RegistrationForm user={user} />
     )
 }
