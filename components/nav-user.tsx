@@ -32,9 +32,8 @@ import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
-// import { useUserStore } from "@/utils/supabase/store/user";
 import { type User } from "@supabase/supabase-js";
-// import { Avatar } from "@/components/avatar-upload";
+import { Skeleton } from "./ui/skeleton";
 
 
 export function NavUser({ user }: { user: User | null }) {
@@ -53,13 +52,13 @@ export function NavUser({ user }: { user: User | null }) {
     id: string,
     username: string,
     fullname: string;
-    // email: string;
     avatar_url?: string;
     age: number;
     gender: string;
   } | null>(null);
 
-  console.log("Fetching profile for user Id: ", user?.id);
+
+
   const getProfile = useCallback(async () => {
     try {
       setLoading(true)
@@ -69,8 +68,10 @@ export function NavUser({ user }: { user: User | null }) {
         .select(`id, username, full_name, website, avatar_url, age, gender`)
         .eq('id', user?.id)
         .single()
-      if (error && status !== 406) {
-        console.log(error)
+
+
+      if (error && status !== 406 && Object.keys(error).length > 0) {
+        console.log(error);
         throw error;
       }
 
@@ -86,8 +87,11 @@ export function NavUser({ user }: { user: User | null }) {
         setFullName(data.full_name);
       }
     } catch (error) {
-      console.error(error)
-      toast.error("Error loading user data.");
+      // if (error && typeof error === "object" && Object.keys(error).length > 0) {
+      //   console.error(error);
+      //   toast.error("Error loading user data.");
+      // }
+      console.log(error);
     } finally {
       setLoading(false);
     }
@@ -136,6 +140,19 @@ export function NavUser({ user }: { user: User | null }) {
     }
     toast.success("You have been logout.");
     router.push("/auth/login");
+  }
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center mt-8h-32 gap-4">
+        {/* Avatar skeleton */}
+        <Skeleton className="h-8 w-8 rounded-full" />
+        {/* Profile info skeleton (name + email) */}
+        <div className="grid flex-1 text-left text-sm leading-tight gap-2">
+          <Skeleton className="h-4 w-24 rounded" /> {/* Name skeleton */}
+          <Skeleton className="h-4 w-32 rounded" /> {/* Email skeleton */}
+        </div>
+      </div>
+    );
   }
   return (
     <>
@@ -314,6 +331,7 @@ export function NavUser({ user }: { user: User | null }) {
                       className="relative cursor-pointer group"
                       onClick={() => document.getElementById("avatar-upload")?.click()}
                     >
+
                       <Avatar className="h-32 w-32 rounded-full border-4 border-gray-300 group-hover:border-blue-500 transition shadow-xl">
                         <AvatarImage src={profile?.avatar_url} alt={profile?.fullname} />
                         <AvatarFallback className="rounded-full text-4xl bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
