@@ -1,9 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer } from 'recharts';
+import { generateHeuristicReportSimple } from '@/lib/pdfGenerator';
 
 const HeuristicDashboard = () => {
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
   // Data for the radar chart based on Jakob Nielsen's 10 Usability Heuristics
   const heuristicData = [
     { heuristic: '01', name: 'Visibility of System Status', value: 20, fullName: 'Visibility of System Status' },
@@ -30,6 +33,20 @@ const HeuristicDashboard = () => {
     return 'bg-red-100 dark:bg-red-900/30';
   };
 
+  const handleExportReport = async () => {
+    setIsGeneratingPDF(true);
+    try {
+      await generateHeuristicReportSimple(heuristicData);
+      // Show success message (optional)
+      alert('PDF report generated successfully!');
+    } catch (error) {
+      console.error('Error generating report:', error);
+      alert('Failed to generate PDF report. Please try again.');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div className="border-b-2 p-2">
@@ -43,17 +60,25 @@ const HeuristicDashboard = () => {
           your projects, with color-coded severity levels (minor vs. major). It helps you spot patterns, understand recurring design challenges, 
           and improve your designs more effectively.
         </p>
-        <button className="bg-[#ED5E20] hover:bg-[#d44e0f] text-white px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors font-['Poppins'] font-medium ml-6">
-          <span>📊</span>
-          <span>Export Report</span>
+        <button 
+          onClick={handleExportReport}
+          disabled={isGeneratingPDF}
+          className={`px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors font-['Poppins'] font-medium ml-6 ${
+            isGeneratingPDF 
+              ? 'bg-gray-400 cursor-not-allowed' 
+              : 'bg-[#ED5E20] hover:bg-[#d44e0f]'
+          } text-white`}
+        >
+          <span>{isGeneratingPDF ? '⏳' : '📊'}</span>
+          <span>{isGeneratingPDF ? 'Generating...' : 'Export Report'}</span>
         </button>
       </div>
 
       <div className="bg-white dark:bg-[#19181D] rounded-xl shadow-lg p-8 border border-gray-200 dark:border-gray-700">
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-12">
           {/* Radar Chart */}
-          <div className="flex flex-col items-center">
-            <div className="w-full h-96">
+          <div id="heuristic-chart-section" className="flex flex-col items-center">
+            <div id="heuristic-chart-container" className="w-full h-96">
               <ResponsiveContainer width="100%" height="100%">
                 <RadarChart data={heuristicData}>
                   <PolarGrid stroke="#9ca3af" />
