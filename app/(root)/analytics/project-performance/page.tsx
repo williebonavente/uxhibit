@@ -2,10 +2,22 @@
 
 import React, { useState, useMemo } from 'react';
 import { IconChevronUp, IconChevronDown, IconFilter } from '@tabler/icons-react';
+import { generateProjectComparisonReport } from '@/lib/projectComparisonPdfGenerator';
+
+interface ProjectData {
+  title: string;
+  score: number;
+  submissionDate: string;
+  feedbackItems: number;
+  severity: 'Minor' | 'Major';
+  dateSort: Date;
+}
 
 export default function ProjectPerformanceComparisonPage() {
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
   // Sample data for the project performance table
-  const projectData = [
+  const projectData: ProjectData[] = [
     {
       title: 'Project 07',
       score: 95,
@@ -104,8 +116,8 @@ export default function ProjectPerformanceComparisonPage() {
     // Apply sorting
     if (sortConfig !== null) {
       filtered.sort((a, b) => {
-        const aValue = a[sortConfig.key as keyof typeof a];
-        const bValue = b[sortConfig.key as keyof typeof b];
+        let aValue: any = a[sortConfig.key as keyof ProjectData];
+        let bValue: any = b[sortConfig.key as keyof ProjectData];
         
         if (aValue < bValue) {
           return sortConfig.direction === 'asc' ? -1 : 1;
@@ -141,6 +153,27 @@ export default function ProjectPerformanceComparisonPage() {
       : <IconChevronDown size={14} />;
   };
 
+  const handleExportReport = async () => {
+    setIsGeneratingPDF(true);
+    try {
+      await generateProjectComparisonReport(
+        projectData, 
+        filteredAndSortedData, 
+        {
+          severityFilter,
+          scoreFilter
+        }
+      );
+      // Show success message (optional)
+      alert('PDF report generated successfully!');
+    } catch (error) {
+      console.error('Error generating report:', error);
+      alert('Failed to generate PDF report. Please try again.');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div className="border-b-2 p-2">
@@ -154,9 +187,17 @@ export default function ProjectPerformanceComparisonPage() {
           items, and the average severity of the issues. Use this to track your progress and identify which projects need more work—or show off your 
           best ones.
         </p>
-        <button className="bg-[#ED5E20] hover:bg-[#d44e0f] text-white px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors font-['Poppins'] font-medium ml-6">
-          <span>📊</span>
-          <span>Export Report</span>
+        <button 
+          onClick={handleExportReport}
+          disabled={isGeneratingPDF}
+          className={`px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors font-['Poppins'] font-medium ml-6 ${
+            isGeneratingPDF 
+              ? 'bg-gray-400 cursor-not-allowed' 
+              : 'bg-[#ED5E20] hover:bg-[#d44e0f]'
+          } text-white`}
+        >
+          <span>{isGeneratingPDF ? '⏳' : '📊'}</span>
+          <span>{isGeneratingPDF ? 'Generating...' : 'Export Report'}</span>
         </button>
       </div>
 

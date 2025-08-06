@@ -1,9 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+import { generateUsabilityTrendReport } from '@/lib/trendPdfGenerator';
 
 export default function UsabilityScoreTrendPage() {
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
   // Sample data for the usability score trend
   const trendData = [
     { version: 'Q1', score: 1.2, label: '01' },
@@ -12,6 +15,20 @@ export default function UsabilityScoreTrendPage() {
     { version: 'Q4', score: 8.7, label: '04' },
     { version: 'Q5', score: 9.4, label: '05' },
   ];
+
+  const handleExportReport = async () => {
+    setIsGeneratingPDF(true);
+    try {
+      await generateUsabilityTrendReport(trendData);
+      // Show success message (optional)
+      alert('PDF report generated successfully!');
+    } catch (error) {
+      console.error('Error generating report:', error);
+      alert('Failed to generate PDF report. Please try again.');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -25,9 +42,17 @@ export default function UsabilityScoreTrendPage() {
           Track how your design improves over time. Each submission is evaluated using Jakob Nielsen's 10 heuristics, and your score is plotted here.
           The line graph helps you see whether revisions are making your UI more usable before it's added to your portfolio.
         </p>
-        <button className="bg-[#ED5E20] hover:bg-[#d44e0f] text-white px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors font-['Poppins'] font-medium ml-6">
-          <span>📊</span>
-          <span>Export Report</span>
+        <button 
+          onClick={handleExportReport}
+          disabled={isGeneratingPDF}
+          className={`px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors font-['Poppins'] font-medium ml-6 ${
+            isGeneratingPDF 
+              ? 'bg-gray-400 cursor-not-allowed' 
+              : 'bg-[#ED5E20] hover:bg-[#d44e0f]'
+          } text-white`}
+        >
+          <span>{isGeneratingPDF ? '⏳' : '📊'}</span>
+          <span>{isGeneratingPDF ? 'Generating...' : 'Export Report'}</span>
         </button>
       </div>
 
