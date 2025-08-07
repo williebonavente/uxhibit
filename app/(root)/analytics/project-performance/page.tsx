@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { IconChevronUp, IconChevronDown, IconFilter } from '@tabler/icons-react';
 import { generateProjectComparisonReport } from '@/lib/projectComparisonPdfGenerator';
+import { toast } from 'sonner';
 
 interface ProjectData {
   title: string;
@@ -17,6 +18,7 @@ export default function ProjectPerformanceComparisonPage() {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   // Sample data for the project performance table
+  //TODO: Data fetching needed
   const projectData: ProjectData[] = [
     {
       title: 'Project 07',
@@ -165,10 +167,12 @@ export default function ProjectPerformanceComparisonPage() {
         }
       );
       // Show success message (optional)
-      alert('PDF report generated successfully!');
+      // alert('PDF report generated successfully!');
+      toast.success("PDF report generated successfully!");
     } catch (error) {
       console.error('Error generating report:', error);
-      alert('Failed to generate PDF report. Please try again.');
+      toast.error("Failed to generate PDF report. Please try again");
+      // alert('Failed to generate PDF report. Please try again.');
     } finally {
       setIsGeneratingPDF(false);
     }

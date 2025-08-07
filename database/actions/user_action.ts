@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/client";
 
+// TODO: To be deleted
 export async function fetchUserName() {
     const supabase = createClient();
     const { data: authData } = await supabase.auth.getUser();

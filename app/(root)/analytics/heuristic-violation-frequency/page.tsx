@@ -1,13 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer } from 'recharts';
+import { RadarChart, PolarGrid, PolarAngleAxis, 
+         PolarRadiusAxis, Radar, 
+         ResponsiveContainer } from 'recharts';
 import { generateHeuristicReportSimple } from '@/lib/pdfGenerator';
+import { toast } from 'sonner';
 
 const HeuristicDashboard = () => {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   // Data for the radar chart based on Jakob Nielsen's 10 Usability Heuristics
+  // TODO: Dynamic data 
+  // The data should be coming from the backend or the result of the AI.
   const heuristicData = [
     { heuristic: '01', name: 'Visibility of System Status', value: 20, fullName: 'Visibility of System Status' },
     { heuristic: '02', name: 'Match Between System and Real World', value: 10, fullName: 'Match Between System and the Real World' },
@@ -36,10 +41,12 @@ const HeuristicDashboard = () => {
   const handleExportReport = async () => {
     setIsGeneratingPDF(true);
     try {
+      toast.success("PDF report generated successfully.");
       await generateHeuristicReportSimple(heuristicData);
       // Show success message (optional)
-      alert('PDF report generated successfully!');
+      // TODO: Adding loading message 
     } catch (error) {
+      toast.error(error as string);
       console.error('Error generating report:', error);
       alert('Failed to generate PDF report. Please try again.');
     } finally {
@@ -56,7 +63,8 @@ const HeuristicDashboard = () => {
       </div>
       <div className="p-2 m-5 flex items-center justify-between">
         <p className="text-gray-600 dark:text-gray-300 mt-1 max-w-3xl font-['Poppins']">
-          This section shows which usability heuristics you're violating most often. The radar chart breaks down how frequently these issues occur in 
+          {/* TODO: Message is too long! */}
+          This section shows which usability heuristics you&apos;re violating most often. The radar chart breaks down how frequently these issues occur in 
           your projects, with color-coded severity levels (minor vs. major). It helps you spot patterns, understand recurring design challenges, 
           and improve your designs more effectively.
         </p>
@@ -108,7 +116,7 @@ const HeuristicDashboard = () => {
           {/* Heuristics List */}
           <div>
             <h3 className="text-xl font-bold mb-6 text-black dark:text-white font-['Poppins']">
-              Jakob Nielsen's 10 Usability Heuristics<br />
+              Jakob Nielsen&apos;s 10 Usability Heuristics<br />
               <span className="text-lg font-medium text-gray-600 dark:text-gray-300">for User Interface Design</span>
             </h3>
             <div className="space-y-4">

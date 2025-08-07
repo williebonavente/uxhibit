@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { generateUsabilityTrendReport } from '@/lib/trendPdfGenerator';
+import { useTheme } from "next-themes";
+import { toast } from 'sonner';
 
 export default function UsabilityScoreTrendPage() {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -21,7 +23,10 @@ export default function UsabilityScoreTrendPage() {
     try {
       await generateUsabilityTrendReport(trendData);
       // Show success message (optional)
-      alert('PDF report generated successfully!');
+      toast.success("PDF report generetead successfully");
+      // showSuccessToast("PDF report generated successfully", theme);
+      // alert('PDF report generated successfully!');
+
     } catch (error) {
       console.error('Error generating report:', error);
       alert('Failed to generate PDF report. Please try again.');
@@ -42,14 +47,13 @@ export default function UsabilityScoreTrendPage() {
           Track how your design improves over time. Each submission is evaluated using Jakob Nielsen's 10 heuristics, and your score is plotted here.
           The line graph helps you see whether revisions are making your UI more usable before it's added to your portfolio.
         </p>
-        <button 
+        <button
           onClick={handleExportReport}
           disabled={isGeneratingPDF}
-          className={`px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors font-['Poppins'] font-medium ml-6 ${
-            isGeneratingPDF 
-              ? 'bg-gray-400 cursor-not-allowed' 
+          className={`px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors font-['Poppins'] font-medium ml-6 ${isGeneratingPDF
+              ? 'bg-gray-400 cursor-not-allowed'
               : 'bg-[#ED5E20] hover:bg-[#d44e0f]'
-          } text-white`}
+            } text-white`}
         >
           <span>{isGeneratingPDF ? '⏳' : '📊'}</span>
           <span>{isGeneratingPDF ? 'Generating...' : 'Export Report'}</span>
@@ -61,7 +65,7 @@ export default function UsabilityScoreTrendPage() {
         <div className="bg-[#ED5E20] text-white px-6 py-4">
           <h3 className="text-lg font-bold font-['Poppins']">Improvements</h3>
         </div>
-        
+
         {/* Chart Container */}
         <div className="p-8">
           <div className="h-80 w-full">
@@ -69,27 +73,27 @@ export default function UsabilityScoreTrendPage() {
               <AreaChart data={trendData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
                 <defs>
                   <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ED5E20" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#ED5E20" stopOpacity={0.1}/>
+                    <stop offset="5%" stopColor="#ED5E20" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#ED5E20" stopOpacity={0.1} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#6b7280" />
-                <XAxis 
+                <XAxis
                   dataKey="label"
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 14, fill: '#6b7280', fontFamily: 'Poppins' }}
                   dy={10}
                 />
-                <YAxis 
+                <YAxis
                   domain={[0, 10]}
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 12, fill: '#ED5E20', fontFamily: 'Poppins', fontWeight: 'bold' }}
                   dx={-10}
-                  label={{ 
-                    value: 'Usability Score', 
-                    angle: -90, 
+                  label={{
+                    value: 'Usability Score',
+                    angle: -90,
                     position: 'insideLeft',
                     style: { textAnchor: 'middle', fill: '#ED5E20', fontFamily: 'Poppins', fontWeight: 'bold' }
                   }}
@@ -104,7 +108,7 @@ export default function UsabilityScoreTrendPage() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
-          
+
           {/* Version labels */}
           <div className="flex justify-center mt-4">
             <div className="text-center">

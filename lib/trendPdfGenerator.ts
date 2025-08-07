@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-
+// TODO: Scan through the dynamic data fetching
 export interface TrendData {
   version: string;
   score: number;
