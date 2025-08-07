@@ -58,6 +58,7 @@ export function NavUser({ user }: { user: User | null }) {
     avatar_url?: string;
     age: number | string;
     gender: string;
+    bio: string;
   } | null>(null);
 
 
@@ -68,7 +69,7 @@ export function NavUser({ user }: { user: User | null }) {
       const supabase = createClient()
       const { data, error, status } = await supabase
         .from('profiles')
-        .select(`id, username, full_name, website, avatar_url, age, gender`)
+        .select(`id, username, full_name, website, avatar_url, age, gender, bio`)
         .eq('id', user?.id)
         .single()
 
@@ -85,7 +86,8 @@ export function NavUser({ user }: { user: User | null }) {
           fullname: data.full_name,
           avatar_url: data.avatar_url,
           age: data.age,
-          gender: data.gender
+          gender: data.gender,
+          bio: data.bio,
         });
         setFullName(data.full_name);
       }
@@ -115,7 +117,7 @@ export function NavUser({ user }: { user: User | null }) {
     if (authData?.user?.id) {
       const { data } = await supabase
         .from("profiles")
-        .select("id, username, full_name, website, avatar_url, age, gender")
+        .select("id, username, full_name, website, avatar_url, age, gender, bio")
         .eq("id", authData.user.id)
         .single();
       if (data) {
@@ -126,14 +128,13 @@ export function NavUser({ user }: { user: User | null }) {
           avatar_url: data.avatar_url,
           age: data.age,
           gender: data.gender,
+          bio: data.bio,
         });
         setOpen(true);
       }
     }
   };
 
-  // Modal functionality
-  // Logout function
   const router = useRouter();
   async function handleLogOut() {
     const result = await logout();
@@ -167,10 +168,10 @@ export function NavUser({ user }: { user: User | null }) {
                 size="lg"
                 className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
               >
-                <Avatar className="h-8 w-8 rounded-lg grayscale">
+                <Avatar className="h-8 w-8 rounded-lg">
                   <AvatarImage src={profile?.avatar_url} alt={profile?.fullname} />
                   {/* Display the the initial if the user does not have avatar */}
-                  <AvatarFallback className="rounded-lg">{getInitials(fullname)}</AvatarFallback>
+                  <AvatarFallback className="rounded-lg grayscale">{getInitials(fullname)}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   {/* Getting the name from the database */}
@@ -195,7 +196,7 @@ export function NavUser({ user }: { user: User | null }) {
                   <Avatar className="h-8 w-8 rounded-lg">
                     {/* TODO: To be implemented */}
                     <AvatarImage src={profile?.avatar_url ?? undefined} alt={profile?.fullname ?? email ?? "User"} />
-                    <AvatarFallback className="rounded-lg">{profile?.fullname ?? email ?? "User"}</AvatarFallback>
+                    <AvatarFallback className="rounded-lg">{getInitials(fullname)}</AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-medium">{fullname}</span>
@@ -272,6 +273,7 @@ export function NavUser({ user }: { user: User | null }) {
                       full_name: profile.fullname,
                       age: profile.age,
                       avatar_url: imageUrl,
+                      bio: profile.bio,
                     })
                     .eq("id", profile.id);
 
@@ -376,6 +378,14 @@ export function NavUser({ user }: { user: User | null }) {
                       }}
                     />
                   </div>
+                  {/* Bio just to replace the UI/UX Designer message */}
+                  <div>
+                  <label>Bio</label>
+                  <Input
+                    value={profile.bio ?? "UI/UX  Designer"}
+                    onChange={e => setProfile({ ...profile, bio: e.target.value })}
+                  />
+                </div>
                 </div>
                 <footer className="flex justify-center gap-4 mt-16">
                   <Button

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { z } from 'zod'
+import { file, z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -21,106 +21,126 @@ import { registerFormSchema } from '@/lib/validation-schemas'
 import MiddleHeaderIcon from './middle-header-icon'
 import Image from 'next/image'
 import { createClient } from "@/utils/supabase/client";
-import { useCallback, useState } from 'react'
+import { type User } from "@supabase/supabase-js";
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+// import { Avatar } from '@radix-ui/react-avatar'
 
 
-
-const formSchema = registerFormSchema
-
-export default function RegistrationForm() {
+export default function RegistrationForm({ user }: { user: User | null }) {
   const router = useRouter();
   const supabase = createClient()
-  const [loading, setLoading] = useState(false)
-  const [name, setName] = useState<string | null>(null)
-  const [age, setAge] = useState<string | null>(null)
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const [loading, setLoading] = useState(true)
+  const [fullname, setFullName] = useState<string | null>(null)
+  const [username, setUsername] = useState<string | null>(null)
+  const [website, setWebsite] = useState<string | null>(null)
+  const [age, setAge] = useState<string | null>(null)
+  const [avatar_url, setAvatarUrl] = useState<string | null>(null)
+
+  const form = useForm<z.infer<typeof registerFormSchema>>({
     defaultValues: {
-      name: '',
+      username: '',
+      full_name: '',
       age: '',
+      gender: '',
       email: '',
+      avatar_url: '',
       password: '',
       confirmPassword: '',
+      website_url: '',
+      bio: ''
     },
 
   })
-  // const getProfile = useCallback(async (userId: string) => {
+
+  // const getProfile = useCallback(async () => {
   //   try {
   //     setLoading(true)
-  //     const { data, error, status } = await supabase
-  //       .from('learner_profile')
-  //       .select('name, email ,age')
-  //       .eq('id', userId)
-  //       .single()
 
+  //     const { data, error, status } = await supabase
+  //       .from('profiles')
+  //       .select('username, full_name, age, avatar_url')
+  //       .eq('id', user?.id)
+  //       .single()
   //     if (error && status !== 406) {
-  //       console.log(error);
+  //       console.log(error)
   //       throw error;
   //     }
-  //     if (data) {
-  //       setName(data.name);
-  //       setAge(data.age);
-  //     }
   //   } catch (error) {
-  //     console.log(error);
-  //     toast.error('Error laoding user data!');
+  //     toast.error("Error loading user data.");
   //   } finally {
-  //     setLoading(false)
+  //     setLoading(false);
   //   }
-  // }, [supabase])
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  // }, [user, supabase])
+
+  // useEffect(() => {
+  //   getProfile()
+  // }, [user, getProfile])
+
+
+  async function updateProfile({
+    username,
+    website,
+    age,
+    avatar_url,
+  }: {
+    username: string | null
+    fullname: string | null
+    age: number
+    website: string | null
+    avatar_url: string | null
+  }) {
     try {
-      // Assuming an async registration function
+      setLoading(true)
+
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({
+          id: user?.id as string,
+          username,
+          full_name: fullname,
+          age,
+          website,
+          avatar_url,
+          updated_at: new Date().toISOString(),
+        })
+      if (error) throw error
+      alert('Profile updated!')
+    } catch (error) {
+      alert('Error updating the data!')
+    } finally {
+      setLoading(false)
+    }
+  }
+  async function onSubmit(values: z.infer<typeof registerFormSchema>) {
+    try {
       const { data, error } = await supabase.auth.signUp({
         email: values.email,
         password: values.password,
+        options: {
+          data: {
+            full_name: values.full_name,
+            avatar_url: values.avatar_url,
+            age: values.age,
+            gender: values.gender,
+            username: values.username,
+            website: values.website_url,
+          }
+        }
       });
 
       if (error) {
         toast.error(error.message || "Registration failed");
         return;
       }
-      const userId = data.user?.id;
-      console.log("userId after signUp: ", userId);
 
-      // 2. Insert additional user info into 'profiles' table
-      if (userId) {
-        const { error: profileError } = await supabase
-          .from('learner_profile')
-          .upsert(
-            {
-              id: userId,
-              name: values.name,
-              email: values.email,
-              age: values.age,
-            }
-          );
-
-        if (profileError) {
-          console.error(profileError);
-          toast.error(profileError.message || "Failed to save profile.");
-          console.log(profileError);
-          return;
-        }
-        // await getProfile(userId);
-      } else {
-        toast.error("User ID is undefined. Email confirmation must be disabled");
-        return;
-      }
-      console.log(values)
       toast.success('Registered successfully!');
       router.push('/auth/login');
-      // toast(
-      //   <pre className="mt-2 w-[340px] rounded-md bg-slate-950 p-4">
-      //     <code className="text-white">{JSON.stringify(values, null, 2)}</code>
-      //   </pre>,
-      // )
     } catch (error) {
-      console.error('Form submission error', error)
-      toast.error('Failed to submit the form. Please try again.')
+      console.error('Form submission error', error);
+      toast.error('Failed to submit the form. Please try again.');
     }
   }
 
@@ -162,17 +182,38 @@ export default function RegistrationForm() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               <div className="grid gap-4">
+                {/* Username Field */}
+                <FormField
+                  control={form.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem className="grid gap-2">
+                      <FormControl>
+                        <Input
+                          id="username"
+                          placeholder="Username"
+                          className="w-full h-12 input-placeholder-lg input-lg input-colored lg:w-[513px] lg:h-[62px]"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 {/* Name Field */}
                 <FormField
                   control={form.control}
-                  name="name"
+                  name="full_name"
                   render={({ field }) => (
                     <FormItem className="grid gap-2">
-                      {/* <FormLabel htmlFor="name">Full Name</FormLabel> */}
                       <FormControl>
-                        <Input id="name" placeholder="Name"
+                        <Input
+                          id="full_name"
+                          placeholder="Full Name"
                           className="w-full h-12 input-placeholder-lg input-lg input-colored lg:w-[513px] lg:h-[62px]"
-                          {...field} />
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -185,14 +226,13 @@ export default function RegistrationForm() {
                   name="email"
                   render={({ field }) => (
                     <FormItem className="grid gap-2">
-                      {/* <FormLabel htmlFor="email">Email</FormLabel> */}
                       <FormControl>
                         <Input
                           id="email"
                           placeholder="Email"
                           type="email"
                           autoComplete="email"
-                          className='w-full h-12 input-placeholder-lg input-lg input-colored lg:w-[513px] lg:h-[62px]'
+                          className="w-full h-12 input-placeholder-lg input-lg input-colored lg:w-[513px] lg:h-[62px]"
                           {...field}
                         />
                       </FormControl>
@@ -207,19 +247,34 @@ export default function RegistrationForm() {
                   name="age"
                   render={({ field }) => (
                     <FormItem className="grid gap-2">
-                      {/* <FormLabel htmlFor="phone">Age </FormLabel> */}
                       <FormControl>
-                        <Input id="age" placeholder='Age'
+                        <Input
+                          id="age"
+                          min={0}
+                          placeholder="Age"
+                          type="number"
                           className="w-full h-12 input-placeholder-lg input-lg input-colored lg:w-[513px] lg:h-[62px]"
                           {...field}
                         />
-                        {/* <Input
-                          id="phone"
-                          placeholder="555-123-4567"
-                          type="tel"
-                          autoComplete="tel"
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Gender Field */}
+                <FormField
+                  control={form.control}
+                  name="gender"
+                  render={({ field }) => (
+                    <FormItem className="grid gap-2">
+                      <FormControl>
+                        <Input
+                          id="gender"
+                          placeholder="Gender"
+                          className="w-full h-12 input-placeholder-lg input-lg input-colored lg:w-[513px] lg:h-[62px]"
                           {...field}
-                          /> */}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -232,7 +287,6 @@ export default function RegistrationForm() {
                   name="password"
                   render={({ field }) => (
                     <FormItem className="grid gap-2">
-                      {/* <FormLabel htmlFor="password">Password</FormLabel> */}
                       <FormControl>
                         <PasswordInput
                           id="password"
@@ -253,9 +307,6 @@ export default function RegistrationForm() {
                   name="confirmPassword"
                   render={({ field }) => (
                     <FormItem className="grid gap-2">
-                      {/* <FormLabel htmlFor="confirmPassword">
-                        Confirm Password
-                      </FormLabel> */}
                       <FormControl>
                         <PasswordInput
                           id="confirmPassword"
@@ -269,6 +320,44 @@ export default function RegistrationForm() {
                     </FormItem>
                   )}
                 />
+
+                {/* Website Field (optional)
+                <FormField
+                  control={form.control}
+                  name="website_url"
+                  render={({ field }) => (
+                    <FormItem className="grid gap-2">
+                      <FormControl>
+                        <Input
+                          id="website_url"
+                          placeholder="Website (optional)"
+                          className="w-full h-12 input-placeholder-lg input-lg input-colored lg:w-[513px] lg:h-[62px]"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                /> */}
+
+                {/* Avatar URL Field (optional) */}
+                {/* <FormField
+                  control={form.control}
+                  name="avatar_url"
+                  render={({ field }) => (
+                    <FormItem className="grid gap-2">
+                      <FormControl>
+                        <Input
+                          id="avatar_url"
+                          placeholder="Avatar URL (optional)"
+                          className="w-full h-12 input-placeholder-lg input-lg input-colored lg:w-[513px] lg:h-[62px]"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                /> */}
 
                 <Button type="submit" className="w-full h-12 text-xl btn-login btn-login:hover cursor-pointer lg:w-[513px] lg:h-[62px]">
                   Register
