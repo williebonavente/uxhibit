@@ -1,27 +1,27 @@
 
-import { IconDashboard, IconChartBar, IconFolder } from "@tabler/icons-react";
+import { IconDashboard, IconChartBar, IconFolder, IconProps } from "@tabler/icons-react";
 
-export const navLinks = {
-  user: {
-    name: "John Doe",
-    email: "JohnDoe@gmail.com",
-    avatar: "/avatars/shadcn.jpg",
+export interface NavMainLink {
+  title: string,
+  url: string,
+  icon: React.FC<IconProps>;
+}
+export const navMain: NavMainLink[] = [
+  {
+    title: "Dashboard",
+    url: "/",
+    icon: IconDashboard
   },
-  navMain: [
-    {
-      title: "Dashboard",
-      url: "/",
-      icon: IconDashboard,
-    },
-    {
-      title: "Analytics",
-      url: "/analytics",
-      icon: IconChartBar,
-    },
-    {
-      title: "Lessons",
-      url: "/lessons",
-      icon: IconFolder,
-    },
-  ],
-};
+  {
+    title: "Analytics",
+    url: "/analytics",
+    icon: IconChartBar,
+  },
+  {
+    title: "Lessons",
+    url: "/lessons",
+    icon: IconFolder
+  }
+]
+
+
