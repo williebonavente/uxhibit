@@ -1,21 +1,29 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
-import { generateUsabilityTrendReport } from '@/lib/trendPdfGenerator';
+import React, { useState } from "react";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ResponsiveContainer,
+} from "recharts";
+import { generateUsabilityTrendReport } from "@/lib/trendPdfGenerator";
 import { useTheme } from "next-themes";
-import { toast } from 'sonner';
+import { toast } from "sonner";
+import { IconLoader2, IconDownload } from "@tabler/icons-react";
 
 export default function UsabilityScoreTrendPage() {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   // Sample data for the usability score trend
   const trendData = [
-    { version: 'Q1', score: 1.2, label: '01' },
-    { version: 'Q2', score: 7.8, label: '02' },
-    { version: 'Q3', score: 6.1, label: '03' },
-    { version: 'Q4', score: 8.7, label: '04' },
-    { version: 'Q5', score: 9.4, label: '05' },
+    { version: "Q1", score: 1.2, label: "01" },
+    { version: "Q2", score: 7.8, label: "02" },
+    { version: "Q3", score: 6.1, label: "03" },
+    { version: "Q4", score: 8.7, label: "04" },
+    { version: "Q5", score: 9.4, label: "05" },
   ];
 
   const handleExportReport = async () => {
@@ -26,10 +34,9 @@ export default function UsabilityScoreTrendPage() {
       toast.success("PDF report generetead successfully");
       // showSuccessToast("PDF report generated successfully", theme);
       // alert('PDF report generated successfully!');
-
     } catch (error) {
-      console.error('Error generating report:', error);
-      alert('Failed to generate PDF report. Please try again.');
+      console.error("Error generating report:", error);
+      alert("Failed to generate PDF report. Please try again.");
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -38,25 +45,34 @@ export default function UsabilityScoreTrendPage() {
   return (
     <div className="space-y-5">
       <div className="border-b-2 p-2">
-        <h1 className="text-3xl font-bold text-black dark:text-white font-['Poppins']">
+        <h1 className="text-xl font-medium text-black dark:text-white font-['Poppins']">
           Usability Score Trend
         </h1>
       </div>
       <div className="p-2 m-5 flex items-center justify-between">
-        <p className="text-gray-600 dark:text-gray-300 mt-1 max-w-3xl font-['Poppins']">
-          Track how your design improves over time. Each submission is evaluated using Jakob Nielsen's 10 heuristics, and your score is plotted here.
-          The line graph helps you see whether revisions are making your UI more usable before it's added to your portfolio.
+        <p>
+          Track how your design improves over time. Each submission is evaluated
+          using Jakob Nielsen's 10 heuristics, and your score is plotted here.
+          The line graph helps you see whether revisions are making your UI more
+          usable before it's added to your portfolio.
         </p>
         <button
           onClick={handleExportReport}
           disabled={isGeneratingPDF}
-          className={`px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors font-['Poppins'] font-medium ml-6 ${isGeneratingPDF
-              ? 'bg-gray-400 cursor-not-allowed'
-              : 'bg-[#ED5E20] hover:bg-[#d44e0f]'
-            } text-white`}
+          className={`px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors font-['Poppins'] font-medium ml-6 cursor-pointer ${
+            isGeneratingPDF
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-[#ED5E20] hover:bg-[#d44e0f]"
+          } text-white`}
         >
-          <span>{isGeneratingPDF ? '⏳' : '📊'}</span>
-          <span>{isGeneratingPDF ? 'Generating...' : 'Export Report'}</span>
+          <span>
+            {isGeneratingPDF ? (
+              <IconLoader2 className="animate-spin" />
+            ) : (
+              <IconDownload />
+            )}
+          </span>
+          <span>{isGeneratingPDF ? "Generating..." : "Export Report"}</span>
         </button>
       </div>
 
@@ -70,9 +86,18 @@ export default function UsabilityScoreTrendPage() {
         <div className="p-8">
           <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trendData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+              <AreaChart
+                data={trendData}
+                margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+              >
                 <defs>
-                  <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient
+                    id="scoreGradient"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
                     <stop offset="5%" stopColor="#ED5E20" stopOpacity={0.3} />
                     <stop offset="95%" stopColor="#ED5E20" stopOpacity={0.1} />
                   </linearGradient>
@@ -82,20 +107,34 @@ export default function UsabilityScoreTrendPage() {
                   dataKey="label"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 14, fill: '#6b7280', fontFamily: 'Poppins' }}
+                  tick={{
+                    fontSize: 14,
+                    fill: "#6b7280",
+                    fontFamily: "Poppins",
+                  }}
                   dy={10}
                 />
                 <YAxis
                   domain={[0, 10]}
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 12, fill: '#ED5E20', fontFamily: 'Poppins', fontWeight: 'bold' }}
+                  tick={{
+                    fontSize: 12,
+                    fill: "#ED5E20",
+                    fontFamily: "Poppins",
+                    fontWeight: "bold",
+                  }}
                   dx={-10}
                   label={{
-                    value: 'Usability Score',
+                    value: "Usability Score",
                     angle: -90,
-                    position: 'insideLeft',
-                    style: { textAnchor: 'middle', fill: '#ED5E20', fontFamily: 'Poppins', fontWeight: 'bold' }
+                    position: "insideLeft",
+                    style: {
+                      textAnchor: "middle",
+                      fill: "#ED5E20",
+                      fontFamily: "Poppins",
+                      fontWeight: "bold",
+                    },
                   }}
                 />
                 <Area
