@@ -1,27 +1,42 @@
 "use client";
-
-import { IconCirclePlusFilled, Icon, IconMail } from "@tabler/icons-react";
+import { IconCirclePlusFilled, Icon, IconChevronDown } from "@tabler/icons-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
+
+interface NavItem {
+  title: string;
+  url: string;
+  icon?: Icon;
+  items?: NavItem[];
+}
 
 export function NavMain({
   items,
 }: {
-  items: {
-    title: string;
-    url: string;
-    icon?: Icon;
-  }[];
+  items: NavItem[];
 }) {
   const pathname = usePathname();
+  const [openItems, setOpenItems] = useState<string[]>(['Analytics']); // Analytics open by default
+
+  const toggleItem = (title: string) => {
+    setOpenItems(prev => 
+      prev.includes(title) 
+        ? prev.filter(item => item !== title)
+        : [...prev, title]
+    );
+  };
 
   return (
     <SidebarGroup>
@@ -39,14 +54,62 @@ export function NavMain({
             </Link>
           </SidebarMenuItem>
         </SidebarMenu>
-
         <SidebarMenu>
           {items.map((item) => {
             const isActive = pathname === item.url;
+            const hasSubItems = item.items && item.items.length > 0;
+            const isOpen = openItems.includes(item.title);
+            const isParentActive = hasSubItems && item.items?.some(subItem => pathname === subItem.url);
+
             return (
               <SidebarMenuItem key={item.title}>
-                <Link href={item.url}>
+                {hasSubItems ? (
+                  <>
+                    <SidebarMenuButton
+                      onClick={() => toggleItem(item.title)}
+                      tooltip={item.title}
+                      className={`justify-start ${
+                        isParentActive
+                          ? "bg-[rgba(237,94,32,0.15)] text-[#ED5E20] font-semibold hover:text-[#ED5E20]"
+                          : ""
+                      }`}
+                    >
+                      {item.icon && <item.icon />}
+                      <span>{item.title}</span>
+                      <IconChevronDown
+                        className={`ml-auto transition-transform duration-200 ${
+                          isOpen ? "rotate-180" : ""
+                        }`}
+                        size={16}
+                      />
+                    </SidebarMenuButton>
+                    {isOpen && (
+                      <SidebarMenuSub>
+                        {item.items?.map((subItem) => {
+                          const isSubActive = pathname === subItem.url;
+                          return (
+                            <SidebarMenuSubItem key={subItem.title}>
+                              <SidebarMenuSubButton
+                                asChild
+                                className={`justify-start pl-2 ${
+                                  isSubActive
+                                    ? "bg-[rgba(237,94,32,0.15)] text-[#ED5E20] font-semibold hover:text-[#ED5E20] hover:cursor-default"
+                                    : ""
+                                }`}
+                              >
+                                <Link href={subItem.url}>
+                                  <span className="text-xs">{subItem.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          );
+                        })}
+                      </SidebarMenuSub>
+                    )}
+                  </>
+                ) : (
                   <SidebarMenuButton
+                    asChild
                     tooltip={item.title}
                     className={`justify-start ${
                       isActive
@@ -54,10 +117,12 @@ export function NavMain({
                         : ""
                     }`}
                   >
-                    {item.icon && <item.icon />}
-                    <span>{item.title}</span>
+                    <Link href={item.url}>
+                      {item.icon && <item.icon />}
+                      <span>{item.title}</span>
+                    </Link>
                   </SidebarMenuButton>
-                </Link>
+                )}
               </SidebarMenuItem>
             );
           })}

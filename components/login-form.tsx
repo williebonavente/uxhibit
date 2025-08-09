@@ -144,12 +144,6 @@ export default function LoginForm() {
                 <Button type="submit" className="w-full h-12 text-xl btn-login btn-login:hover cursor-pointer lg:w-[513px] lg:h-[62px]">
                   Log In
                 </Button>
-                <div className="text-[16px] text-[#1E1E1E]/50 text-right ">
-                  <Link href="/auth/forgot-password"
-                    className="text-[#ED5E20]/100 hover:text-[ED5E20] transition-colors duration-200 hover:underline">
-                    Forgot Password
-                  </Link>
-                </div>
 
                 {/* Service Provider */}
                 {/* <Button variant="outline" className="w-full h-12 text-xl cursor-pointer lg:w-[513px] lg:h-[62px]">
@@ -161,8 +155,9 @@ export default function LoginForm() {
                     className="mr-2"
                   />
                   Continue with Google
-                </Button> */}
-                <Button variant="outline" className="w-full h-12 text-xl cursor-pointer lg:w-[513px] lg:h-[62px]">
+                  </Button> */}
+                {/* TODO: Follow up */}
+                {/* <Button variant="outline" className="w-full h-12 text-xl cursor-pointer lg:w-[513px] lg:h-[62px]">
                   <Image
                     src="/figma_logo.png"
                     alt="Google Logo"
@@ -171,16 +166,22 @@ export default function LoginForm() {
                     className="mr-2"
                   />
                   Continue with Figma
-                </Button>
+                </Button> */}
               </div>
             </form>
           </Form>
-          <div className="mt-4 text-center text-[18px] text-[#1E1E1E]/50 dark:text-[#F5F5F5]/40">
+          <div className="mt-8 text-center text-[18px] text-[#1E1E1E]/50 dark:text-[#F5F5F5]/40">
             Don&apos;t have an account?{' '}
             <Link href="/auth/signup"
-              className="text-[#ff7f3f] hover:text-[#ED5E20] transition-colors duration-200 hover:underline">
+              className="text-[#ff7f3f] hover:text-[#ED5E20] transition-colors duration-200 hover:underline font-medium">
               Sign Up
             </Link>
+            <div className="mt-4 text-[18px] text-[#1E1E1E]/50 text-middle">
+              <Link href="/auth/forgot-password"
+                className="text-[#1E1E1E]/50 dark:text-[#F5F5F5]/40 hover:text-[#ED5E20] transition-colors duration-200 hover:underline">
+                Forgot Password
+              </Link>
+            </div>
           </div>
         </div>
       </div>
