@@ -1,4 +1,5 @@
-import { IconDashboard, IconChartBar, IconFolder, IconRadar, IconTrendingUp, IconCompass, IconProps } from "@tabler/icons-react";
+import { IconDashboard, IconChartBar, IconFolder, IconRadar, IconTrendingUp, 
+      IconCompass, IconProps, IconSearch } from "@tabler/icons-react";
 
 export interface NavMainLink {
   title: string,
@@ -38,6 +39,11 @@ export const navMain: NavMainLink[] = [
     title: "Lessons",
     url: "/lessons",
     icon: IconFolder
-  }
+  },
+  {
+    title: "Explore",
+    url: "/explore",
+    icon: IconSearch, 
+  },
 ]
 

@@ -168,7 +168,7 @@ export function NavUser({ user }: { user: User | null }) {
                 size="lg"
                 className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
               >
-                <Avatar className="h-8 w-8 rounded-lg">
+                <Avatar className="h-8 w-8 rounded-bl-full ">
                   <AvatarImage src={profile?.avatar_url} alt={profile?.fullname} />
                   {/* Display the the initial if the user does not have avatar */}
                   <AvatarFallback className="rounded-lg grayscale">{getInitials(fullname)}</AvatarFallback>
@@ -193,7 +193,7 @@ export function NavUser({ user }: { user: User | null }) {
               {/* TODO:  */}
               <DropdownMenuLabel className="p-0 font-normal">
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                  <Avatar className="h-8 w-8 rounded-lg">
+                  <Avatar className="h-8 w-8 rounded-bl-full">
                     {/* TODO: To be implemented */}
                     <AvatarImage src={profile?.avatar_url ?? undefined} alt={profile?.fullname ?? email ?? "User"} />
                     <AvatarFallback className="rounded-lg">{getInitials(fullname)}</AvatarFallback>
@@ -292,6 +292,48 @@ export function NavUser({ user }: { user: User | null }) {
                 className="space-y-4"
               >
                 <div>
+                <div>
+                  <div className="flex flex-col items-center gap-2">
+                    <div
+                      className="relative cursor-pointer group"
+                      onClick={() => document.getElementById("avatar-upload")?.click()}
+                    >
+                      <Avatar className="h-32 w-32 rounded-full border-4 border-gray-300 group-hover:border-blue-500 transition shadow-xl">
+                        {/* <AvatarImage src={profile?.avatar_url} alt={profile?.fullname} /> */}
+                        <AvatarImage src={avatarPreview ?? profile?.avatar_url} alt={profile?.fullname} />
+                        <AvatarFallback className="rounded-full text-4xl bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
+                          {getInitials(profile?.fullname)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition rounded-full">
+                        <span className="text-white text-lg font-semibold">Change</span>
+                      </div>
+                    </div>
+                    <input
+                      id="avatar-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async e => {
+                        if (e.target.files && e.target.files[0]) {
+                          const file = e.target.files[0];
+                          // Adding preview
+                          setPendingAvatar(file);
+                          setAvatarPreview(URL.createObjectURL(file));
+                        }
+                      }}
+                    />
+                  </div>
+                  {/* Bio just to replace the UI/UX Designer message */}
+                  <div>
+                    <label>Bio</label>
+                    <Input
+                      value={profile.bio ?? "UI/UX  Designer"}
+                      onChange={e => setProfile({ ...profile, bio: e.target.value })}
+                      className="mb-4"
+                    />  
+                  </div>
+                </div>
                   <label>Username</label>
                   <Input
                     value={profile.username ?? "User"}
@@ -343,49 +385,7 @@ export function NavUser({ user }: { user: User | null }) {
                   />
                 </div>
 
-                {/* UU Be careful */}
-                <div>
-                  <div className="flex flex-col items-center gap-2">
-                    <label className="font-semibold mb-2">Avatar</label>
-                    <div
-                      className="relative cursor-pointer group"
-                      onClick={() => document.getElementById("avatar-upload")?.click()}
-                    >
-                      <Avatar className="h-32 w-32 rounded-full border-4 border-gray-300 group-hover:border-blue-500 transition shadow-xl">
-                        {/* <AvatarImage src={profile?.avatar_url} alt={profile?.fullname} /> */}
-                        <AvatarImage src={avatarPreview ?? profile?.avatar_url} alt={profile?.fullname} />
-                        <AvatarFallback className="rounded-full text-4xl bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
-                          {getInitials(profile?.fullname)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition rounded-full">
-                        <span className="text-white text-lg font-semibold">Change</span>
-                      </div>
-                    </div>
-                    <input
-                      id="avatar-upload"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={async e => {
-                        if (e.target.files && e.target.files[0]) {
-                          const file = e.target.files[0];
-                          // Adding preview
-                          setPendingAvatar(file);
-                          setAvatarPreview(URL.createObjectURL(file));
-                        }
-                      }}
-                    />
-                  </div>
-                  {/* Bio just to replace the UI/UX Designer message */}
-                  <div>
-                  <label>Bio</label>
-                  <Input
-                    value={profile.bio ?? "UI/UX  Designer"}
-                    onChange={e => setProfile({ ...profile, bio: e.target.value })}
-                  />
-                </div>
-                </div>
+                {/* Avatar */}
                 <footer className="flex justify-center gap-4 mt-16">
                   <Button
                     type="button"
@@ -397,7 +397,7 @@ export function NavUser({ user }: { user: User | null }) {
                   </Button>
                   <Button
                     type="submit"
-                    className="cursor-pointer"
+                    className="cursor-pointer bg-[#ED5E20] hover:bg-[#d44e0f]"
                   >
                     Save Changes
                   </Button>

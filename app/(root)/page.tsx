@@ -41,7 +41,7 @@ export default async function Dashboard() {
         </div>
         <div className="user-card">
           <div>
-            <Avatar className="h-14 w-14 rounded-lg">
+            <Avatar className="h-14 w-14 rounded-bl-full">
               {profile?.avatar_url? (
                 <AvatarImage src={profile.avatar_url} alt={profile.full_name} />
               ) : null}
