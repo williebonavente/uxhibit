@@ -1,5 +1,5 @@
 
-import { IconDashboard, IconChartBar, IconFolder } from "@tabler/icons-react";
+import { IconDashboard, IconChartBar, IconFolder, IconSearch } from "@tabler/icons-react";
 
 export const navLinks = {
   user: {
@@ -22,6 +22,11 @@ export const navLinks = {
       title: "Lessons",
       url: "/lessons",
       icon: IconFolder,
+    },
+    {
+      title: "Explore",
+      url: "/explore",
+      icon: IconSearch,
     },
   ],
 };

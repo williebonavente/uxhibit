@@ -25,19 +25,51 @@ export default function FigmaLinkUploader() {
     setProgress(0);
 
     // Replace with real ones
+    let hasUploaded = false;
     const fakeUpload = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
-          clearInterval(fakeUpload);
-          setLoading(false);
-          setUploadedLink(link);
+          if (!hasUploaded) {
+            clearInterval(fakeUpload);
+            setLoading(false);
+            setUploadedLink(link);
+            hasUploaded = true;
+
+            const extractFileKey = (url: string) => {
+              const match = url.match(/file\/([a-zA-Z0-9]+)\//);
+              return match ? match[1] : "unknown";
+            };
+
+            const figmaKey = extractFileKey(link);
+
+            const newDesign = {
+              id: crypto.randomUUID(),
+              figma_link: link,
+              thumbnail: `https://api.figma.com/v1/images/${figmaKey}?ids=0:1&format=png`,
+              project_name: "Untitled Design",
+              likes: 0,
+              views: 0,
+              age,
+              occupation,
+            };
+
+            const existing = JSON.parse(localStorage.getItem("designs") || "[]");
+
+            const isDuplicate = existing.some((design: any) => design.figma_link === link);
+
+            if (isDuplicate) {
+              toast.error("This design is already uploaded.");
+            } else {
+              localStorage.setItem("designs", JSON.stringify([...existing, newDesign]));
+              toast.success("Design uploaded successfully!");
+            }
+          }
           return 100;
         }
-        // TODO: Return with real loading part of the screen
+
         return prev + 20;
       });
-      // TODO: Add later for optimization
-    }, 200);
+    }, 200);                              
   };
 
   const isParamsComplete = age.trim() !== "" && occupation.trim() !== "";

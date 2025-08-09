@@ -48,14 +48,14 @@ export function NavUser({
   const [dbEmail, setDbEmail] = useState<string>("");
   const [open, setOpen] = useState(false);
   // const [profile, setProfile] = useState<{ name: string; email: string; age: number; image_url?: string } | null>(null);
-  const [profile, setProfile] = useState<{ 
-    id: string, 
-    name: string; 
-    email: string; 
-    age: number; 
+  const [profile, setProfile] = useState<{
+    id: string;
+    name: string;
+    email: string;
+    age: number;
     image_url?: string;
     newAvatarFile?: File;
-} | null>(null);
+  } | null>(null);
 
   // const { setUser } = useUserStore();
   useEffect(() => {
@@ -90,8 +90,7 @@ export function NavUser({
       setProfile(data);
       setOpen(true);
     }
-  }
-
+  };
 
   // Logout function
   const router = useRouter();
@@ -115,11 +114,16 @@ export function NavUser({
                 size="lg"
                 className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
               >
-                <Avatar className="h-8 w-8 rounded-lg grayscale">
+                <Avatar className="h-8 w-8 rounded-bl-full grayscale">
                   {/* <AvatarImage src={user.avatar} alt={user.name} /> */}
-                  <AvatarImage src={profile?.image_url || user.avatar} alt={profile?.name || user.name} />
+                  <AvatarImage
+                    src={profile?.image_url || user.avatar}
+                    alt={profile?.name || user.name}
+                  />
                   {/* Display the avatar */}
-                  <AvatarFallback className="rounded-lg">{getInitials(dbName)}</AvatarFallback>
+                  <AvatarFallback className="rounded-lg">
+                    {getInitials(dbName)}
+                  </AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   {/* Getting the name from the database */}
@@ -128,8 +132,7 @@ export function NavUser({
                   {/* <span className="truncate font-medium">{dbName}</span> */}
                   <span className="text-muted-foreground truncate text-xs">
                     {/* Getting the email from the database */}
-                    <span className="truncate font-medium">{dbName}</span>
-
+                    <span className="truncate font-medium">{dbEmail}</span>
                   </span>
                 </div>
                 <IconDotsVertical className="ml-auto size-4" />
@@ -164,10 +167,7 @@ export function NavUser({
                   {/* TODO: make the functional button here */}
                   Account
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <IconCreditCard />
-                  Billing
-                </DropdownMenuItem>
+                {/* removed billing */}
                 <DropdownMenuItem>
                   <IconNotification />
                   Notifications
@@ -191,7 +191,9 @@ export function NavUser({
           />
           {/* Centered form */}
           <div className="relative z-10 bg-white dark:bg-[#141414] rounded-xl shadow-lg p-8 w-full max-w-md mx-auto">
-            <h2 className="text-2xl font-bold mb-4 text-center">Account Information</h2>
+            <h2 className="text-2xl font-bold mb-4 text-center">
+              Account Information
+            </h2>
             <p className="mb-6 text-center text-muted-foreground">
               View and update your personal information.
             </p>
@@ -204,12 +206,13 @@ export function NavUser({
                   let imageUrl = profile.image_url;
                   // Uploading avatar profile
                   if (profile.newAvatarFile) {
-                    const { data: uploadData, error: uploadError }  = await supabase.storage 
-                    .from("avatars")
-                    .upload(`public/${profile.id}`, profile.newAvatarFile, {
-                      cacheControl: "3600",
-                      upsert: true,
-                    });
+                    const { data: uploadData, error: uploadError } =
+                      await supabase.storage
+                        .from("avatars")
+                        .upload(`public/${profile.id}`, profile.newAvatarFile, {
+                          cacheControl: "3600",
+                          upsert: true,
+                        });
 
                     if (uploadError) {
                       console.error("Upload error: ", uploadError);
@@ -255,14 +258,18 @@ export function NavUser({
                   <label>Name</label>
                   <Input
                     value={profile.name}
-                    onChange={e => setProfile({ ...profile, name: e.target.value })}
+                    onChange={(e) =>
+                      setProfile({ ...profile, name: e.target.value })
+                    }
                   />
                 </div>
                 <div>
                   <label>Email</label>
                   <Input
                     value={profile.email}
-                    onChange={e => setProfile({ ...profile, email: e.target.value })}
+                    onChange={(e) =>
+                      setProfile({ ...profile, email: e.target.value })
+                    }
                   />
                 </div>
                 <div>
@@ -270,33 +277,42 @@ export function NavUser({
                   <Input
                     type="number"
                     value={profile.age ?? ""}
-                    onChange={e => setProfile({ ...profile, age: Number(e.target.value) })}
+                    onChange={(e) =>
+                      setProfile({ ...profile, age: Number(e.target.value) })
+                    }
                   />
                 </div>
                 <div>
                   <label>Avatar</label>
-                  <Input 
-                  type="file"
-                  accept="image/*"
-                  onChange={e => {
-                    if (e.target.files && e.target.files[0]) {
-                      setProfile({ ...profile, newAvatarFile: e.target.files[0]})
-                    }
-                  }}
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setProfile({
+                          ...profile,
+                          newAvatarFile: e.target.files[0],
+                        });
+                      }
+                    }}
                   />
                 </div>
-                {/* Upload  Avata here! */}
+                {/* Upload  Avatar here! */}
                 <footer className="flex justify-end gap-2">
-                  <Button type="button" 
+                  <Button
+                    type="button"
                     variant="outline"
                     onClick={() => setOpen(false)}
-                    className="cursor-pointer" 
-                    >
+                    className="cursor-pointer"
+                  >
                     Cancel
                   </Button>
-                  <Button type="submit"
-                    className="cursor-pointer"
-                  >Save Changes</Button>
+                  <Button
+                    type="submit"
+                    className="cursor-pointer bg-[#ED5E20] text-white px-8 py-2 rounded-md hover:bg-orange-600 hover:cursor-pointer text-sm"
+                  >
+                    Save Changes
+                  </Button>
                 </footer>
               </form>
             )}
