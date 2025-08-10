@@ -121,9 +121,9 @@ export default function FigmaLinkUploader() {
             className="p-2 border rounded-md bg-white dark:bg-[#120F12] font-sm"
           >
             <option value="">Select Generation</option>
-            <option value="Gen Z">Gen Z (1997–2012)</option>
-            <option value="Millennial">Millennial (1981–1996)</option>
-            <option value="Gen Alpha">Gen Alpha (2013–Present)</option>
+            <option value="Gen Z">Gen Z (1997-2012)</option>
+            <option value="Millennial">Millennial (1981-1996)</option>
+            <option value="Gen Alpha">Gen Alpha (2013-Present)</option>
           </select>
 
           {/* Occupation Dropdown */}
