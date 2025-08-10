@@ -10,7 +10,7 @@ export default function Evaluate() {
         <div className="mb-5 flex items-center justify-center">
           <p>Paste your design&apos;s Figma link below.</p>
         </div>
-        {/* Maximum of 10 design per user only  */}
+        {/* TODO: Maximum of 5 design per user only  */}
         <UploadWithLink />
       </div>
     </div>

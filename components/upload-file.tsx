@@ -69,37 +69,36 @@ export default function FigmaLinkUploader() {
 
         return prev + 20;
       });
-    }, 200);                              
+    }, 200);
   };
 
   const isParamsComplete = age.trim() !== "" && occupation.trim() !== "";
 
-  return (
     // Limit only to maximum of 10 design per user
-    <div className="flex flex-col items-center justify-center space-y-6">
+      return (
+    <div className="flex flex-col items-center justify-center space-y-6 w-full px-2">
       {/* Upload Inputs */}
-      <div className="flex space-x-4">
+      <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-4">
         <input
           type="text"
           value={link}
           onChange={(e) => setLink(e.target.value)}
           placeholder="https://www.figma.com/design/"
-          className="w-[400px] p-2 rounded-md bg-white dark:bg-[#120F12] border"
+          className="w-full sm:w-[400px] p-2 rounded-md bg-white dark:bg-[#120F12] border text-sm"
         />
 
         <button
           onClick={handleUpload}
-          className="bg-[#ED5E20] text-white px-8 py-2 rounded-md hover:bg-orange-600 hover:cursor-pointer text-sm"
+          className="bg-[#ED5E20] text-white px-6 py-2 rounded-md hover:bg-orange-600 hover:cursor-pointer text-sm w-full sm:w-auto"
           disabled={loading}
         >
           Upload
         </button>
       </div>
 
-    {/* TODO: Replace with dynamic loading percentage according to the speed of data fetching of the client  */}
       {/* Loading Bar */}
       {loading && (
-        <div className="w-full max-w-xl bg-white dark:bg-[#120F12] rounded-xl h-10 flex items-center px-4 space-x-4">
+        <div className="w-full max-w-xs sm:max-w-xl bg-white dark:bg-[#120F12] rounded-xl h-10 flex items-center px-4 space-x-4">
           <span className="text-sm font-medium w-12">{progress}%</span>
           <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
             <div
@@ -110,15 +109,14 @@ export default function FigmaLinkUploader() {
         </div>
       )}
 
-      {/* TODO: Separate in another file/component */}
       {/* Form after upload */}
       {uploadedLink && !loading && (
-        <div className="w-full max-w-xl flex flex-col space-y-4">
+        <div className="w-full max-w-xs sm:max-w-xl flex flex-col space-y-4">
           {/* Age Dropdown */}
           <select
             value={age}
             onChange={(e) => setAge(e.target.value)}
-            className="p-2 border rounded-md bg-white dark:bg-[#120F12] font-sm"
+            className="p-2 border rounded-md bg-white dark:bg-[#120F12] text-sm"
           >
             <option value="">Select Generation</option>
             <option value="Gen Z">Gen Z (1997-2012)</option>
@@ -130,8 +128,9 @@ export default function FigmaLinkUploader() {
           <select
             value={occupation}
             onChange={(e) => setOccupation(e.target.value)}
-            className="p-2 border rounded-md bg-white dark:bg-[#120F12] font-sm"
+            className="p-2 border rounded-md bg-white dark:bg-[#120F12] text-sm"
           >
+            <option value="">Select Occupation</option>
             <option value="Student">Student</option>
             <option value="Freelancer">Freelancer</option>
             <option value="Designer">Designer</option>
@@ -141,11 +140,10 @@ export default function FigmaLinkUploader() {
 
           {/* Evaluate Button */}
           <button
-            className={`px-8 py-3 rounded-md text-white text-sm font-medium ${
-              isParamsComplete
+            className={`px-8 py-3 rounded-md text-white text-sm font-medium ${isParamsComplete
                 ? "bg-[#ED5E20] hover:bg-orange-600 hover:cursor-pointer"
                 : "bg-gray-400 cursor-not-allowed"
-            }`}
+              } w-full`}
             disabled={!isParamsComplete}
           >
             Evaluate Design
@@ -155,3 +153,4 @@ export default function FigmaLinkUploader() {
     </div>
   );
 }
+

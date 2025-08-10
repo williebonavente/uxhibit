@@ -245,176 +245,176 @@ export function NavUser({ user }: { user: User | null }) {
             <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4 text-center">
               Account Information
             </h2>
-          <p className="mb-6 text-center text-muted-foreground">
-            View and update your personal information.
-          </p>
-          {profile && (
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                const supabase = createClient();
-                let imageUrl = profile.avatar_url;
-                //  Only upload if a new avatar is selected
-                if (pendingAvatar) {
-                  const { data, error: uploadError } = await supabase.storage
-                    .from("avatars")
-                    .upload(`${profile.id}-${pendingAvatar.name}`, pendingAvatar, {
-                      cacheControl: "3600",
-                      upsert: true,
-                    });
-                  if (uploadError) {
-                    toast.error(uploadError.message);
-                    return;
-                  }
-                  const { data: publicUrlData } = supabase.storage
-                    .from("avatars")
-                    .getPublicUrl(`${profile.id}-${pendingAvatar.name}`);
-                  imageUrl = publicUrlData.publicUrl;
-                }
-
-                // Update profile in DB
-                const { error } = await supabase
-                  .from("profiles")
-                  .update({
-                    username: profile.username,
-                    full_name: profile.fullname,
-                    age: profile.age,
-                    avatar_url: imageUrl,
-                    bio: profile.bio,
-                  })
-                  .eq("id", profile.id);
-
-                if (!error) {
-                  toast.success("Profile Updated!");
-                  setFullName(profile.fullname);
-                  setAvatarUrl(imageUrl ?? null);
-                  setOpen(false);
-                  router.refresh();
-                  getProfile();
-                  setPendingAvatar(null);
-                  setAvatarPreview(null);
-                } else {
-                  toast.error("Failed to update profile");
-                }
-              }}
-              className="space-y-4"
-            >
-              <div>
-                <div>
-                  <div className="flex flex-col items-center gap-2">
-                    <div
-                      className="relative cursor-pointer group"
-                      onClick={() => document.getElementById("avatar-upload")?.click()}
-                    >
-                      <Avatar className="h-24 w-24 sm:h-32 sm:w-32 rounded-full border-4 border-gray-300 group-hover:border-blue-500 transition shadow-xl">
-                        <AvatarImage src={avatarPreview ?? profile?.avatar_url} alt={profile?.fullname} />
-                        <AvatarFallback className="rounded-full text-3xl sm:text-4xl bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
-                          {getInitials(profile?.fullname)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition rounded-full">
-                        <span className="text-white text-lg font-semibold">Change</span>
-                      </div>
-                    </div>
-                    <input
-                      id="avatar-upload"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={async e => {
-                        if (e.target.files && e.target.files[0]) {
-                          const file = e.target.files[0];
-                          // Adding preview
-                          setPendingAvatar(file);
-                          setAvatarPreview(URL.createObjectURL(file));
-                        }
-                      }}
-                    />
-                  </div>
-                  {/* Bio just to replace the UI/UX Designer message */}
-                  <div>
-                    <label>Bio</label>
-                    <Input
-                      value={profile.bio ?? "UI/UX  Designer"}
-                      onChange={e => setProfile({ ...profile, bio: e.target.value })}
-                      className="mb-4"
-                    />
-                  </div>
-                </div>
-                <label>Username</label>
-                <Input
-                  value={profile.username ?? "User"}
-                  onChange={e => setProfile({ ...profile, username: e.target.value })}
-                />
-              </div>
-              <div>
-                <label>Full Name</label>
-                <Input
-                  value={profile.fullname}
-                  onChange={e => setProfile({ ...profile, fullname: e.target.value })}
-                />
-              </div>
-              <div>
-                <label>Email</label>
-                <Input
-                  value={email ?? "Cannot fetch User email"}
-                  disabled
-                />
-              </div>
-              <div>
-                <label>Age</label>
-                <Input
-                  type="number"
-                  min={10}
-                  max={80}
-                  value={profile.age === 0 ? "" : profile.age ?? ""}
-                  onChange={e => {
-                    const raw = e.target.value;
-                    if (raw === "") {
-                      setProfile({ ...profile, age: "" });
+            <p className="mb-6 text-center text-muted-foreground">
+              View and update your personal information.
+            </p>
+            {profile && (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const supabase = createClient();
+                  let imageUrl = profile.avatar_url;
+                  //  Only upload if a new avatar is selected
+                  if (pendingAvatar) {
+                    const { data, error: uploadError } = await supabase.storage
+                      .from("avatars")
+                      .upload(`${profile.id}-${pendingAvatar.name}`, pendingAvatar, {
+                        cacheControl: "3600",
+                        upsert: true,
+                      });
+                    if (uploadError) {
+                      toast.error(uploadError.message);
                       return;
                     }
-                    const value = Number(raw);
-                    // Only update if value is a valid number and in range
-                    if (!isNaN(value) && value >= 10 && value <= 80) {
-                      setProfile({ ...profile, age: value });
-                    }
-                  }}
-                  placeholder="Enter your age (10-80)"
-                />
-              </div>
+                    const { data: publicUrlData } = supabase.storage
+                      .from("avatars")
+                      .getPublicUrl(`${profile.id}-${pendingAvatar.name}`);
+                    imageUrl = publicUrlData.publicUrl;
+                  }
 
-              <div>
-                <label >Gender</label>
-                <Input
-                  value={profile.gender}
-                  onChange={e => setProfile({ ...profile, gender: e.target.value })}
-                />
-              </div>
+                  // Update profile in DB
+                  const { error } = await supabase
+                    .from("profiles")
+                    .update({
+                      username: profile.username,
+                      full_name: profile.fullname,
+                      age: profile.age,
+                      avatar_url: imageUrl,
+                      bio: profile.bio,
+                    })
+                    .eq("id", profile.id);
 
-              {/* Footer buttons are now responsive: stack on mobile, row on desktop */}
-              <footer className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-4 mt-6 sm:mt-16">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setOpen(false)}
-                  className="cursor-pointer w-full sm:w-auto"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  className="cursor-pointer w-full sm:w-auto bg-[#ED5E20] text-[#FFF] hover:bg-[#d44e0f] dark:bg-[#d44e0f] dark:text-[#FFF] dark:hover:bg-[#ED5E20]"
-                >
-                  Save Changes
-                </Button>
-              </footer>
-            </form>
-          )}
-        </div>
+                  if (!error) {
+                    toast.success("Profile Updated!");
+                    setFullName(profile.fullname);
+                    setAvatarUrl(imageUrl ?? null);
+                    setOpen(false);
+                    router.refresh();
+                    getProfile();
+                    setPendingAvatar(null);
+                    setAvatarPreview(null);
+                  } else {
+                    toast.error("Failed to update profile");
+                  }
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <div>
+                    <div className="flex flex-col items-center gap-2">
+                      <div
+                        className="relative cursor-pointer group"
+                        onClick={() => document.getElementById("avatar-upload")?.click()}
+                      >
+                        <Avatar className="h-24 w-24 sm:h-32 sm:w-32 rounded-full border-4 border-gray-300 group-hover:border-blue-500 transition shadow-xl">
+                          <AvatarImage src={avatarPreview ?? profile?.avatar_url} alt={profile?.fullname} />
+                          <AvatarFallback className="rounded-full text-3xl sm:text-4xl bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
+                            {getInitials(profile?.fullname)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition rounded-full">
+                          <span className="text-white text-lg font-semibold">Change</span>
+                        </div>
+                      </div>
+                      <input
+                        id="avatar-upload"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async e => {
+                          if (e.target.files && e.target.files[0]) {
+                            const file = e.target.files[0];
+                            // Adding preview
+                            setPendingAvatar(file);
+                            setAvatarPreview(URL.createObjectURL(file));
+                          }
+                        }}
+                      />
+                    </div>
+                    {/* Bio just to replace the UI/UX Designer message */}
+                    <div>
+                      <label>Bio</label>
+                      <Input
+                        value={profile.bio ?? "UI/UX  Designer"}
+                        onChange={e => setProfile({ ...profile, bio: e.target.value })}
+                        className="mb-4"
+                      />
+                    </div>
+                  </div>
+                  <label>Username</label>
+                  <Input
+                    value={profile.username ?? "User"}
+                    onChange={e => setProfile({ ...profile, username: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label>Full Name</label>
+                  <Input
+                    value={profile.fullname}
+                    onChange={e => setProfile({ ...profile, fullname: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label>Email</label>
+                  <Input
+                    value={email ?? "Cannot fetch User email"}
+                    disabled
+                  />
+                </div>
+                <div>
+                  <label>Age</label>
+                  <Input
+                    type="number"
+                    min={10}
+                    max={80}
+                    value={profile.age === 0 ? "" : profile.age ?? ""}
+                    onChange={e => {
+                      const raw = e.target.value;
+                      if (raw === "") {
+                        setProfile({ ...profile, age: "" });
+                        return;
+                      }
+                      const value = Number(raw);
+                      // Only update if value is a valid number and in range
+                      if (!isNaN(value) && value >= 10 && value <= 80) {
+                        setProfile({ ...profile, age: value });
+                      }
+                    }}
+                    placeholder="Enter your age (10-80)"
+                  />
+                </div>
+
+                <div>
+                  <label >Gender</label>
+                  <Input
+                    value={profile.gender}
+                    onChange={e => setProfile({ ...profile, gender: e.target.value })}
+                  />
+                </div>
+
+                {/* Footer buttons are now responsive: stack on mobile, row on desktop */}
+                <footer className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-4 mt-6 sm:mt-16">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setOpen(false)}
+                    className="cursor-pointer w-full sm:w-auto"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="cursor-pointer w-full sm:w-auto bg-[#ED5E20] text-[#FFF] hover:bg-[#d44e0f] dark:bg-[#d44e0f] dark:text-[#FFF] dark:hover:bg-[#ED5E20]"
+                  >
+                    Save Changes
+                  </Button>
+                </footer>
+              </form>
+            )}
+          </div>
         </div >
       )
-}
+      }
     </>
   );
 }
