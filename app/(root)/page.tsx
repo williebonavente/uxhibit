@@ -11,6 +11,7 @@ export function getInitials(name: string | null) {
 }
 
 export default async function Dashboard() {
+  // TODO: feat: Add Pagination
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
 

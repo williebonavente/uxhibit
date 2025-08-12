@@ -42,7 +42,15 @@ export default function DesignsGallery() {
           key={design.id}
           className="bg-white dark:bg-[#1A1A1A] rounded-xl shadow-md space-y-0 flex flex-col h-full"
         >
-          <Link href={design.figma_link} target="_blank" rel="noopener noreferrer">
+          {/* TODO: 
+          It should redirect to the page where AI evaluated the design
+          Dynamic route   
+          */}
+          {/* design.figma_link */}
+          <Link href={`/designs/${design.id}`} 
+                target="_blank" 
+                rel="noopener noreferrer">
+
             <div className="relative w-full overflow-hidden rounded-t-xl aspect-[4/3] lg:aspect-auto lg:h-[280px]">
               <Image
                 src={
