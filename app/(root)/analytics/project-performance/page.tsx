@@ -9,6 +9,8 @@ import {
 import { generateProjectComparisonReport } from "@/lib/projectComparisonPdfGenerator";
 import { toast } from "sonner";
 import { IconLoader2, IconDownload } from "@tabler/icons-react";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"; // Adjust import path if needed
+
 
 interface ProjectData {
   title: string;
@@ -203,8 +205,8 @@ export default function ProjectPerformanceComparisonPage() {
           Project Performance Comparison
         </h1>
       </div>
-      <div className="p-2 m-5 flex items-center justify-between">
-        <p>
+      <div className="p-2 m-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+        <p className="text-sm sm:text-base text-gray-700 dark:text-gray-200 max-w-xl w-full sm:mb-0 font-['Poppins']">
           Compare all your submitted projects at a glance. This section displays
           each design's usability score, submission date, number of feedback
           items, and the average severity of the issues. Use this to track your
@@ -214,11 +216,10 @@ export default function ProjectPerformanceComparisonPage() {
         <button
           onClick={handleExportReport}
           disabled={isGeneratingPDF}
-          className={`px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors font-['Poppins'] font-medium ml-6 cursor-pointer ${
-            isGeneratingPDF
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-[#ED5E20] hover:bg-[#d44e0f]"
-          } text-white`}
+          className={`w-full sm:w-auto px-6 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors font-['Poppins'] font-medium mt-4 sm:mt-0 sm:ml-6 cursor-pointer ${isGeneratingPDF
+            ? "bg-gray-400 cursor-not-allowed"
+            : "bg-[#ED5E20] hover:bg-[#d44e0f]"
+            } text-white`}
         >
           <span>
             {isGeneratingPDF ? (
@@ -232,32 +233,35 @@ export default function ProjectPerformanceComparisonPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+      <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+        {/* Filter label and icon */}
         <div className="flex items-center space-x-2">
-          <IconFilter size={16} className="text-gray-500" />
+          <IconFilter size={20} className="text-gray-500" />
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300 font-['Poppins']">
             Filters:
           </span>
         </div>
 
+        {/* Severity filter dropdown */}
         <select
           value={severityFilter}
           onChange={(e) =>
             setSeverityFilter(e.target.value as "all" | "Minor" | "Major")
           }
-          className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-['Poppins'] text-gray-700 dark:text-gray-300"
+          className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-['Poppins'] text-gray-700 dark:text-gray-300 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ED5E20] transition"
         >
           <option value="all">All Severities</option>
           <option value="Minor">Minor Issues</option>
           <option value="Major">Major Issues</option>
         </select>
 
+        {/* Score filter dropdown */}
         <select
           value={scoreFilter}
           onChange={(e) =>
             setScoreFilter(e.target.value as "all" | "high" | "medium" | "low")
           }
-          className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-['Poppins'] text-gray-700 dark:text-gray-300"
+          className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-['Poppins'] text-gray-700 dark:text-gray-300 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ED5E20] transition"
         >
           <option value="all">All Scores</option>
           <option value="high">High Score (80+)</option>
@@ -265,106 +269,75 @@ export default function ProjectPerformanceComparisonPage() {
           <option value="low">Low Score (&lt;50)</option>
         </select>
 
-        <div className="text-sm text-gray-500 dark:text-gray-400 font-['Poppins']">
-          Showing {filteredAndSortedData.length} of {projectData.length}{" "}
-          projects
+        {/* Project count display */}
+        <div className="text-sm text-gray-500 dark:text-gray-400 font-['Poppins'] sm:ml-auto">
+          Showing <span className="font-bold text-[#ED5E20]">{filteredAndSortedData.length}</span> of <span className="font-bold">{projectData.length}</span> projects
         </div>
       </div>
 
-      <div className="bg-white dark:bg-[#19181D] rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-        {/* Table Header */}
-        <div className="bg-[#ED5E20] text-white">
-          <div className="grid grid-cols-5 gap-6 px-6 py-4">
-            <button
-              onClick={() => handleSort("title")}
-              className="font-bold font-['Poppins'] text-left flex items-center space-x-1 hover:bg-[#d44e0f] px-2 py-1 rounded transition-colors"
-            >
-              <span>Project Title</span>
-              {getSortIcon("title")}
-            </button>
-            <button
-              onClick={() => handleSort("score")}
-              className="font-bold font-['Poppins'] text-center flex items-center justify-center space-x-1 hover:bg-[#d44e0f] px-2 py-1 rounded transition-colors"
-            >
-              <span>Score</span>
-              {getSortIcon("score")}
-            </button>
-            <button
-              onClick={() => handleSort("dateSort")}
-              className="font-bold font-['Poppins'] text-center flex items-center justify-center space-x-1 hover:bg-[#d44e0f] px-2 py-1 rounded transition-colors"
-            >
-              <span>Submission Date</span>
-              {getSortIcon("dateSort")}
-            </button>
-            <button
-              onClick={() => handleSort("feedbackItems")}
-              className="font-bold font-['Poppins'] text-center flex items-center justify-center space-x-1 hover:bg-[#d44e0f] px-2 py-1 rounded transition-colors"
-            >
-              <span># of Feedback Items</span>
-              {getSortIcon("feedbackItems")}
-            </button>
-            <button
-              onClick={() => handleSort("severity")}
-              className="font-bold font-['Poppins'] text-center flex items-center justify-center space-x-1 hover:bg-[#d44e0f] px-2 py-1 rounded transition-colors"
-            >
-              <span>Severity</span>
-              {getSortIcon("severity")}
-            </button>
-          </div>
-        </div>
-
-        {/* Table Body */}
-        <div className="divide-y divide-gray-200 dark:divide-gray-700">
-          {filteredAndSortedData.map((project, index) => (
-            <div
-              key={project.title}
-              className="grid grid-cols-5 gap-6 px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-            >
-              {/* Project Title */}
-              <div className="flex items-center">
-                <span className="text-gray-800 dark:text-gray-200 font-medium font-['Poppins']">
+      <div className="bg-[#ED5E20] text-white rounded-t-xl overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-white font-bold font-['Poppins'] text-xs sm:text-sm px-2 sm:px-4 bg-[#ED5E20]">
+                <button onClick={() => handleSort("title")} className="flex items-center space-x-1 hover:bg-[#d44e0f] rounded transition-colors">
+                  <span>Project Title</span>
+                  {getSortIcon("title")}
+                </button>
+              </TableHead>
+              <TableHead className="text-white font-bold font-['Poppins'] text-xs sm:text-sm px-2 sm:px-4 bg-[#ED5E20]">
+                <button onClick={() => handleSort("score")} className="flex items-center justify-center space-x-1 hover:bg-[#d44e0f] rounded transition-colors">
+                  <span>Score</span>
+                  {getSortIcon("score")}
+                </button>
+              </TableHead>
+              <TableHead className="text-white font-bold font-['Poppins'] text-xs sm:text-sm px-2 sm:px-4 bg-[#ED5E20] hidden sm:table-cell">
+                <button onClick={() => handleSort("dateSort")} className="flex items-center justify-center space-x-1 hover:bg-[#d44e0f] px-1 py-1 rounded transition-colors">
+                  <span>Submission Date</span>
+                  {getSortIcon("dateSort")}
+                </button>
+              </TableHead>
+              <TableHead className="text-white font-bold font-['Poppins'] text-xs sm:text-sm px-2 sm:px-4 bg-[#ED5E20] hidden sm:table-cell">
+                <button onClick={() => handleSort("feedbackItems")} className="flex items-center justify-center space-x-1 hover:bg-[#d44e0f] px-1 py-1 rounded transition-colors">
+                  <span>Number of Feedback</span>
+                  {getSortIcon("feedbackItems")}
+                </button>
+              </TableHead>
+              <TableHead className="text-white font-bold font-['Poppins'] text-xs sm:text-sm px-2 sm:px-4 bg-[#ED5E20]">
+                <button onClick={() => handleSort("severity")} className="flex items-center justify-center space-x-1 hover:bg-[#d44e0f] px-1 py-1 rounded transition-colors">
+                  <span>Severity</span>
+                  {getSortIcon("severity")}
+                </button>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredAndSortedData.map((project) => (
+              <TableRow key={project.title} className="bg-white dark:bg-[#19181D]">
+                {/* Project Title */}
+                <TableCell className="font-['Poppins'] text-xs sm:text-sm px-2 sm:px-4 truncate text-black align-middle">
                   {project.title}
-                </span>
-              </div>
-
-              {/* Score */}
-              <div className="flex items-center justify-center">
-                <span
-                  className={`font-bold text-lg ${getScoreColor(
-                    project.score
-                  )}`}
-                >
+                </TableCell>
+                {/* Score */}
+                <TableCell className={`font-bold px-2 sm:px-4 text-xs sm:text-sm ${getScoreColor(project.score)}`}>
                   {project.score}
-                </span>
-              </div>
-
-              {/* Submission Date */}
-              <div className="flex items-center justify-center">
-                <span className="text-gray-600 dark:text-gray-400 text-sm font-['Poppins']">
+                </TableCell>
+                {/* Submission Date - hidden on mobile */}
+                <TableCell className="px-2 sm:px-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400 hidden sm:table-cell">
                   {project.submissionDate}
-                </span>
-              </div>
-
-              {/* Feedback Items */}
-              <div className="flex items-center justify-center">
-                <span className="text-gray-800 dark:text-gray-200 font-medium">
+                </TableCell>
+                {/* Feedback Items - hidden on mobile */}
+                <TableCell className="px-2 sm:px-4 text-xs sm:text-sm text-gray-800 dark:text-gray-200 hidden sm:table-cell">
                   {project.feedbackItems}
-                </span>
-              </div>
-
-              {/* Severity */}
-              <div className="flex items-center justify-center">
-                <span
-                  className={`font-medium ${getSeverityColor(
-                    project.severity
-                  )}`}
-                >
+                </TableCell>
+                {/* Severity */}
+                <TableCell className={`px-2 sm:px-4 text-xs sm:text-sm ${getSeverityColor(project.severity)} `}>
                   {project.severity}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
 
       {/* Summary Stats */}
@@ -383,9 +356,9 @@ export default function ProjectPerformanceComparisonPage() {
           <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-2">
             {filteredAndSortedData.length > 0
               ? Math.round(
-                  filteredAndSortedData.reduce((sum, p) => sum + p.score, 0) /
-                    filteredAndSortedData.length
-                )
+                filteredAndSortedData.reduce((sum, p) => sum + p.score, 0) /
+                filteredAndSortedData.length
+              )
               : 0}
           </div>
           <div className="text-sm text-gray-600 dark:text-gray-400 font-['Poppins']">
@@ -396,11 +369,11 @@ export default function ProjectPerformanceComparisonPage() {
           <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mb-2">
             {filteredAndSortedData.length > 0
               ? Math.round(
-                  filteredAndSortedData.reduce(
-                    (sum, p) => sum + p.feedbackItems,
-                    0
-                  ) / filteredAndSortedData.length
-                )
+                filteredAndSortedData.reduce(
+                  (sum, p) => sum + p.feedbackItems,
+                  0
+                ) / filteredAndSortedData.length
+              )
               : 0}
           </div>
           <div className="text-sm text-gray-600 dark:text-gray-400 font-['Poppins']">
@@ -411,11 +384,11 @@ export default function ProjectPerformanceComparisonPage() {
           <div className="text-2xl font-bold text-red-600 dark:text-red-400 mb-2">
             {filteredAndSortedData.length > 0
               ? Math.round(
-                  (filteredAndSortedData.filter((p) => p.severity === "Major")
-                    .length /
-                    filteredAndSortedData.length) *
-                    100
-                )
+                (filteredAndSortedData.filter((p) => p.severity === "Major")
+                  .length /
+                  filteredAndSortedData.length) *
+                100
+              )
               : 0}
             %
           </div>

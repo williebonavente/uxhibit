@@ -42,42 +42,18 @@ export default function RegistrationForm({ user }: { user: User | null }) {
     defaultValues: {
       username: '',
       full_name: '',
+      name: '',
       age: '',
       gender: '',
       email: '',
-      avatar_url: '',
       password: '',
       confirmPassword: '',
-      website_url: '',
-      bio: ''
     },
+    resolver: zodResolver(registerFormSchema)
 
-  })
+  });
 
-  // const getProfile = useCallback(async () => {
-  //   try {
-  //     setLoading(true)
 
-  //     const { data, error, status } = await supabase
-  //       .from('profiles')
-  //       .select('username, full_name, age, avatar_url')
-  //       .eq('id', user?.id)
-  //       .single()
-  //     if (error && status !== 406) {
-  //       console.log(error)
-  //       throw error;
-  //     }
-  //   } catch (error) {
-  //     toast.error("Error loading user data.");
-  //   } finally {
-  //     setLoading(false);
-  //   }
-
-  // }, [user, supabase])
-
-  // useEffect(() => {
-  //   getProfile()
-  // }, [user, getProfile])
 
 
   async function updateProfile({
@@ -121,12 +97,10 @@ export default function RegistrationForm({ user }: { user: User | null }) {
         password: values.password,
         options: {
           data: {
+            username: values.username,
             full_name: values.full_name,
-            avatar_url: values.avatar_url,
             age: values.age,
             gender: values.gender,
-            username: values.username,
-            website: values.website_url,
           }
         }
       });

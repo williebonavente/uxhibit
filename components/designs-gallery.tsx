@@ -36,20 +36,26 @@ export default function DesignsGallery() {
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 px-2 sm:px-0">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 px-2 sm:px-0 items-stretch">
       {designs.map((design) => (
         <div
           key={design.id}
-          className="bg-white dark:bg-[#1A1A1A] rounded-xl shadow-md space-y-2"
+          className="bg-white dark:bg-[#1A1A1A] rounded-xl shadow-md space-y-0 flex flex-col h-full"
         >
           <Link href={design.figma_link} target="_blank" rel="noopener noreferrer">
-            <Image
-              src="/images/design-thumbnail.png"
-              alt="Figma Preview"
-              width={400}
-              height={300}
-              className="w-full object-cover rounded-t-xl"
-            />
+            <div className="relative w-full overflow-hidden rounded-t-xl aspect-[4/3] lg:aspect-auto lg:h-[280px]">
+              <Image
+                src={
+                  design.fileKey
+                    ? `/api/figma/thumbnail?fileKey=${design.fileKey}${design.nodeId ? `&nodeId=${encodeURIComponent(design.nodeId)}` : ""}`
+                    : "/images/design-thumbnail.png"
+                }
+                alt={design.project_name || "Figma Preview"}
+                width={400}
+                height={300}
+                className="w-full object-cover rounded-t-xl"
+              />
+            </div>
           </Link>
           <div className="p-3 space-y-2 group relative">
             <div className="flex items-center justify-between gap-2">
@@ -101,9 +107,9 @@ export default function DesignsGallery() {
                     {
                       position: "top-center",
                       style: {
-                        width: "90vw",
-                        maxWidth: "375px", // fits iPhone 6/7/8/X/SE and most mobile screens
-                        minWidth: "280px",
+                        width: "80vw",
+                        maxWidth: "275px", // fits iPhone 6/7/8/X/SE and most mobile screens
+                        minWidth: "180px",
                         padding: "16px 8px",
                         // boxSizing: "border-box",
                       },

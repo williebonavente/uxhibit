@@ -169,7 +169,18 @@ export function NavUser({ user }: { user: User | null }) {
                 className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
               >
                 <Avatar className="h-8 w-8 rounded-bl-full ">
-                  <AvatarImage src={profile?.avatar_url} alt={profile?.fullname} />
+                  {/* <AvatarImage src={profile?.avatar_url} alt={profile?.fullname} /> */}
+                  <AvatarImage
+                    src={
+                      avatarPreview
+                      ?? (profile?.avatar_url
+                        ? (profile.avatar_url.startsWith("http")
+                          ? profile.avatar_url
+                          : `/api/avatars?path=${encodeURIComponent(profile.avatar_url)}`)
+                        : undefined)
+                    }
+                    alt={profile?.fullname}
+                  />
                   {/* Display the the initial if the user does not have avatar */}
                   <AvatarFallback className="rounded-lg grayscale">{getInitials(fullname)}</AvatarFallback>
                 </Avatar>
@@ -194,8 +205,20 @@ export function NavUser({ user }: { user: User | null }) {
               <DropdownMenuLabel className="p-0 font-normal">
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                   <Avatar className="h-8 w-8 rounded-bl-full">
-                    {/* TODO: To be implemented */}
-                    <AvatarImage src={profile?.avatar_url ?? undefined} alt={profile?.fullname ?? email ?? "User"} />
+
+                    {/* <AvatarImage 
+                      src={profile?.avatar_url ?? undefined} alt={profile?.fullname ?? email ?? "User"} /> */}
+                    <AvatarImage
+                      src={
+                        avatarPreview
+                        ?? (profile?.avatar_url
+                          ? (profile.avatar_url.startsWith("http")
+                            ? profile.avatar_url
+                            : `/api/avatars?path=${encodeURIComponent(profile.avatar_url)}`)
+                          : undefined)
+                      }
+                      alt={profile?.fullname}
+                    />
                     <AvatarFallback className="rounded-lg">{getInitials(fullname)}</AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
@@ -255,22 +278,45 @@ export function NavUser({ user }: { user: User | null }) {
                   const supabase = createClient();
                   let imageUrl = profile.avatar_url;
                   //  Only upload if a new avatar is selected
+                  // if (pendingAvatar) {
+                  //   const { data, error: uploadError } = await supabase.storage
+                  //     .from("avatars")
+                  //     .upload(`${profile.id}-${pendingAvatar.name}`, pendingAvatar, {
+                  //       cacheControl: "3600",
+                  //       upsert: true,
+                  //     });
+                  //   if (uploadError) {
+                  //     toast.error(uploadError.message);
+                  //     return;
+                  //   }
+                  //   imageUrl = `${profile.id}-${pendingAvatar}`
+                  //   const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+                  //     .from("avatars")
+                  //     // TODO: 
+                  //       .createSignedUrl(`${profile.id}-${pendingAvatar.name}`, 6000 * 6000); // URL valid for 1 hour
+
+                  //   if (signedUrlError) {
+                  //     toast.error(signedUrlError.message);
+                  //     return;
+                  //   }
+                  //   imageUrl = signedUrlData?.signedUrl;
+                  // }
+
                   if (pendingAvatar) {
-                    const { data, error: uploadError } = await supabase.storage
+                    const filePath = `${profile.id}/${Date.now()}-${pendingAvatar.name}`;
+                    const { error: uploadError } = await supabase.storage
                       .from("avatars")
-                      .upload(`${profile.id}-${pendingAvatar.name}`, pendingAvatar, {
-                        cacheControl: "3600",
+                      .upload(filePath, pendingAvatar, {
+                        cacheControl: "31536000",
                         upsert: true,
                       });
                     if (uploadError) {
                       toast.error(uploadError.message);
                       return;
                     }
-                    const { data: publicUrlData } = supabase.storage
-                      .from("avatars")
-                      .getPublicUrl(`${profile.id}-${pendingAvatar.name}`);
-                    imageUrl = publicUrlData.publicUrl;
+                    imageUrl = filePath;
                   }
+
 
                   // Update profile in DB
                   const { error } = await supabase
@@ -307,7 +353,18 @@ export function NavUser({ user }: { user: User | null }) {
                         onClick={() => document.getElementById("avatar-upload")?.click()}
                       >
                         <Avatar className="h-24 w-24 sm:h-32 sm:w-32 rounded-full border-4 border-gray-300 group-hover:border-blue-500 transition shadow-xl">
-                          <AvatarImage src={avatarPreview ?? profile?.avatar_url} alt={profile?.fullname} />
+                          {/* <AvatarImage src={avatarPreview ?? profile?.avatar_url} alt={profile?.fullname} /> */}
+                          <AvatarImage
+                            src={
+                              avatarPreview
+                              ?? (profile?.avatar_url
+                                ? (profile.avatar_url.startsWith("http")
+                                  ? profile.avatar_url
+                                  : `/api/avatars?path=${encodeURIComponent(profile.avatar_url)}`)
+                                : undefined)
+                            }
+                            alt={profile?.fullname ?? email ?? "User"}
+                          />
                           <AvatarFallback className="rounded-full text-3xl sm:text-4xl bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
                             {getInitials(profile?.fullname)}
                           </AvatarFallback>
