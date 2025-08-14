@@ -3,9 +3,13 @@
 import { parseFigmaUrl } from "@/lib/figma";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
+type ParsedFigma = { fileKey: string; nodeId?: string; name?: string };
 
 export default function FigmaLinkUploader() {
+  const router = useRouter();
+  const [lastId, setLastId] = useState<string | null>(null);
   const [link, setLink] = useState("");
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -13,8 +17,13 @@ export default function FigmaLinkUploader() {
   const [age, setAge] = useState("");
   const [occupation, setOccupation] = useState("");
 
-  const handleUpload = async () => {
+  async function handleUpload(e: React.FormEvent) {
+    e.preventDefault();
     const parsed = parseFigmaUrl(link);
+    if (!parsed) {
+      toast.error("The input is empty");
+      return;
+    }
     setLoading(true);
     setProgress(10);
 
@@ -48,7 +57,8 @@ export default function FigmaLinkUploader() {
         fileKey: parsed?.fileKey || null,
         nodeId: parsed?.nodeId || null,
         // optional immediate preview if you already have one
-        thumbnail: (data?.nodeImageUrl as string) || (data?.thumbnailUrl as string) || null
+        thumbnail: (data?.nodeImageUrl as string) || (data?.thumbnailUrl as string) || null,
+        createdAt: new Date().toISOString(),
       };
 
       const existing = JSON.parse(localStorage.getItem("designs") || "[]");
@@ -56,12 +66,15 @@ export default function FigmaLinkUploader() {
 
       if (isDuplicate) {
         toast.error("This design is already uploaded.");
+        setLoading(false);
+        setProgress(0);
+        return;
       } else {
-        localStorage.setItem("designs", JSON.stringify([...(existing || []), newDesign]));
-        toast.success("Design uploaded successfully!");
+        localStorage.setItem("designs", JSON.stringify([newDesign, ...existing])); toast.success("Design uploaded successfully!");
         setUploadedLink(link);
+        setLastId(newDesign.id);
+        setProgress(100);
       }
-      setProgress(100);
     } catch {
       toast.error("Network error");
       setProgress(0);
@@ -142,7 +155,8 @@ export default function FigmaLinkUploader() {
               ? "bg-[#ED5E20] hover:bg-orange-600 hover:cursor-pointer"
               : "bg-gray-400 cursor-not-allowed"
               } w-full`}
-            disabled={!isParamsComplete}
+            disabled={!isParamsComplete || !uploadedLink}
+            onClick={() => lastId && router.push(`/designs/${lastId}`)}
           >
             Evaluate Design
           </button>
