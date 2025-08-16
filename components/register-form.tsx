@@ -37,12 +37,12 @@ export default function RegistrationForm({ user }: { user: User | null }) {
   const [website, setWebsite] = useState<string | null>(null)
   const [age, setAge] = useState<string | null>(null)
   const [avatar_url, setAvatarUrl] = useState<string | null>(null)
+  const [isCheck, setCheck ] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof registerFormSchema>>({
     defaultValues: {
       username: '',
       full_name: '',
-      name: '',
       age: '',
       gender: '',
       email: '',
@@ -100,6 +100,8 @@ export default function RegistrationForm({ user }: { user: User | null }) {
             username: values.username,
             full_name: values.full_name,
             age: values.age,
+            // TODO: value, male, female, nonbinary, prefer not to say
+            // TODO: drop-down menu
             gender: values.gender,
           }
         }
@@ -293,8 +295,10 @@ export default function RegistrationForm({ user }: { user: User | null }) {
                       <FormMessage />
                     </FormItem>
                   )}
-                />
 
+
+                />
+               
                 {/* Website Field (optional)
                 <FormField
                   control={form.control}
@@ -344,6 +348,8 @@ export default function RegistrationForm({ user }: { user: User | null }) {
             <Link href="/auth/login" className="text-[#ff7f3f] hover:text-[#ED5E20] transition-colors duration-200 hover:underline">
               Login
             </Link>
+            {/* TODO: Checkbox for terms and agreemnt  */}
+            {/* Checkbox */}
           </div>
         </div>
       </div>

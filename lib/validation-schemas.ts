@@ -7,6 +7,7 @@ export const registerFormSchema = z.object({
     email: z.email('Invalid email'),
     gender: z.string().min(3, "Gender Must have a value"),
     // website_url: z.string(),
+    
     password: z.string().min(6, 'Password must be at least 6 characters.'),
     confirmPassword: z.string().min(6, 'Confirm Password must be at least 6 characters.'),
 }).refine(data => data.password === data.confirmPassword, {
