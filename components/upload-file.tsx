@@ -4,6 +4,7 @@ import { parseFigmaUrl } from "@/lib/figma";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
 
 type ParsedFigma = { fileKey: string; nodeId?: string; name?: string };
 
@@ -43,7 +44,6 @@ export default function FigmaLinkUploader() {
 
       setProgress(80);
 
-      // const thumbnail = (data.nodeImageUrl as string) || (data.thumbnailUrl as string) || "";
 
       const newDesign = {
         id: crypto.randomUUID(),
@@ -61,20 +61,60 @@ export default function FigmaLinkUploader() {
         createdAt: new Date().toISOString(),
       };
 
-      const existing = JSON.parse(localStorage.getItem("designs") || "[]");
-      const isDuplicate = existing.some((d: any) => d.figma_link === link);
+      try {
 
-      if (isDuplicate) {
-        toast.error("This design is already uploaded.");
+        // get the signed-in user from Supabse (client-side)
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
+          toast.error("Please sign in first.");
+          setLoading(false);
+          setProgress(0);
+          return;
+        }
+
+
+        const saveRes = await fetch("/api/designs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            // owner_id: ownerId, // TODO: inject from your auth/session
+            title: newDesign.project_name,
+            figma_link: link,
+            file_key: newDesign.fileKey,
+            node_id: newDesign.nodeId,
+            thumbnail_url: newDesign.thumbnail,
+            snapshot: { age, occupation },
+            ai: null,
+          }),
+        });
+        const saved = await saveRes.json();
+        // attach remote identifiers to your local record
+        (newDesign as any).remoteId = saved?.design?.id;
+        (newDesign as any).remoteCurrentVersionId = saved?.current_version?.id;
+        (newDesign as any).remoteVersionNumber = saved?.current_version?.version;
+
+      } catch (e: any) {
+        toast.error(e.message || "Failed to save to database");
         setLoading(false);
         setProgress(0);
         return;
-      } else {
+      }
+      const existing = JSON.parse(localStorage.getItem("designs") || "[]");
+      // const isDuplicate = existing.some((d: any) => d.figma_link === link);
+
+      // if (isDuplicate) {
+      //   toast.error("This design is already uploaded.");
+      //   setLoading(false);
+      //   setProgress(0);
+      //   return;
+      // } 
+      
         localStorage.setItem("designs", JSON.stringify([newDesign, ...existing])); toast.success("Design uploaded successfully!");
         setUploadedLink(link);
         setLastId(newDesign.id);
         setProgress(100);
-      }
+      
     } catch {
       toast.error("Network error");
       setProgress(0);

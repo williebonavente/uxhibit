@@ -36,6 +36,22 @@ type EvalResponse = {
     } | null
 };
 
+export async function evaluteDesign(input: {
+    fileKey: string;
+    nodeId?: string;
+    scale?: number;
+    fallbackImageUrl?: string;
+}): Promise<EvalResponse> {
+    const res = await fetch("/api/ai/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || "Failed to evaluate");
+    return data as EvalResponse;
+}
+
 export default function DesignDetailPage() {
     const [design, setDesign] = useState<Design | null>(null);
     const { id } = useParams() as { id: string };
@@ -48,26 +64,47 @@ export default function DesignDetailPage() {
         const stored = JSON.parse(localStorage.getItem("designs") || "[]");
         setDesign(stored.find((d: Design) => d.id === id) || null);
     }, [id]);
+
+    useEffect(() => {
+        const auto = typeof window !== "undefined" && new URLSearchParams(location.search).get("auto") === "1";
+        if (auto && design?.fileKey && !loadingEval && !evalResult) {
+            handleEvaluate();
+        }
+    });
     async function handleEvaluate() {
         if (!design?.fileKey) return;
         setLoadingEval(true);
         setEvalError(null);
+        // try {
+        //     const r = await fetch("/api/ai/evaluate", {
+        //         method: "POST",
+        //         headers: { "Content-Type": "application/json" },
+        //         body: JSON.stringify({
+        //             fileKey: design.fileKey,
+        //             nodeId: design.nodeId,
+        //             scale: 3,
+        //             fallbackImageUrl: design.thumbnail || undefined,   // added
+        //         }),
+        //     });
+        //     const data = await r.json();
+        //     if (!r.ok) throw new Error(data?.error || "Failed to evaluate");
+        //     setEvalResult(data);
+        // } catch (e: any) {
+        //     setEvalError(e.message || "Failed to evaluate");
+        // } finally {
+        //     setLoadingEval(false);
+        // }
+
         try {
-            const r = await fetch("/api/ai/evaluate", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    fileKey: design.fileKey,
-                    nodeId: design.nodeId,
-                    scale: 3,
-                    fallbackImageUrl: design.thumbnail || undefined,   // added
-                }),
+            const data = await evaluteDesign({
+                fileKey: design.fileKey,
+                nodeId: design.nodeId,
+                scale: 3,
+                fallbackImageUrl: design.thumbnail || undefined,
             });
-            const data = await r.json();
-            if (!r.ok) throw new Error(data?.error || "Failed to evaluate");
             setEvalResult(data);
         } catch (e: any) {
-            setEvalError(e.message || "Failed to evaluate");
+            setEvalError(e.message || "Failed to evalute");
         } finally {
             setLoadingEval(false);
         }
