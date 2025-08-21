@@ -5,6 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import { Input } from "./ui/input";
 
 type ParsedFigma = { fileKey: string; nodeId?: string; name?: string };
 
@@ -18,6 +19,11 @@ export default function FigmaLinkUploader() {
   const [age, setAge] = useState("");
   const [occupation, setOccupation] = useState("");
 
+  function handleClear() {
+    setLink?.("");
+    setProgress(0);
+    setLoading(false);
+  }
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault();
     const parsed = parseFigmaUrl(link);
@@ -109,12 +115,12 @@ export default function FigmaLinkUploader() {
       //   setProgress(0);
       //   return;
       // } 
-      
-        localStorage.setItem("designs", JSON.stringify([newDesign, ...existing])); toast.success("Design uploaded successfully!");
-        setUploadedLink(link);
-        setLastId(newDesign.id);
-        setProgress(100);
-      
+
+      localStorage.setItem("designs", JSON.stringify([newDesign, ...existing])); toast.success("Design uploaded successfully!");
+      setUploadedLink(link);
+      setLastId(newDesign.id);
+      setProgress(100);
+
     } catch {
       toast.error("Network error");
       setProgress(0);
@@ -129,22 +135,45 @@ export default function FigmaLinkUploader() {
   return (
     <div className="flex flex-col items-center justify-center space-y-6 w-full px-2">
       {/* Upload Inputs */}
-      <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-4">
-        <input
-          type="text"
+      <div className="w-full max-w-xl space-y-5">
+        <Input
+          type="url"
           value={link}
           onChange={(e) => setLink(e.target.value)}
-          placeholder="https://www.figma.com/design/"
-          className="w-full sm:w-[400px] p-2 rounded-md bg-white dark:bg-[#120F12] border text-sm"
+          placeholder="https://www.figma.com/design/..."
+          className="w-full sm:max-w-[640px] md:max-w-[720px]
+               h-12 md:h-14 px-4 md:px-5 rounded-lg
+               bg-white dark:bg-[#120F12] border
+               text-base md:text-lg"
         />
 
-        <button
-          onClick={handleUpload}
-          className="bg-[#ED5E20] text-white px-6 py-2 rounded-md hover:bg-orange-600 hover:cursor-pointer text-sm w-full sm:w-auto"
-          disabled={loading}
-        >
-          Upload
-        </button>
+        {/* Buttons below input */}
+        <div className="flex flex-col sm:flex-row mt-10 gap-5 items-center justify-center">
+          <button
+            type="button"
+            onClick={handleUpload}
+            className="h-[44px] px-6 inline-flex items-center justify-center rounded-[10px]
+                       bg-[#ED5E20] text-white text-sm font-semibold
+                       transition-colors duration-200 hover:bg-[#56cc1b] hover:cursor-pointer
+                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF8700]
+                       disabled:opacity-50 w-full sm:w-auto"
+            disabled={loading}
+          >
+            Upload
+          </button>
+
+          <button
+            type="button"
+            onClick={handleClear}
+            className="h-[44px] px-6 inline-flex items-center justify-center rounded-[10px]
+                       bg-[#ED5E20] text-white text-sm font-semibold
+                       transition-colors duration-200 hover:bg-[#fc0317] hover:cursor-pointer
+                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF8700]
+                       disabled:opacity-50 w-full sm:w-auto"
+          >
+            Clear
+          </button>
+        </div>
       </div>
 
       {/* Loading Bar */}

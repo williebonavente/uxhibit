@@ -11,7 +11,7 @@ export interface NavMainLink {
 export const navMain: NavMainLink[] = [
   {
     title: "Dashboard",
-    url: "/",
+    url: "/dashboard",
     icon: IconDashboard
   },
   {

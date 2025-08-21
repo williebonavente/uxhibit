@@ -58,7 +58,7 @@ export default function LoginForm() {
         return;
       }
       toast.success("Logged in successfully!");
-      router.push("/");
+      router.push("/dashboard");
     } catch (error) {
       console.error('Form submission error', error)
       // toast.error('Failed to submit the form. Please try again.')
@@ -67,7 +67,7 @@ export default function LoginForm() {
 
   return (
     <>
-      <MiddleHeaderIcon href="/auth/login" />
+      <MiddleHeaderIcon href="/" />
       <div className="flex flex-col-reverse lg:flex-row min-h-[50vh] w-full items-center justify-center px-4 py-8 lg:justify-end lg:px-70 lg:py-10">
         {/* Image  */}
         <div className="hidden 2xl:block mr-[116px] w-full 2xl:w-[640px] 2xl:h-[857px] flex-shrink-0 relative">

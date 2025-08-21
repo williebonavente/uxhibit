@@ -27,7 +27,7 @@ import {
 import { logout } from "@/app/auth/login/action";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { getInitials } from "@/app/(root)/page";
+import { getInitials } from "@/app/(root)/dashboard/page";
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Input } from "./ui/input";

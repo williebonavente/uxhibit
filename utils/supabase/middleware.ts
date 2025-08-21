@@ -1,18 +1,15 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
-import { AUTH_PATH} from "@/constants/common";
+import { AUTH_PATH } from "@/constants/common";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next(
     {
-    // request: {
-    //   headers: request.headers,
-    // },
-    request
-  }
-);
+      request
+    }
+  );
   const supabase = createServerClient(
     supabaseUrl!,
     supabaseKey!,
@@ -32,14 +29,21 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
+  const PUBLIC_PATHS = new Set<string>(["/"]);
+
+  function isPublicPath(path: string) {
+    if (PUBLIC_PATHS.has(path)) return true;
+    if (path.startsWith("/_next") || path === "/favicon.ico" || path.startsWith("/images")) return true;
+    return false;
+  }
+
   const { data: { user } } = await supabase.auth.getUser()
 
   const path = request.nextUrl.pathname;
 
   // Redirect unauthenticated users to login, except for auth routes
-  if (!user && !path.startsWith("/auth"))
-  {
-    const url =  request.nextUrl.clone();
+  if (!user && !path.startsWith("/auth") && !isPublicPath(path)) {
+    const url = request.nextUrl.clone();
     url.pathname = AUTH_PATH;
     // url.searchParams.set('next', path);
     return NextResponse.redirect(url);
@@ -72,10 +76,10 @@ export async function updateSession(request: NextRequest) {
 
 
   // Preventing authenticated users from accessing the login page
-  if (user && path.startsWith(AUTH_PATH)) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/';
-    return NextResponse.redirect(url);
-  }
+  // if (user && path.startsWith(AUTH_PATH)) {
+  //   const url = request.nextUrl.clone();
+  //   url.pathname = '/';
+  //   return NextResponse.redirect(url);
+  // }
   return supabaseResponse;
 }
