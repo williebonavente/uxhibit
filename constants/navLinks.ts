@@ -1,6 +1,7 @@
 import { IconDashboard, IconChartBar, IconFolder, IconRadar, IconTrendingUp, 
       IconCompass, IconProps, IconSearch, 
       IconAB2} from "@tabler/icons-react";
+import { IceCreamIcon } from "lucide-react";
 
 export interface NavMainLink {
   title: string,
@@ -50,6 +51,11 @@ export const navMain: NavMainLink[] = [
     title: "Test",
     url: "/test",
     icon: IconAB2
+  },
+  {
+    title: "Review",
+    url: "/review",
+    icon: IconFolder,
   }
 ]
 

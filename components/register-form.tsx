@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { file, z } from 'zod'
+import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -11,7 +11,6 @@ import {
   FormControl,
   FormField,
   FormItem,
-  // FormLabel,
   FormMessage,
 } from '@/components/ui/form'
 import { Button } from '@/components/ui/button'
@@ -22,7 +21,7 @@ import MiddleHeaderIcon from './middle-header-icon'
 import Image from 'next/image'
 import { createClient } from "@/utils/supabase/client";
 import { type User } from "@supabase/supabase-js";
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 // import { Avatar } from '@radix-ui/react-avatar'
 
@@ -37,7 +36,7 @@ export default function RegistrationForm({ user }: { user: User | null }) {
   const [website, setWebsite] = useState<string | null>(null)
   const [age, setAge] = useState<string | null>(null)
   const [avatar_url, setAvatarUrl] = useState<string | null>(null)
-  const [isCheck, setCheck ] = useState<string | null>(null);
+  const [isCheck, setCheck] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof registerFormSchema>>({
     defaultValues: {
@@ -56,46 +55,51 @@ export default function RegistrationForm({ user }: { user: User | null }) {
 
 
 
-  async function updateProfile({
-    username,
-    website,
-    age,
-    avatar_url,
-  }: {
-    username: string | null
-    fullname: string | null
-    age: number
-    website: string | null
-    avatar_url: string | null
-  }) {
-    try {
-      setLoading(true)
+  // async function updateProfile({
+  //   username,
+  //   website,
+  //   age,
+  //   avatar_url,
+  // }: {
+  //   username: string | null
+  //   fullname: string | null
+  //   age: number
+  //   website: string | null
+  //   avatar_url: string | null
+  // }) {
+  //   try {
+  //     setLoading(true)
 
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user?.id as string,
-          username,
-          full_name: fullname,
-          age,
-          website,
-          avatar_url,
-          updated_at: new Date().toISOString(),
-        })
-      if (error) throw error
-      alert('Profile updated!')
-    } catch (error) {
-      alert('Error updating the data!')
-    } finally {
-      setLoading(false)
-    }
-  }
+  //     const { error } = await supabase
+  //       .from('profiles')
+  //       .upsert({
+  //         id: user?.id as string,
+  //         username,
+  //         full_name: fullname,
+  //         age,
+  //         website,
+  //         avatar_url,
+  //         updated_at: new Date().toISOString(),
+  //       })
+  //     if (error) throw error
+  //     alert('Profile updated!')
+  //   } catch (error) {
+  //     alert('Error updating the data!')
+  //   } finally {
+  //     setLoading(false)
+  //   }
+  // }
+  const origin =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : process.env.NEXT_PUBLIC_SITE_URL || "";
   async function onSubmit(values: z.infer<typeof registerFormSchema>) {
     try {
       const { data, error } = await supabase.auth.signUp({
         email: values.email,
         password: values.password,
         options: {
+          emailRedirectTo: `${origin}/auth/confirm?next=/auth/login`,
           data: {
             username: values.username,
             full_name: values.full_name,
@@ -112,7 +116,7 @@ export default function RegistrationForm({ user }: { user: User | null }) {
         return;
       }
 
-      toast.success('Registered successfully!');
+      toast.success('Check your email to confirm your account');
       router.push('/auth/login');
     } catch (error) {
       console.error('Form submission error', error);
@@ -298,7 +302,7 @@ export default function RegistrationForm({ user }: { user: User | null }) {
 
 
                 />
-               
+
                 {/* Website Field (optional)
                 <FormField
                   control={form.control}
