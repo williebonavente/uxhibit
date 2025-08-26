@@ -33,8 +33,7 @@ export default function DesignsGallery() {
     async (thumb: string | null) => {
       if (!thumb) return null;
       if (thumb.startsWith("http")) return thumb; // already URL
-      const { data } = await supabase
-        .storage
+      const { data } = await supabase.storage
         .from("design-thumbnails")
         .createSignedUrl(thumb, 3600);
       return data?.signedUrl || null;
@@ -58,7 +57,7 @@ export default function DesignsGallery() {
     }
     // Sign thumbnails as needed (parallel)
     const withThumbs = await Promise.all(
-      (data || []).map(async d => ({
+      (data || []).map(async (d) => ({
         ...d,
         thumbnail_url: await resolveThumbnail(d.thumbnail_url),
       }))
@@ -85,7 +84,9 @@ export default function DesignsGallery() {
 
   // CHANGED: update DB title instead of localStorage
   const handleNameChange = async (id: string, newName: string) => {
-    setDesigns(ds => ds.map(d => d.id === id ? { ...d, title: newName } : d));
+    setDesigns((ds) =>
+      ds.map((d) => (d.id === id ? { ...d, title: newName } : d))
+    );
     const { error } = await supabase
       .from("designs")
       .update({ title: newName })
@@ -130,7 +131,7 @@ export default function DesignsGallery() {
                 .eq("id", id);
               if (error) toast.error("Delete failed");
               else {
-                setDesigns(d => d.filter(x => x.id !== id));
+                setDesigns((d) => d.filter((x) => x.id !== id));
                 toast.success("Deleted");
               }
               setShowOverlay(false);
@@ -155,7 +156,9 @@ export default function DesignsGallery() {
   }
 
   if (designs.length === 0) {
-    return <p className="mt-4 text-gray-400 text-sm">No designs uploaded yet.</p>;
+    return (
+      <p className="mt-4 text-gray-400 text-sm">No designs uploaded yet.</p>
+    );
   }
 
   return (
@@ -163,27 +166,31 @@ export default function DesignsGallery() {
       {designs.map((design) => (
         <div
           key={design.id}
-            className="bg-white dark:bg-[#1A1A1A] rounded-xl shadow-md space-y-0 flex flex-col h-full"
+          className="bg-white dark:bg-[#312727] rounded-xl shadow-md space-y-0 flex flex-col h-full p-2"
         >
           <Link
             href={`/designs/${design.id}`}
             target="_blank"
             rel="noopener noreferrer"
           >
-            <div className="relative w-full overflow-hidden rounded-t-xl aspect-[4/3] lg:aspect-auto lg:h-[280px]">
+            <div className="relative w-full aspect-video rounded-lg border overflow-hidden">
               <Image
                 // CHANGED: prefer stored signed/public thumbnail; fallback to Figma endpoint or placeholder
                 src={
                   design.thumbnail_url
                     ? design.thumbnail_url
                     : design.file_key
-                      ? `/api/figma/thumbnail?fileKey=${design.file_key}${design.node_id ? `&nodeId=${encodeURIComponent(design.node_id)}` : ""}`
-                      : "/images/design-thumbnail.png"
+                    ? `/api/figma/thumbnail?fileKey=${design.file_key}${
+                        design.node_id
+                          ? `&nodeId=${encodeURIComponent(design.node_id)}`
+                          : ""
+                      }`
+                    : "/images/design-thumbnail.png"
                 }
                 alt={design.title || "Design Preview"}
-                width={400}
-                height={300}
-                className="w-full h-full object-cover rounded-t-xl"
+                fill
+                className="object-cover"
+                sizes="(min-width:1280px) 1280px, 100vw"
               />
             </div>
           </Link>
