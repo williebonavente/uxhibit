@@ -1,5 +1,9 @@
 "use client";
-import { IconCirclePlusFilled, Icon, IconChevronDown } from "@tabler/icons-react";
+import {
+  IconCirclePlusFilled,
+  Icon,
+  IconChevronDown,
+} from "@tabler/icons-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { usePathname } from "next/navigation";
@@ -22,18 +26,14 @@ interface NavItem {
   items?: NavItem[];
 }
 
-export function NavMain({
-  items,
-}: {
-  items: NavItem[];
-}) {
+export function NavMain({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
-  const [openItems, setOpenItems] = useState<string[]>(['Analytics']); // Analytics open by default
+  const [openItems, setOpenItems] = useState<string[]>([]); // Analytics closed by default
 
   const toggleItem = (title: string) => {
-    setOpenItems(prev => 
-      prev.includes(title) 
-        ? prev.filter(item => item !== title)
+    setOpenItems((prev) =>
+      prev.includes(title)
+        ? prev.filter((item) => item !== title)
         : [...prev, title]
     );
   };
@@ -59,7 +59,9 @@ export function NavMain({
             const isActive = pathname === item.url;
             const hasSubItems = item.items && item.items.length > 0;
             const isOpen = openItems.includes(item.title);
-            const isParentActive = hasSubItems && item.items?.some(subItem => pathname === subItem.url);
+            const isParentActive =
+              hasSubItems &&
+              item.items?.some((subItem) => pathname === subItem.url);
 
             return (
               <SidebarMenuItem key={item.title}>
@@ -98,7 +100,9 @@ export function NavMain({
                                 }`}
                               >
                                 <Link href={subItem.url}>
-                                  <span className="text-xs">{subItem.title}</span>
+                                  <span className="text-xs">
+                                    {subItem.title}
+                                  </span>
                                 </Link>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
