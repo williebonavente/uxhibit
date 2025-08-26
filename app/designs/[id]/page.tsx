@@ -321,7 +321,7 @@ export default function DesignDetailPage({
       <div className="flex pt-5 pb-5 items-center justify-between">
         <div className="flex items-center">
           {/* Back Button */}
-          <Link href="/">
+          <Link href="/dashboard">
             <IconArrowLeft
               size={24}
               className="cursor-pointer hover:text-orange-600 mr-2"
