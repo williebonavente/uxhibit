@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { parseFigmaUrl } from "@/lib/figma";
+import { uploadThumbnailFromUrl } from "@/lib/uploadThumbnail";
 
 export const runtime = "nodejs";
 const FIGMA_TOKEN = process.env.FIGMA_ACCESS_TOKEN as string;

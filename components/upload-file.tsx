@@ -19,6 +19,18 @@ export default function FigmaLinkUploader() {
   const [age, setAge] = useState("");
   const [occupation, setOccupation] = useState("");
 
+  const handleEvaluate = () => {
+    if (!uploadedLink) return;
+    if (!age || !occupation) {
+      toast.error("Select generation and occupation first.");
+      return;
+    }
+    if (!lastId) {
+      toast.error("Missing design Id.");
+      return;
+    }
+    router.push(`/designs/${lastId}`);
+  }
   function handleClear() {
     setLink?.("");
     setProgress(0);
@@ -53,8 +65,7 @@ export default function FigmaLinkUploader() {
 
       const newDesign = {
         id: crypto.randomUUID(),
-        figma_link: link,
-        project_name: data?.name || "Untitled Design",
+         project_name: data?.name || "Untitled Design",
         likes: 0,
         views: 0,
         age,
@@ -135,7 +146,7 @@ export default function FigmaLinkUploader() {
   return (
     <div className="flex flex-col items-center justify-center space-y-6 w-full px-2">
       {/* Upload Inputs */}
-      <div className="w-full max-w-xl space-y-5">
+      <div className="w-full max-w-xl space-y-5 mb-10">
         <Input
           type="url"
           value={link}
@@ -210,7 +221,7 @@ export default function FigmaLinkUploader() {
             onChange={(e) => setOccupation(e.target.value)}
             className="p-2 border rounded-md bg-white dark:bg-[#120F12] text-sm"
           >
-            <option value="">Select Occupation</option>
+            <option value=""  >Select Occupation</option>
             <option value="Student">Student</option>
             <option value="Freelancer">Freelancer</option>
             <option value="Designer">Designer</option>

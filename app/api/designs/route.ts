@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from '@/utils/supabase/server';
+import { uploadThumbnailFromUrl } from "@/lib/uploadThumbnail";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,23 +11,21 @@ export async function POST(req: Request) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { title, figma_link, file_key, node_id, thumbnail_url, snapshot, ai } = await req.json();
+    const body = await req.json();
+    const { title, figma_link, file_key, node_id, thumbnail_url, snapshot, ai } = body;
+
     if (!title) return NextResponse.json({ error: "title is required" }, { status: 400 });
     if (!figma_link) return NextResponse.json({ error: "figma_link is required" }, { status: 400 });
 
-    // 0) Check if a design with the same figma_link already exists for this user
     const { data: existing, error: existErr } = await supabase
       .from("designs")
-      .select("id, title")
+      .select("id,title")
       .eq("owner_id", user.id)
       .eq("figma_link", figma_link)
       .maybeSingle();
-    if (existErr && existErr.code !== "PGRST116") {
-      // PGRST116 = Results contain 0 rows (safe to ignore when using maybeSingle)
+    if (existErr && existErr.code !== "PGRST116")
       return NextResponse.json({ error: existErr.message }, { status: 400 });
-    }
 
-    // Helper: get next version number
     const getNextVersion = async (designId: string) => {
       const { data: rows, error } = await supabase
         .from("design_versions")
@@ -38,10 +37,20 @@ export async function POST(req: Request) {
       return ((rows?.[0]?.version as number | undefined) ?? 0) + 1;
     };
 
+    // EXISTING DESIGN -> add version
     if (existing?.id) {
-      // A design for this link already exists -> create a new version only
-      const next = await getNextVersion(existing.id);
+      let storedThumbnail = thumbnail_url || null;
+      if (thumbnail_url) {
+        const up = await uploadThumbnailFromUrl(
+          supabase as any,
+            thumbnail_url,
+            existing.id,
+            { makePublic: false } // set true if bucket public
+        );
+        if (up.publicUrl) storedThumbnail = up.publicUrl; else if (up.path) storedThumbnail = up.path;
+      }
 
+      const next = await getNextVersion(existing.id);
       const { data: ver, error: vErr } = await supabase
         .from("design_versions")
         .insert({
@@ -49,7 +58,7 @@ export async function POST(req: Request) {
           version: next,
           file_key,
           node_id,
-          thumbnail_url,
+          thumbnail_url: storedThumbnail,      // no thumbnail_path
           snapshot: snapshot ?? null,
           ai_summary: ai?.summary ?? null,
           ai_data: ai ?? null,
@@ -61,24 +70,43 @@ export async function POST(req: Request) {
 
       const { error: uErr } = await supabase
         .from("designs")
-        .update({ current_version_id: ver.id })
+        .update({
+          current_version_id: ver.id,
+          thumbnail_url: storedThumbnail,
+        })
         .eq("id", existing.id);
       if (uErr) return NextResponse.json({ error: uErr.message }, { status: 400 });
 
       return NextResponse.json({
-        design: { id: existing.id, title: existing.title, figma_link },
+        design: {
+          id: existing.id,
+          title: existing.title,
+          figma_link,
+          thumbnail_url: storedThumbnail,
+        },
         current_version: ver,
         existed: true,
       });
     }
 
-    // No existing design -> create a new design and version 1
+    // NEW DESIGN
     const { data: design, error: dErr } = await supabase
       .from("designs")
       .insert({ owner_id: user.id, title, figma_link })
       .select("*")
       .single();
     if (dErr) return NextResponse.json({ error: dErr.message }, { status: 400 });
+
+    let storedThumbnail = thumbnail_url || null;
+    if (thumbnail_url) {
+      const up = await uploadThumbnailFromUrl(
+        supabase as any,
+        thumbnail_url,
+        design.id,
+        { makePublic: false }
+      );
+      if (up.publicUrl) storedThumbnail = up.publicUrl; else if (up.path) storedThumbnail = up.path;
+    }
 
     const { data: ver, error: vErr } = await supabase
       .from("design_versions")
@@ -87,7 +115,7 @@ export async function POST(req: Request) {
         version: 1,
         file_key,
         node_id,
-        thumbnail_url,
+        thumbnail_url: storedThumbnail,
         snapshot: snapshot ?? null,
         ai_summary: ai?.summary ?? null,
         ai_data: ai ?? null,
@@ -99,11 +127,18 @@ export async function POST(req: Request) {
 
     const { error: uErr } = await supabase
       .from("designs")
-      .update({ current_version_id: ver.id })
+      .update({
+        current_version_id: ver.id,
+        thumbnail_url: storedThumbnail,
+      })
       .eq("id", design.id);
     if (uErr) return NextResponse.json({ error: uErr.message }, { status: 400 });
 
-    return NextResponse.json({ design, current_version: ver, existed: false });
+    return NextResponse.json({
+      design: { ...design, thumbnail_url: storedThumbnail },
+      current_version: ver,
+      existed: false,
+    });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });
   }
