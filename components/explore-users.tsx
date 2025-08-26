@@ -213,7 +213,7 @@ export default function ExplorePage() {
 
       {/* User Cards */}
       {filteredUsers.map((user) => (
-        <div key={user.id} className="bg-accent rounded-xl shadow p-5 mb-10">
+        <div key={user.id} className="border rounded-xl shadow p-5 mb-10">
           <div className="flex items-center gap-3 mb-4">
             <Image
               src={user.avatar}
