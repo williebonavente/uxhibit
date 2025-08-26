@@ -57,10 +57,12 @@ export default async function Dashboard() {
       <div className="site-header grid grid-cols-1 sm:grid-cols-[1fr_auto] items-start sm:items-center gap-4 sm:gap-6 px-2 sm:px-0">
         <div className="flex-1 min-w-0">
           <p className="hidden sm:block text-white text-sm sm:text-base">
-            Welcome back, <span className="font-semibold">{fullName.split(" ")[0]}</span>!
+            Welcome back,{" "}
+            <span className="font-semibold">{fullName.split(" ")[0]}</span>!
           </p>
           <p className="hidden sm:block font-semibold text-white text-balance leading-tight text-[clamp(1.25rem,4vw,2rem)]">
-            It&apos;s Time to <span className="xhibit-gradient-text">Xhibit</span> Greatness.
+            It&apos;s Time to{" "}
+            <span className="xhibit-gradient-text">Xhibit</span> Greatness.
           </p>
         </div>
         <div className="user-card hidden sm:flex items-center gap-3 sm:gap-4 bg-white/5 rounded-xl p-2 sm:p-3 backdrop-blur supports-[backdrop-filter]:bg-white/10">
