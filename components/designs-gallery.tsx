@@ -166,7 +166,7 @@ export default function DesignsGallery() {
       {designs.map((design) => (
         <div
           key={design.id}
-          className="bg-white dark:bg-[#312727] rounded-xl shadow-md space-y-0 flex flex-col h-full p-2"
+          className="bg-accent dark:bg-[#1A1A1A] rounded-xl shadow-md space-y-0 flex flex-col h-full p-2"
         >
           <Link
             href={`/designs/${design.id}`}

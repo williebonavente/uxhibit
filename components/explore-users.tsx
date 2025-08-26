@@ -1,8 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { IconSearch, IconHeart, IconHeartFilled, IconEye } from "@tabler/icons-react";
-import Image from "next/image"
+import {
+  IconSearch,
+  IconHeart,
+  IconHeartFilled,
+  IconEye,
+} from "@tabler/icons-react";
+import Image from "next/image";
 import Link from "next/link";
 
 // Fetch this in database
@@ -170,10 +175,10 @@ export default function ExplorePage() {
         designs: user.designs.map((design) =>
           design.id === designId
             ? {
-              ...design,
-              liked: !design.liked,
-              likes: design.liked ? design.likes - 1 : design.likes + 1,
-            }
+                ...design,
+                liked: !design.liked,
+                likes: design.liked ? design.likes - 1 : design.likes + 1,
+              }
             : design
         ),
       };
@@ -209,7 +214,6 @@ export default function ExplorePage() {
       {/* User Cards */}
       {filteredUsers.map((user) => (
         <div key={user.id} className="bg-accent rounded-xl shadow p-5 mb-10">
-
           <div className="flex items-center gap-3 mb-4">
             <Image
               src={user.avatar}
@@ -226,21 +230,23 @@ export default function ExplorePage() {
             {user.designs.map((design) => (
               <div
                 key={design.id}
-                className="bg-white dark:bg-[#1A1A1A] rounded-xl shadow-sm space-y-2"
+                className="bg-accent dark:bg-[#1A1A1A] rounded-xl shadow-md space-y-0 flex flex-col h-full p-2"
               >
                 <Link
                   href={design.figma_link}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  {/* Thumbnail Links */}
-                  <Image
-                    src={"/images/design-thumbnail.png"}
-                    alt="Design thumbnail"
-                    className="w-full object-cover rounded-t-xl"
-                    width={400}
-                    height={400}
-                  />
+                  <div className="relative w-full aspect-video rounded-lg border overflow-hidden">
+                    {/* Thumbnail Links */}
+                    <Image
+                      src={"/images/design-thumbnail.png"}
+                      alt="Design thumbnail"
+                      className="object-cover"
+                      width={400}
+                      height={400}
+                    />
+                  </div>
                 </Link>
                 <div className="p-3 space-y-2 group relative">
                   <div className="flex items-center justify-between gap-2">

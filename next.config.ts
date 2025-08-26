@@ -21,7 +21,7 @@ const nextConfig: NextConfig = {
       },
 
     ],
-    // domains: ["i.pravatar.cc"],
+    domains: ["i.pravatar.cc"],
   },
 };
 export default nextConfig;
