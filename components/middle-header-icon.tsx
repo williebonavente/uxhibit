@@ -6,7 +6,10 @@ interface MiddleHeaderIconProps {
   ariaLabel?: string;
 }
 
-export default function MiddleHeaderIcon({ href = "/", ariaLabel = "Go to homepage" }: MiddleHeaderIconProps) {
+export default function MiddleHeaderIcon({
+  href = "/",
+  ariaLabel = "Go to homepage",
+}: MiddleHeaderIconProps) {
   const iconContent = (
     <span className="inline-flex">
       <Image
