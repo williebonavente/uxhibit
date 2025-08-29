@@ -121,7 +121,7 @@ export default function RegistrationForm({ user }: { user: User | null }) {
 
   return (
     <>
-      <MiddleHeaderIcon href="/auth/signup" />
+      <MiddleHeaderIcon href="/" />
 
       {/* Responsive wrapper */}
       <div className="flex flex-col lg:flex-row min-h-screen w-full justify-center items-center px-4 py-8 lg:px-20 lg:py-12">
