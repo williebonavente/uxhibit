@@ -1,6 +1,8 @@
-import { IconDashboard, IconChartBar, IconFolder, IconRadar, IconTrendingUp, 
-      IconCompass, IconProps, IconSearch, 
-      IconAB2} from "@tabler/icons-react";
+import {
+  IconDashboard, IconChartBar, IconFolder, IconRadar, IconTrendingUp,
+  IconCompass, IconProps, IconSearch,
+  IconAB2
+} from "@tabler/icons-react";
 import { IceCreamIcon } from "lucide-react";
 
 export interface NavMainLink {
@@ -45,17 +47,9 @@ export const navMain: NavMainLink[] = [
   {
     title: "Explore",
     url: "/explore",
-    icon: IconSearch, 
+    icon: IconSearch,
   },
-  {
-    title: "Test",
-    url: "/test",
-    icon: IconAB2
-  },
-  {
-    title: "Review",
-    url: "/review",
-    icon: IconFolder,
-  }
+
+
 ]
 
