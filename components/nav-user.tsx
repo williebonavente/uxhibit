@@ -27,7 +27,7 @@ import {
 import { logout } from "@/app/auth/login/action";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { getInitials } from "@/app/(root)/page";
+import { getInitials } from "@/app/(root)/dashboard/page";
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Input } from "./ui/input";
@@ -169,7 +169,18 @@ export function NavUser({ user }: { user: User | null }) {
                 className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
               >
                 <Avatar className="h-8 w-8 rounded-bl-full ">
-                  <AvatarImage src={profile?.avatar_url} alt={profile?.fullname} />
+                  {/* <AvatarImage src={profile?.avatar_url} alt={profile?.fullname} /> */}
+                  <AvatarImage
+                    src={
+                      avatarPreview
+                      ?? (profile?.avatar_url
+                        ? (profile.avatar_url.startsWith("http")
+                          ? profile.avatar_url
+                          : `/api/avatars?path=${encodeURIComponent(profile.avatar_url)}`)
+                        : undefined)
+                    }
+                    alt={profile?.fullname}
+                  />
                   {/* Display the the initial if the user does not have avatar */}
                   <AvatarFallback className="rounded-lg grayscale">{getInitials(fullname)}</AvatarFallback>
                 </Avatar>
@@ -194,8 +205,20 @@ export function NavUser({ user }: { user: User | null }) {
               <DropdownMenuLabel className="p-0 font-normal">
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                   <Avatar className="h-8 w-8 rounded-bl-full">
-                    {/* TODO: To be implemented */}
-                    <AvatarImage src={profile?.avatar_url ?? undefined} alt={profile?.fullname ?? email ?? "User"} />
+
+                    {/* <AvatarImage 
+                      src={profile?.avatar_url ?? undefined} alt={profile?.fullname ?? email ?? "User"} /> */}
+                    <AvatarImage
+                      src={
+                        avatarPreview
+                        ?? (profile?.avatar_url
+                          ? (profile.avatar_url.startsWith("http")
+                            ? profile.avatar_url
+                            : `/api/avatars?path=${encodeURIComponent(profile.avatar_url)}`)
+                          : undefined)
+                      }
+                      alt={profile?.fullname}
+                    />
                     <AvatarFallback className="rounded-lg">{getInitials(fullname)}</AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
@@ -233,8 +256,16 @@ export function NavUser({ user }: { user: User | null }) {
             onClick={() => setOpen(false)}
           />
           {/* Centered form */}
-          <div className="relative z-10 bg-white dark:bg-[#141414] rounded-xl shadow-lg p-8 w-full max-w-md mx-auto">
-            <h2 className="text-2xl font-bold mb-4 text-center">
+          <div
+            className="
+        relative z-10 bg-white dark:bg-[#141414] rounded-xl shadow-lg
+        w-full max-w-xs sm:max-w-md mx-auto
+        p-3 sm:p-8
+        overflow-y-auto max-h-[90vh]
+      "
+          >
+            {/* Adjusted font size and margin for mobile */}
+            <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4 text-center">
               Account Information
             </h2>
             <p className="mb-6 text-center text-muted-foreground">
@@ -247,22 +278,45 @@ export function NavUser({ user }: { user: User | null }) {
                   const supabase = createClient();
                   let imageUrl = profile.avatar_url;
                   //  Only upload if a new avatar is selected
+                  // if (pendingAvatar) {
+                  //   const { data, error: uploadError } = await supabase.storage
+                  //     .from("avatars")
+                  //     .upload(`${profile.id}-${pendingAvatar.name}`, pendingAvatar, {
+                  //       cacheControl: "3600",
+                  //       upsert: true,
+                  //     });
+                  //   if (uploadError) {
+                  //     toast.error(uploadError.message);
+                  //     return;
+                  //   }
+                  //   imageUrl = `${profile.id}-${pendingAvatar}`
+                  //   const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+                  //     .from("avatars")
+                  //     // TODO: 
+                  //       .createSignedUrl(`${profile.id}-${pendingAvatar.name}`, 6000 * 6000); // URL valid for 1 hour
+
+                  //   if (signedUrlError) {
+                  //     toast.error(signedUrlError.message);
+                  //     return;
+                  //   }
+                  //   imageUrl = signedUrlData?.signedUrl;
+                  // }
+
                   if (pendingAvatar) {
-                    const { data, error: uploadError } = await supabase.storage
+                    const filePath = `${profile.id}/${Date.now()}-${pendingAvatar.name}`;
+                    const { error: uploadError } = await supabase.storage
                       .from("avatars")
-                      .upload(`${profile.id}-${pendingAvatar.name}`, pendingAvatar, {
-                        cacheControl: "3600",
+                      .upload(filePath, pendingAvatar, {
+                        cacheControl: "31536000",
                         upsert: true,
                       });
                     if (uploadError) {
                       toast.error(uploadError.message);
                       return;
                     }
-                    const { data: publicUrlData } = supabase.storage
-                      .from("avatars")
-                      .getPublicUrl(`${profile.id}-${pendingAvatar.name}`);
-                    imageUrl = publicUrlData.publicUrl;
+                    imageUrl = filePath;
                   }
+
 
                   // Update profile in DB
                   const { error } = await supabase
@@ -292,48 +346,58 @@ export function NavUser({ user }: { user: User | null }) {
                 className="space-y-4"
               >
                 <div>
-                <div>
-                  <div className="flex flex-col items-center gap-2">
-                    <div
-                      className="relative cursor-pointer group"
-                      onClick={() => document.getElementById("avatar-upload")?.click()}
-                    >
-                      <Avatar className="h-32 w-32 rounded-full border-4 border-gray-300 group-hover:border-blue-500 transition shadow-xl">
-                        {/* <AvatarImage src={profile?.avatar_url} alt={profile?.fullname} /> */}
-                        <AvatarImage src={avatarPreview ?? profile?.avatar_url} alt={profile?.fullname} />
-                        <AvatarFallback className="rounded-full text-4xl bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
-                          {getInitials(profile?.fullname)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition rounded-full">
-                        <span className="text-white text-lg font-semibold">Change</span>
-                      </div>
-                    </div>
-                    <input
-                      id="avatar-upload"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={async e => {
-                        if (e.target.files && e.target.files[0]) {
-                          const file = e.target.files[0];
-                          // Adding preview
-                          setPendingAvatar(file);
-                          setAvatarPreview(URL.createObjectURL(file));
-                        }
-                      }}
-                    />
-                  </div>
-                  {/* Bio just to replace the UI/UX Designer message */}
                   <div>
-                    <label>Bio</label>
-                    <Input
-                      value={profile.bio ?? "UI/UX  Designer"}
-                      onChange={e => setProfile({ ...profile, bio: e.target.value })}
-                      className="mb-4"
-                    />  
+                    <div className="flex flex-col items-center gap-2">
+                      <div
+                        className="relative cursor-pointer group"
+                        onClick={() => document.getElementById("avatar-upload")?.click()}
+                      >
+                        <Avatar className="h-24 w-24 sm:h-32 sm:w-32 rounded-full border-4 border-gray-300 group-hover:border-blue-500 transition shadow-xl">
+                          {/* <AvatarImage src={avatarPreview ?? profile?.avatar_url} alt={profile?.fullname} /> */}
+                          <AvatarImage
+                            src={
+                              avatarPreview
+                              ?? (profile?.avatar_url
+                                ? (profile.avatar_url.startsWith("http")
+                                  ? profile.avatar_url
+                                  : `/api/avatars?path=${encodeURIComponent(profile.avatar_url)}`)
+                                : undefined)
+                            }
+                            alt={profile?.fullname ?? email ?? "User"}
+                          />
+                          <AvatarFallback className="rounded-full text-3xl sm:text-4xl bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
+                            {getInitials(profile?.fullname)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition rounded-full">
+                          <span className="text-white text-lg font-semibold">Change</span>
+                        </div>
+                      </div>
+                      <input
+                        id="avatar-upload"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async e => {
+                          if (e.target.files && e.target.files[0]) {
+                            const file = e.target.files[0];
+                            // Adding preview
+                            setPendingAvatar(file);
+                            setAvatarPreview(URL.createObjectURL(file));
+                          }
+                        }}
+                      />
+                    </div>
+                    {/* Bio just to replace the UI/UX Designer message */}
+                    <div>
+                      <label>Bio</label>
+                      <Input
+                        value={profile.bio ?? "UI/UX  Designer"}
+                        onChange={e => setProfile({ ...profile, bio: e.target.value })}
+                        className="mb-4"
+                      />
+                    </div>
                   </div>
-                </div>
                   <label>Username</label>
                   <Input
                     value={profile.username ?? "User"}
@@ -385,19 +449,19 @@ export function NavUser({ user }: { user: User | null }) {
                   />
                 </div>
 
-                {/* Avatar */}
-                <footer className="flex justify-center gap-4 mt-16">
+                {/* Footer buttons are now responsive: stack on mobile, row on desktop */}
+                <footer className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-4 mt-6 sm:mt-16">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => setOpen(false)}
-                    className="cursor-pointer"
+                    className="cursor-pointer w-full sm:w-auto"
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
-                    className="cursor-pointer bg-[#ED5E20] hover:bg-[#d44e0f]"
+                    className="cursor-pointer w-full sm:w-auto bg-[#ED5E20] text-[#FFF] hover:bg-[#d44e0f] dark:bg-[#d44e0f] dark:text-[#FFF] dark:hover:bg-[#ED5E20]"
                   >
                     Save Changes
                   </Button>
@@ -405,8 +469,9 @@ export function NavUser({ user }: { user: User | null }) {
               </form>
             )}
           </div>
-        </div>
-      )}
+        </div >
+      )
+      }
     </>
   );
 }

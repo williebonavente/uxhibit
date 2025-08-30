@@ -7,7 +7,7 @@ export default function Explore() {
         <h1 className="text-xl font-medium">Explore</h1>
       </div>
       <div className="p-2 m-5 flex items-center">
-        <p>
+        <p className="text-sm sm:text-base text-gray-700 dark:text-gray-200 w-full sm:mb-0 font-['Poppins']">
           Discover other users’ UI/UX designs and see how they applied usability
           heuristics, design principles, and best practices. Analyze their
           layout choices, interactions, and accessibility features to gain

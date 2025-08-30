@@ -1,5 +1,7 @@
 import { IconDashboard, IconChartBar, IconFolder, IconRadar, IconTrendingUp, 
-      IconCompass, IconProps, IconSearch } from "@tabler/icons-react";
+      IconCompass, IconProps, IconSearch, 
+      IconAB2} from "@tabler/icons-react";
+import { IceCreamIcon } from "lucide-react";
 
 export interface NavMainLink {
   title: string,
@@ -10,7 +12,7 @@ export interface NavMainLink {
 export const navMain: NavMainLink[] = [
   {
     title: "Dashboard",
-    url: "/",
+    url: "/dashboard",
     icon: IconDashboard
   },
   {
@@ -45,5 +47,15 @@ export const navMain: NavMainLink[] = [
     url: "/explore",
     icon: IconSearch, 
   },
+  {
+    title: "Test",
+    url: "/test",
+    icon: IconAB2
+  },
+  {
+    title: "Review",
+    url: "/review",
+    icon: IconFolder,
+  }
 ]
 

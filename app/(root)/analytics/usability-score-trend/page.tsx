@@ -49,8 +49,8 @@ export default function UsabilityScoreTrendPage() {
           Usability Score Trend
         </h1>
       </div>
-      <div className="p-2 m-5 flex items-center justify-between">
-        <p>
+      <div className="p-2 m-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+        <p className="text-sm sm:text-base text-gray-700 dark:text-gray-200 w-full sm:mb-0 font-['Poppins']">
           Track how your design improves over time. Each submission is evaluated
           using Jakob Nielsen's 10 heuristics, and your score is plotted here.
           The line graph helps you see whether revisions are making your UI more
@@ -59,7 +59,7 @@ export default function UsabilityScoreTrendPage() {
         <button
           onClick={handleExportReport}
           disabled={isGeneratingPDF}
-          className={`px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors font-['Poppins'] font-medium ml-6 cursor-pointer ${
+          className={`w-full sm:w-auto px-6 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors font-['Poppins'] font-medium mt-4 sm:mt-0 sm:ml-6 cursor-pointer ${
             isGeneratingPDF
               ? "bg-gray-400 cursor-not-allowed"
               : "bg-[#ED5E20] hover:bg-[#d44e0f]"
@@ -72,14 +72,15 @@ export default function UsabilityScoreTrendPage() {
               <IconDownload />
             )}
           </span>
-          <span>{isGeneratingPDF ? "Generating..." : "Export Report"}</span>
+          <span>{isGeneratingPDF ? "Generating..." : "Export"}</span>
         </button>
       </div>
-
       <div className="bg-white dark:bg-[#19181D] rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
         {/* Header with Improvements label */}
         <div className="bg-[#ED5E20] text-white px-6 py-4">
-          <h3 className="text-lg font-bold font-['Poppins']">Improvements</h3>
+          <h3 className="text-center align-middle text-lg font-bold font-['Poppins']">
+            Improvements
+          </h3>
         </div>
 
         {/* Chart Container */}

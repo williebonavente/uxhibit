@@ -117,8 +117,8 @@ const HeuristicDashboard = () => {
           Heuristic Violation Frequency
         </h1>
       </div>
-      <div className="p-2 m-5 flex items-center justify-between">
-        <p>
+      <div className="p-2 m-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+        <p className="text-sm sm:text-base text-gray-700 dark:text-gray-200 w-full sm:mb-0 font-['Poppins']">
           {/* TODO: Message is too long! */}
           This section shows which usability heuristics you&apos;re violating
           most often. The radar chart breaks down how frequently these issues
@@ -129,7 +129,7 @@ const HeuristicDashboard = () => {
         <button
           onClick={handleExportReport}
           disabled={isGeneratingPDF}
-          className={`px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors font-['Poppins'] font-medium ml-6 cursor-pointer ${
+          className={`w-full sm:w-auto px-6 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors font-['Poppins'] font-medium sm:ml-6 cursor-pointer ${
             isGeneratingPDF
               ? "bg-gray-400 cursor-not-allowed"
               : "bg-[#ED5E20] hover:bg-[#d44e0f]"
@@ -142,7 +142,7 @@ const HeuristicDashboard = () => {
               <IconDownload />
             )}
           </span>
-          <span>{isGeneratingPDF ? "Generating..." : "Export Report"}</span>
+          <span>{isGeneratingPDF ? "Generating..." : "Export"}</span>
         </button>
       </div>
 
@@ -188,45 +188,42 @@ const HeuristicDashboard = () => {
           </div>
 
           {/* Heuristics List */}
-          <div className="flex flex-col items-center justify-center">
-            <div className="space-y-4 w-xl">
+          <div className="flex flex-col items-center justify-center w-full">
+            <div className="space-y-4 w-full max-w-2xl">
               {heuristicData.map((item, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:bg-[#ED5E20]/50 dark:hover:bg-[#ED5E20]/50 transition-colors border border-gray-100 dark:border-gray-700 cursor-pointer"
+                  className="flex flex-row items-center justify-between p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:bg-[#ED5E20]/50 dark:hover:bg-[#ED5E20]/50 transition-colors border border-gray-100 dark:border-gray-700 cursor-pointer"
                 >
-                  <div className="flex items-center space-x-3">
-                    <span className="text-[#ED5E20] font-bold text-sm min-w-[24px]">
-                      {item.heuristic}.
-                    </span>
-                    <span className="text-gray-800 dark:text-gray-200 text-sm font-['Poppins']">
-                      {item.fullName}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <span
-                      className={`font-bold text-sm ${getSeverityColor(
-                        item.value
-                      )}`}
-                    >
-                      {item.value}
-                    </span>
-                    <div
-                      className={`w-3 h-3 rounded-full ${getSeverityBg(
-                        item.value
-                      )}`}
-                    ></div>
-                  </div>
+                  {/* Number, title, and score all side by side */}
+                  <span className="text-[#ED5E20] font-bold text-xs sm:text-sm min-w-[24px] text-center shrink-0">
+                    {item.heuristic}.
+                  </span>
+                  <span className="text-gray-800 dark:text-gray-200 text-xs sm:text-sm font-['Poppins'] mx-2 flex-1 truncate">
+                    {item.fullName}
+                  </span>
+                  <span
+                    className={`font-bold text-xs sm:text-sm ${getSeverityColor(
+                      item.value
+                    )} shrink-0 mx-2`}
+                  >
+                    {item.value}
+                  </span>
+                  <div
+                    className={`w-3 h-3 rounded-full ${getSeverityBg(
+                      item.value
+                    )} shrink-0`}
+                  ></div>
                 </div>
               ))}
             </div>
 
             {/* Legend */}
-            <div className="flex flex-col items-center mt-8 p-4 bg-white dark:bg-[#120F12] rounded-lg border w-xl border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col items-center mt-8 p-4 bg-white dark:bg-[#120F12] rounded-lg border w-full max-w-2xl border-gray-200 dark:border-gray-700">
               <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 font-['Poppins']">
                 Legend:
               </div>
-              <div className="flex justify-between w-full text-xs font-['Poppins'] mb-2">
+              <div className="flex flex-row justify-between w-full text-xs font-['Poppins'] mb-2">
                 <span className="text-green-600 dark:text-green-400 font-medium">
                   Minor Severity
                 </span>

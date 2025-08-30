@@ -157,6 +157,7 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
     font-family: "Poppins", sans-serif;
@@ -175,8 +176,9 @@
   }
 } */
 .dark .title-register-login {
-  color: #F5F5F5  !important;
+  color: #F5F5F5 !important;
 }
+
 .input-placeholder-lg::placeholder {
   font-size: 20px;
 }
@@ -186,13 +188,45 @@
 }
 
 .xhibit-gradient-text {
-  background: linear-gradient(to right, #FF4D00, #ED5E20, #FFA600, #FFDB97 );
+  background: linear-gradient(to right, #FF4D00, #ED5E20, #FFA600, #FFDB97);
   background-clip: text;
-  -webkit-background-clip: text; /* for Safari/Chrome */
+  -webkit-background-clip: text;
+  /* Safari/Chrome */
+  -webkit-text-fill-color: transparent;
+  /* Safari */
   color: transparent;
-  font-weight: 600; /* font-semibold */
+  font-weight: 600;
+
+  /* Responsive typography (mobile-first) */
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+  /* ~28px to 40px */
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  display: inline-block;
+}
+/* Tune for small phones (≈375x667) */
+@media (max-width: 390px) and (max-height: 740px) {
+  .xhibit-gradient-text {
+    font-size: 1.75rem;
+    /* 28px */
+  }
 }
 
+/* sm ≥ 640px */
+@media (min-width: 640px) {
+  .xhibit-gradient-text {
+    font-size: 2rem;
+    /* 32px */
+  }
+}
+
+/* lg ≥ 1024px */
+@media (min-width: 1024px) {
+  .xhibit-gradient-text {
+    font-size: 2.5rem;
+    /* 40px */
+  }
+}
 
 .image-overlay-text {
   font-family: 'Poppins', sans-serif !important;
@@ -201,16 +235,19 @@
   font-size: 55px !important;
   background: linear-gradient(to right, #FEFEFE, #cac2c2, #a29999, #908a8a);
   background-clip: text;
-  -webkit-background-clip: text; 
+  -webkit-background-clip: text;
   color: transparent;
 }
 
 /* Site header */
 .site-header {
-  padding: 2rem; /* p-8 = 2rem */
-  height: 12rem; /* h-48 = 12rem */
+  padding: 2rem;
+  /* p-8 = 2rem */
+  height: 12rem;
+  /* h-48 = 12rem */
   width: 100%;
-  border-radius: 0.75rem; /* rounded-xl = 0.75rem */
+  border-radius: 0.75rem;
+  /* rounded-xl = 0.75rem */
   background: linear-gradient(to right, #19181D, #B22A13, #ED5E20, #FFA600);
   display: flex;
   flex-direction: row;
@@ -235,6 +272,7 @@
   border-radius: 10px;
   color: #1E1E1E;
 }
+
 .dark .input-colored {
   background: #19181D;
   color: #F5F5F5;
@@ -242,7 +280,8 @@
 
 .user-card {
   background-color: #FFF;
-  padding: 1rem; /* p-4 = 1rem */
+  padding: 1rem;
+  /* p-4 = 1rem */
   border-top-left-radius: 5rem;
   border-bottom-left-radius: 5rem;
   border-top-right-radius: 1.5rem;
@@ -252,11 +291,44 @@
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem; /* space-x- 2 gap between children, 0.5rem*/
+  gap: 0.5rem;
+  
+  /* space-x- 2 gap between children, 0.5rem*/
 }
+/* ...existing code... */
+.user-card-mobile {
+  background-color: #FFF;
+  color: #000;
+  padding: 1rem;              /* p-4 */
+  border-top-left-radius: 5rem;
+  border-bottom-left-radius: 5rem;
+  border-top-right-radius: 1.5rem;
+  border-bottom-right-radius: 1.5rem;
+  display: flex;
+  justify-content: center;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;                /* space-x-2 */
+}
+
+/* Hide the desktop card on mobile (you already have this) */
+@media (max-width: 639px) {
+  .user-card { display: none !important; }
+}
+
+/* Hide the mobile card on >= sm */
+@media (min-width: 640px) {
+  .user-card-mobile { display: none !important; }
+  .user-card { display: flex; }
+}
+
 
 /* for modal  */
 /* Example for shadcn/ui or Tailwind */
-[data-state="open"] > .dialog-overlay {
+[data-state="open"]>.dialog-overlay {
   @apply backdrop-blur-sm bg-black/40;
+}
+
+.text-balance {
+  text-wrap:balance;
 }

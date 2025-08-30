@@ -7,7 +7,10 @@ import {
   IconHeartFilled,
   IconEye,
 } from "@tabler/icons-react";
+import Image from "next/image";
+import Link from "next/link";
 
+// Fetch this in database
 const dummyUsers = [
   {
     id: 1,
@@ -210,13 +213,14 @@ export default function ExplorePage() {
 
       {/* User Cards */}
       {filteredUsers.map((user) => (
-        <div key={user.id} className="bg-accent rounded-xl shadow p-5 mb-10">
-          {/* User Header */}
+        <div key={user.id} className="border rounded-xl shadow p-5 mb-10">
           <div className="flex items-center gap-3 mb-4">
-            <img
+            <Image
               src={user.avatar}
               alt={user.name}
               className="w-10 h-10 rounded-full"
+              width={400}
+              height={400}
             />
             <h2 className="text-lg font-medium">{user.name}</h2>
           </div>
@@ -226,19 +230,24 @@ export default function ExplorePage() {
             {user.designs.map((design) => (
               <div
                 key={design.id}
-                className="bg-white dark:bg-[#1A1A1A] rounded-xl shadow-sm space-y-2"
+                className="bg-accent dark:bg-[#1A1A1A] rounded-xl shadow-md space-y-0 flex flex-col h-full p-2"
               >
-                <a
+                <Link
                   href={design.figma_link}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <img
-                    src="/images/design-thumbnail.png"
-                    alt="Design thumbnail"
-                    className="w-full object-cover rounded-t-xl"
-                  />
-                </a>
+                  <div className="relative w-full aspect-video rounded-lg border overflow-hidden">
+                    {/* Thumbnail Links */}
+                    <Image
+                      src={"/images/design-thumbnail.png"}
+                      alt="Design thumbnail"
+                      className="object-cover"
+                      width={400}
+                      height={400}
+                    />
+                  </div>
+                </Link>
                 <div className="p-3 space-y-2 group relative">
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="w-full text-lg truncate">
