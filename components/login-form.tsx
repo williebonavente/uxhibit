@@ -82,7 +82,7 @@ export default function LoginForm() {
             playsInline
             className="object-cover w-full h-full rounded-4xl"
           >
-            <source src="/images/uxhibit-gif-3.mp4" type="video/mp4" />
+            <source src="/images/uxhibit-gif-3(webm).webm" type="video/webm" />
             Your browser does not support the video tag.
           </video>
 

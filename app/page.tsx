@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function Home() {
   return (
@@ -13,15 +14,19 @@ export default function Home() {
             aria-label="Home"
             className="inline-flex items-center shrink-0 hover:scale-105 transition-transform"
           >
-            <img
+            <Image
               src="/images/header-icon.png"
               alt="UXhibit"
               className="block dark:hidden w-[102px] h-[42px]"
+              width={102}
+              height={42}
             />
-            <img
+            <Image
               src="/images/dark-header-icon.png"
               alt="UXhibit (Dark)"
               className="hidden dark:block w-[102px] h-[42px]"
+              width={102}
+              height={42}
             />
           </Link>
           {/* Right: Auth Buttons */}
@@ -50,7 +55,7 @@ export default function Home() {
           playsInline
           className="w-full h-full object-cover"
         >
-          <source src="/images/landing-page-bg.mp4" type="video/mp4" />
+          <source src="/images/landing-page-bg(webm).webm" type="video/webm" />
           Your browser does not support the video tag.
         </video>
         {/* gradient overlay for readability */}
@@ -61,10 +66,12 @@ export default function Home() {
       <main className="flex flex-col lg:flex-row items-center justify-center w-full min-h-screen px-4 sm:px-6 lg:px-12 gap-15 relative z-10 text-white">
         {/* Left Column: Image */}
         <div className="flex-1 flex justify-center lg:justify-start max-w-md sm:max-w-lg lg:max-w-xl">
-          <img
+          <Image
             src="/images/uxhibit-icon.png"
             alt="Xhibit Mockup"
             className="w-full rounded-xl"
+            width={1510}
+            height={1508}
           />
         </div>
 
@@ -83,7 +90,7 @@ export default function Home() {
           {/* Paragraph */}
           <p className="text-sm sm:text-base lg:text-lg xl:text-xl mb-8 text-gray-200 w-full">
             Build stunning UI/UX designs with smart feedback and usability
-            scores. Don’t just showcase your work—prove you understand UX.
+            scores. Don&apos;t just showcase your work—prove you understand UX.
           </p>
 
           {/* CTA */}
