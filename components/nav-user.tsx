@@ -257,12 +257,10 @@ export function NavUser({ user }: { user: User | null }) {
           />
           {/* Centered form */}
           <div
-            className="
-        relative z-10 bg-white dark:bg-[#141414] rounded-xl shadow-lg
-        w-full max-w-xs sm:max-w-md mx-auto
-        p-3 sm:p-8
-        overflow-y-auto max-h-[90vh]
-      "
+            className=" relative z-10 bg-white dark:bg-[#141414] rounded-xl shadow-lg 
+              w-full max-w-xs sm:max-w-md mx-auto
+            p-3 sm:p-8
+          overflow-y-auto max-h-[90vh]"
           >
             {/* Adjusted font size and margin for mobile */}
             <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4 text-center">
@@ -327,6 +325,7 @@ export function NavUser({ user }: { user: User | null }) {
                       age: profile.age,
                       avatar_url: imageUrl,
                       bio: profile.bio,
+                      gender: profile.gender,
                     })
                     .eq("id", profile.id);
 

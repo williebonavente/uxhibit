@@ -4,8 +4,9 @@ import React from "react";
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+// import { Button } from "@/components/ui/button";
 import { createClient } from "@/utils/supabase/client";
+import { useRouter } from "next/navigation";
 import {
   IconArrowLeft,
   IconLayoutSidebarRightCollapse,
@@ -13,6 +14,7 @@ import {
   IconUpload,
   IconHistory,
 } from "@tabler/icons-react";
+import { Input } from "@/components/ui/input";
 
 type Design = {
   id: string;
@@ -22,8 +24,19 @@ type Design = {
   imageUrl: string;
   thumbnail?: string;
   thumbnailPath?: string;
+  snapshot: any;
   // Add other properties as needed
 };
+
+
+type EvaluateInput = {
+  designId: string;
+  fileKey: string
+  nodeId?: string;
+  scale?: number;
+  fallbackImageUrl?: string;
+  snapshot?: any; // Add this line to include snapshot data
+}
 
 type ExportedFrame = {
   nodeId: string;
@@ -61,19 +74,25 @@ type EvalResponse = {
   } | null;
 };
 
-export async function evaluateDesign(input: {
-  fileKey: string;
-  nodeId?: string;
-  scale?: number;
-  fallbackImageUrl?: string;
-}): Promise<EvalResponse> {
-  const res = await fetch("/api/ai/evaluate", {
+export async function evaluateDesign(input: EvaluateInput): Promise<EvalResponse> {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  console.log('Calling evaluate with:', input);
+
+  const res = await fetch(`${baseUrl}/api/ai/evaluate`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(input),
   });
+
   const data = await res.json();
-  if (!res.ok) throw new Error(data?.error || "Failed to evaluate");
+  console.log('Evaluate response:', data);
+
+  if (!res.ok) {
+    console.error('Evaluate failed:', data);
+    throw new Error(data?.error || "Failed to evaluate");
+  }
   return data as EvalResponse;
 }
 
@@ -83,6 +102,7 @@ export default function DesignDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = React.use(params);
+  const router = useRouter();
 
   const [showEval, setShowEval] = useState(true); // toggle evaluation sidebar
   const [showVersions, setShowVersions] = useState(false); // toggle version history modal
@@ -91,67 +111,98 @@ export default function DesignDetailPage({
   const [design, setDesign] = useState<Design | null>(null);
   // const [loading, setLoading] = useState(false);
   const [designLoading, setDesignLoading] = useState(true);
-  const [framesLoading, setFramesLoading] = useState(false); // separate from evaluation
-  const [exportedFrames, setExported] = useState<ExportedFrame[]>([]);
+  // const [framesLoading, setFramesLoading] = useState(false); // separate from evaluation
+  // const [exportedFrames, setExported] = useState<ExportedFrame[]>([]);
   const [evalResult, setEvalResult] = useState<EvalResponse | null>(null);
   const [loadingEval, setLoadingEval] = useState(false);
   const [evalError, setEvalError] = useState<string | null>(null);
   const [thumbUrl, setThumbUrl] = useState<string | null>(null);
 
-  async function refreshSignedThumb(path: string) {
-    const supabase = createClient();
-    const { data: signed, error } = await supabase.storage
-      .from("design-thumbnails")
-      .createSignedUrl(path, 3600); // 1 hour
-    if (!error && signed?.signedUrl) setThumbUrl(signed.signedUrl);
-  }
+  // async function refreshSignedThumb(path: string) {
+  //   const supabase = createClient();
+  //   const { data: signed, error } = await supabase.storage
+  //     .from("design-thumbnails")
+  //     .createSignedUrl(path, 3600); // 1 hour
+  //   if (!error && signed?.signedUrl) setThumbUrl(signed.signedUrl);
+  // }
 
   async function handleEvaluate() {
-    if (!design?.fileKey) return;
+    if (!design?.id || !design?.fileKey) {
+      console.error('Missing required design data:', { id: design?.id, fileKey: design?.fileKey });
+      setEvalError("Missing required design data");
+      return;
+    }
+
     setLoadingEval(true);
     setEvalError(null);
+
     try {
+      // Get signed URL if thumbnail is a storage path
+      let imageUrlForAI = design.thumbnail;
+      if (imageUrlForAI && !imageUrlForAI.startsWith('http')) {
+        const supabase = createClient();
+        const { data: signed } = await supabase.storage
+          .from("design-thumbnails")
+          .createSignedUrl(imageUrlForAI, 3600);
+
+        if (signed?.signedUrl) {
+          imageUrlForAI = signed.signedUrl;
+        }
+      }
+      console.log('Starting evaluation with:', {
+        designId: design.id,  // Make sure this exists
+        fileKey: design.fileKey,
+        nodeId: design.nodeId,
+        thumbnail: design.thumbnail,
+        snapshot: design.snapshot,
+      });
+
       const data = await evaluateDesign({
+        designId: design.id,
         fileKey: design.fileKey,
         nodeId: design.nodeId,
         scale: 3,
-        fallbackImageUrl: design.thumbnail || undefined,
+        fallbackImageUrl: imageUrlForAI, // Use the signed URL here
+        snapshot: design.snapshot || null,
       });
+
+      console.log('Evaluation successful:', data);
       setEvalResult(data);
     } catch (e: any) {
+      console.error('Evaluation failed:', e);
       setEvalError(e.message || "Failed to evaluate");
     } finally {
       setLoadingEval(false);
     }
   }
 
-  async function exportFrames() {
-    if (!design?.fileKey) return;
-    setFramesLoading(true);
-    try {
-      const res = await fetch("/api/figma/export", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileKey: design?.fileKey,
-          mode: "frames",
-          scale: 2,
-          format: "png",
-          upload: false,
-        }),
-      });
+  // async function exportFrames() {
+  //   if (!design?.fileKey) return;
+  //   setFramesLoading(true);
+  //   try {
+  //     const res = await fetch("/api/figma/export", {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({
+  //         fileKey: design?.fileKey,
+  //         mode: "frames",
+  //         scale: 2,
+  //         format: "png",
+  //         upload: false,
+  //       }),
+  //     });
 
-      if (!res.ok) {
-        throw new Error(`Export failed (${res.status})`);
-      }
-      const data: { nodes: ExportedFrame[] } = await res.json();
-      setExported(data.nodes ?? []);
-    } catch (err: any) {
-      console.error(err);
-    } finally {
-      setFramesLoading(false);
-    }
-  }
+  //     if (!res.ok) {
+  //       throw new Error(`Export failed (${res.status})`);
+  //     }
+  //     const data: { nodes: ExportedFrame[] } = await res.json();
+  //     setExported(data.nodes ?? []);
+  //   } catch (err: any) {
+  //     console.error(err);
+  //   } finally {
+  //     setFramesLoading(false);
+  //   }
+  // }
 
   // Save updated project back to localStorage
   const saveProject = (updated: any) => {
@@ -195,6 +246,7 @@ export default function DesignDetailPage({
       saveProject(updatedProject);
     };
     reader.readAsDataURL(file);
+    router.push("/evaluate");
   };
 
   // Publish project (latest version)
@@ -212,39 +264,103 @@ export default function DesignDetailPage({
   useEffect(() => {
     async function loadDesign() {
       setDesignLoading(true);
-      // 2. Fetch from DB (via Supabase)
       try {
         const supabase = createClient();
+        // Modify the query to include AI evaluation data
         const { data, error } = await supabase
           .from("designs")
-          .select("id,title,figma_link,file_key,node_id,thumbnail_url")
+          .select(`
+            id,
+            title,
+            figma_link,
+            file_key,
+            node_id,
+            thumbnail_url,
+            current_version_id,
+            design_versions!design_versions_design_id_fkey (
+              id,
+              file_key,
+              node_id,
+              thumbnail_url,
+              ai_summary,
+              ai_data,
+              snapshot,
+              created_at,
+              version
+            )
+          `)
           .eq("id", id)
+          .order('created_at', { foreignTable: 'design_versions', ascending: false })
+          .limit(1, { foreignTable: 'design_versions' })
           .single();
 
         if (!error && data) {
+          const latestVersion = data.design_versions?.[0];
+          // Parse the JSONB data
+          let parsedAiData = null;
+          if (latestVersion?.ai_data) {
+            try {
+              // Handle both string and object formats
+              parsedAiData = typeof latestVersion.ai_data === 'string'
+                ? JSON.parse(latestVersion.ai_data)
+                : latestVersion.ai_data;
+
+              console.log('Parsed AI data:', parsedAiData);
+            } catch (e) {
+              console.error('Error parsing AI data:', e);
+            }
+          }
+
+          // Set the design data
           const normalized: Design = {
             id: data.id,
             project_name: data.title,
-            fileKey: data.file_key || undefined,
-            nodeId: data.node_id || undefined,
+            fileKey: latestVersion?.file_key || data.file_key || undefined,
+            nodeId: latestVersion?.node_id || data.node_id || undefined,
             imageUrl: data.thumbnail_url || "/images/design-thumbnail.png",
             thumbnail: data.thumbnail_url || undefined,
+            snapshot: latestVersion?.snapshot || null
           };
           setDesign(normalized);
 
-          // Only refresh signed URL on client
+          // Set the evaluation result if it exists
+          if (latestVersion?.ai_data) {
+            const aiData = latestVersion.ai_data;
+            console.log('Loading saved AI data:', aiData);
+
+            if (parsedAiData) {
+              const evalData: EvalResponse = {
+                nodeId: latestVersion.node_id,
+                imageUrl: latestVersion.thumbnail_url,
+                summary: latestVersion.ai_summary ?? aiData.summary ?? "",
+                heuristics: aiData.heuristics ?? null,
+                ai_status: "ok",
+                overall_score: aiData.overall_score ?? null,
+                strengths: Array.isArray(aiData.strengths) ? aiData.strengths : [],
+                weaknesses: Array.isArray(aiData.weaknesses) ? aiData.weaknesses : [],
+                issues: Array.isArray(aiData.issues) ? aiData.issues : [],
+                category_scores: aiData.category_scores ?? null,
+                ai: aiData
+              }
+              console.log('Setting evaluation result:', evalData);
+              setEvalResult(evalData);
+            }
+            setShowEval(true); // Show evaluation panel automatically
+          }
+
+          // Handle thumbnail URL
           if (data.thumbnail_url && !data.thumbnail_url.startsWith("http")) {
-            // treat as storage path
             const { data: signed } = await supabase.storage
               .from("design-thumbnails")
               .createSignedUrl(data.thumbnail_url, 3600);
             if (signed?.signedUrl) setThumbUrl(signed.signedUrl);
-            // refreshSignedThumb(data.thumbnail_url);
           }
         } else {
+          console.error('Failed to load design:', error);
           setDesign(null);
         }
-      } catch {
+      } catch (err) {
+        console.error('Error loading design:', err);
         setDesign(null);
       } finally {
         setDesignLoading(false);
@@ -301,10 +417,78 @@ export default function DesignDetailPage({
     }
   }, [id]);
 
+useEffect(() => {
+    const supabase = createClient();
+    async function loadSavedEvaluation() {
+      try {
+        if (!design?.id) return;
+        
+        // Get latest evaluation data
+        const { data, error } = await supabase
+          .from("design_versions")
+          .select(`
+            node_id, 
+            thumbnail_url, 
+            ai_summary, 
+            ai_data, 
+            snapshot, 
+            created_at
+          `)
+          .eq("design_id", design.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (error) {
+          console.error('Failed to load evaluation:', error);
+          return;
+        }
+
+        // Parse the JSONB ai_data
+        let parsedAiData = null;
+        if (data?.ai_data) {
+          try {
+            parsedAiData = typeof data.ai_data === 'string' 
+              ? JSON.parse(data.ai_data) 
+              : data.ai_data;
+
+            console.log('Parsed saved AI data:', parsedAiData);
+          } catch (err) {
+            console.error('Error parsing saved AI data:', err);
+          }
+        }
+
+        if (parsedAiData) {
+          const mapped: EvalResponse = {
+            nodeId: data.node_id,
+            imageUrl: data.thumbnail_url,
+            summary: data.ai_summary ?? parsedAiData.summary ?? "",
+            heuristics: parsedAiData.heuristics ?? null,
+            ai_status: "ok",
+            overall_score: parsedAiData.overall_score ?? null,
+            strengths: Array.isArray(parsedAiData.strengths) ? parsedAiData.strengths : [],
+            weaknesses: Array.isArray(parsedAiData.weaknesses) ? parsedAiData.weaknesses : [],
+            issues: Array.isArray(parsedAiData.issues) ? parsedAiData.issues : [],
+            category_scores: parsedAiData.category_scores ?? null,
+            ai: parsedAiData
+          };
+
+          console.log('Setting saved evaluation:', mapped);
+          setEvalResult(mapped);
+          setShowEval(true);
+        }
+      } catch (err) {
+        console.error("Failed to load saved AI evaluation:", err);
+      }
+    }
+
+    loadSavedEvaluation();
+  }, [design?.id]); // Only re-run when design.id changes
+
   if (designLoading)
     return (
       <div className="flex items-center justify-center h-screen">
-        <p>Loading Design</p>
+        <p>Loading Design...</p>
       </div>
     );
 
@@ -335,8 +519,9 @@ export default function DesignDetailPage({
 
         <div className="flex gap-3 items-center">
           {/* Upload New Version */}
-          <input
+          <Input
             type="file"
+            accept=".fig"
             id="fileUpload"
             onChange={handleFileUpload}
             className="hidden"
@@ -375,12 +560,11 @@ export default function DesignDetailPage({
               thumbUrl
                 ? thumbUrl
                 : design.fileKey
-                ? `/api/figma/thumbnail?fileKey=${design.fileKey}${
-                    design.nodeId
-                      ? `&nodeId=${encodeURIComponent(design.nodeId)}`
-                      : ""
+                  ? `/api/figma/thumbnail?fileKey=${design.fileKey}${design.nodeId
+                    ? `&nodeId=${encodeURIComponent(design.nodeId)}`
+                    : ""
                   }`
-                : "/images/design-thumbnail.png"
+                  : "/images/design-thumbnail.png"
             }
             alt={design.project_name || "Design"}
             width={600}
@@ -406,138 +590,93 @@ export default function DesignDetailPage({
         {/* RIGHT PANEL (Evaluation Sidebar) */}
         {showEval && (
           <div className="w-96 bg-gray-50 border rounded-md dark:bg-[#1A1A1A] p-5 overflow-y-auto flex flex-col h-screen">
-            <div>
-              <h2 className="text-lg font-semibold mb-3 text-center">
-                AI Evaluation
-              </h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold text-center flex-1">AI Evaluation</h2>
+              <button
+                onClick={handleEvaluate}
+                disabled={loadingEval}
+                className="px-4 py-1 text-sm rounded-md bg-[#ED5E20] text-white hover:bg-orange-600 disabled:opacity-50 cursor-pointer"
+              >
+                {loadingEval ? "Evaluating..." : "Re-Evaluate"}
+              </button>
             </div>
-            <div className="flex items-center justify-center border rounded-md p-3 h-full w-full">
-              {/* Placeholder for AI evaluation content */}
-              <div className="prose m-0 dark:prose-invert text-center">
-                <Button
-                  onClick={handleEvaluate}
-                  disabled={!design.fileKey || loadingEval}
-                  className="px-3 py-2 rounded-md disabled:opacity-50 mb-5 cursor-pointer"
-                >
-                  {loadingEval ? "Evaluating…" : "Evaluate with AI"}
-                </Button>
-                {evalError && (
-                  <p className="text-red-500 text-sm mt-2">{evalError}</p>
-                )}
 
-                {evalResult && (
-                  <div className="mt-4 text-sm">
-                    <p className="font-medium">
-                      {evalResult.ai?.summary ?? evalResult.summary}
+            <div className="space-y-4">
+              {/* Loading State */}
+              {loadingEval && (
+                <div className="text-center text-neutral-500">
+                  Running evaluation...
+                </div>
+              )}
+
+              {/* Error State */}
+              {evalError && (
+                <div className="text-red-500 text-sm">
+                  Error: {evalError}
+                </div>
+              )}
+
+              {/* Results */}
+              {evalResult && !loadingEval && (
+                <>
+                  {/* Summary */}
+                  <div>
+                    <h3 className="font-medium mb-2">Summary</h3>
+                    <p className="text-sm text-neutral-600 dark:text-neutral-300">
+                      {evalResult.summary}
                     </p>
-                    {typeof (
-                      evalResult.overall_score ?? evalResult.ai?.overall_score
-                    ) === "number" && (
-                      <p>
-                        Score:{" "}
-                        {evalResult.overall_score ??
-                          evalResult.ai?.overall_score}
-                      </p>
-                    )}
-                    {(evalResult.strengths?.length ||
-                      evalResult.ai?.strengths?.length) && (
-                      <div className="mt-2">
-                        <p className="font-medium">Strengths</p>
-                        <ul className="list-disc pl-5">
-                          {(
-                            evalResult.strengths ??
-                            evalResult.ai?.strengths ??
-                            []
-                          )
-                            .slice(0, 5)
-                            .map((s, idx) => (
-                              <li key={idx}>{s}</li>
-                            ))}
-                        </ul>
-                      </div>
-                    )}
-                    {evalResult.issues?.length ||
-                    evalResult.ai?.issues?.length ? (
-                      <ul className="list-disc pl-5">
-                        {(evalResult.issues ?? evalResult.ai?.issues ?? [])
-                          .slice(0, 5)
-                          .map((i) => (
-                            <li key={i.id}>
-                              <span className="font-medium">{i.message}</span> —{" "}
-                              {i.suggestion}
-                            </li>
-                          ))}
-                      </ul>
-                    ) : (
-                      <p className="opacity-80">
-                        No AI issues returned. Heuristics:{" "}
-                        {evalResult.heuristics?.notes?.join(", ") || "—"}
-                      </p>
-                    )}
-                    {evalResult.category_scores && (
-                      <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1">
-                        {Object.entries(evalResult.category_scores).map(
-                          ([k, v]) => (
-                            <div key={k} className="flex justify-between">
-                              <span className="capitalize">{k}</span>
-                              <span>{v}</span>
-                            </div>
-                          )
-                        )}
-                      </div>
-                    )}
-
-                    {(evalResult.weaknesses?.length ||
-                      evalResult.ai?.weaknesses?.length) && (
-                      <div className="mt-2">
-                        <p className="font-medium">Weaknesses</p>
-                        <ul className="list-disc pl-5">
-                          {(
-                            evalResult.weaknesses ??
-                            evalResult.ai?.weaknesses ??
-                            []
-                          )
-                            .slice(0, 5)
-                            .map((w, idx) => (
-                              <li key={idx}>{w}</li>
-                            ))}
-                        </ul>
-                      </div>
-                    )}
                   </div>
-                )}
-                <div>
-                  <Button
-                    onClick={exportFrames}
-                    disabled={!design.fileKey || framesLoading}
-                    className="cursor-pointer"
-                  >
-                    {framesLoading ? "Exporting…" : "Export Frames"}
-                  </Button>
-                  {framesLoading && (
-                    <p className="text-sm mt-2">Exporting...</p>
-                  )}
-                  {exportedFrames.length > 0 && (
-                    <div className="mt-6 grid gap-4 grid-cols-2 md:grid-cols-3">
-                      {exportedFrames.map((f) => (
-                        <div
-                          key={f.nodeId}
-                          className="border rounded-md p-2 bg-white/5"
-                        >
-                          <Image
-                            src={f.remoteUrl}
-                            alt={f.nodeId}
-                            width={300}
-                            height={220}
-                            className="w-full h-auto object-cover rounded"
-                          />
-                          <p className="mt-1 text-xs break-all">{f.nodeId}</p>
-                        </div>
-                      ))}
+
+                  {/* Score */}
+                  {evalResult.overall_score && (
+                    <div>
+                      <h3 className="font-medium mb-2">Overall Score</h3>
+                      <div className="text-2xl font-bold text-[#ED5E20]">
+                        {Math.round(evalResult.overall_score)}/100
+                      </div>
                     </div>
                   )}
-                </div>
-              </div>
+
+                  {/* Strengths */}
+                  {evalResult.strengths && evalResult.strengths.length > 0 && (
+                    <div>
+                      <h3 className="font-medium mb-2">Strengths</h3>
+                      <ul className="list-disc list-inside text-sm space-y-1">
+                        {evalResult.strengths.map((s, i) => (
+                          <li key={i} className="text-neutral-600 dark:text-neutral-300">{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Weaknesses */}
+                  {evalResult.weaknesses && evalResult.weaknesses.length > 0 && (
+                    <div>
+                      <h3 className="font-medium mb-2">Weaknesses</h3>
+                      <ul className="list-disc list-inside text-sm space-y-1">
+                        {evalResult.weaknesses.map((w, i) => (
+                          <li key={i} className="text-neutral-600 dark:text-neutral-300">{w}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Category Scores */}
+                  {evalResult.category_scores && (
+                    <div>
+                      <h3 className="font-medium mb-2">Category Scores</h3>
+                      <div className="grid grid-cols-2 gap-2">
+                        {Object.entries(evalResult.category_scores).map(([category, score]) => (
+                          <div key={category} className="flex justify-between text-sm">
+                            <span className="capitalize">{category.replace(/_/g, " ")}</span>
+                            <span className="font-medium">{Math.round(score)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         )}
@@ -563,11 +702,10 @@ export default function DesignDetailPage({
                     setSelectedVersion(v);
                     setShowVersions(false);
                   }}
-                  className={`p-2 border rounded-md cursor-pointer ${
-                    selectedVersion?.version === v.version
-                      ? "bg-orange-200 dark:bg-orange-700"
-                      : "bg-gray-100 dark:bg-gray-700"
-                  }`}
+                  className={`p-2 border rounded-md cursor-pointer ${selectedVersion?.version === v.version
+                    ? "bg-orange-200 dark:bg-orange-700"
+                    : "bg-gray-100 dark:bg-gray-700"
+                    }`}
                 >
                   v{v.version} - {v.timestamp} ({v.fileName})
                 </li>

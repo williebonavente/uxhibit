@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from '@/utils/supabase/server';
 import { uploadThumbnailFromUrl } from "@/lib/uploadThumbnail";
+import { toast } from "sonner";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ export async function POST(req: Request) {
       .select("id,title")
       .eq("owner_id", user.id)
       .eq("figma_link", figma_link)
+      .eq("file_key", file_key)
       .maybeSingle();
     if (existErr && existErr.code !== "PGRST116")
       return NextResponse.json({ error: existErr.message }, { status: 400 });
@@ -42,13 +44,36 @@ export async function POST(req: Request) {
       let storedThumbnail = thumbnail_url || null;
       if (thumbnail_url) {
         const up = await uploadThumbnailFromUrl(
+          // TODO: Fix the any with defined type
           supabase as any,
             thumbnail_url,
             existing.id,
-            { makePublic: false } // set true if bucket public
+            { makePublic: false } 
         );
         if (up.publicUrl) storedThumbnail = up.publicUrl; else if (up.path) storedThumbnail = up.path;
       }
+      
+      // WATCH: AI evaluation 
+      let aiResult = null;
+      try {
+        const aiResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            fileKey: file_key,
+            nodeId: node_id,
+            imageUrl: thumbnail_url,
+            designId: existing.id
+          })
+        });
+
+        if (aiResponse.ok) {
+          aiResult = await aiResponse.json();
+        }
+      } catch (err) {
+        console.error('Error calling AI evaluate: ', err); 
+      }
+
 
       const next = await getNextVersion(existing.id);
       const { data: ver, error: vErr } = await supabase
@@ -60,8 +85,8 @@ export async function POST(req: Request) {
           node_id,
           thumbnail_url: storedThumbnail,      // no thumbnail_path
           snapshot: snapshot ?? null,
-          ai_summary: ai?.summary ?? null,
-          ai_data: ai ?? null,
+          ai_summary: aiResult?.summary ?? null,
+          ai_data: aiResult ?? null,
           created_by: user.id,
         })
         .select("*")
@@ -92,7 +117,7 @@ export async function POST(req: Request) {
     // NEW DESIGN
     const { data: design, error: dErr } = await supabase
       .from("designs")
-      .insert({ owner_id: user.id, title, figma_link })
+      .insert({ owner_id: user.id, title, figma_link, file_key })
       .select("*")
       .single();
     if (dErr) return NextResponse.json({ error: dErr.message }, { status: 400 });

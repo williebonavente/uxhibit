@@ -179,12 +179,11 @@ export default function DesignsGallery() {
                   design.thumbnail_url
                     ? design.thumbnail_url
                     : design.file_key
-                    ? `/api/figma/thumbnail?fileKey=${design.file_key}${
-                        design.node_id
-                          ? `&nodeId=${encodeURIComponent(design.node_id)}`
-                          : ""
+                      ? `/api/figma/thumbnail?fileKey=${design.file_key}${design.node_id
+                        ? `&nodeId=${encodeURIComponent(design.node_id)}`
+                        : ""
                       }`
-                    : "/images/design-thumbnail.png"
+                      : "/images/design-thumbnail.png"
                 }
                 alt={design.title || "Design Preview"}
                 fill
@@ -202,7 +201,10 @@ export default function DesignsGallery() {
                 className="w-full bg-transparent text-lg focus:outline-none"
               />
               <button
-                className="text-gray-500 text-xl hover:text-red-500 transition cursor-pointer opacity-0 group-hover:opacity-100"
+                style={{
+                  cursor: "url('/cursors/cursor-pointer.svg') 3 3, pointer"
+                }}
+                className="text-gray-500 text-xl hover:text-red-500 transition opacity-0 group-hover:opacity-100"
                 title="Delete"
                 onClick={() => handleDelete(design.id)}
               >
