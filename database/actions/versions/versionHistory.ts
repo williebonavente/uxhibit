@@ -1,6 +1,5 @@
 import { createClient } from "@/utils/supabase/client";  
 
-// Define the Versions type to match the structure returned from Supabase
 type Versions = {
   id: string;
   design_id: string;
@@ -34,4 +33,16 @@ export async function fetchDesignVersions(designId: string): Promise<Versions[]>
     .order("version", { ascending: true});
   if (error) throw error;
   return data || [];
+}
+
+
+export async function deleteDesignVersion(versionId: string):Promise<boolean> {
+  const supabase = createClient();
+  const { error } = await supabase 
+  .from("design_versions")
+  .delete()
+  .eq("id", versionId);
+
+  if (error) throw error;
+  return true;
 }

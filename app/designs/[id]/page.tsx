@@ -13,10 +13,18 @@ import {
   IconLayoutSidebarRightExpand,
   IconUpload,
   IconHistory,
+  IconTrash
 } from "@tabler/icons-react";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/shadcn-io/spinner/index";
-import { fetchDesignVersions } from "@/database/actions/versions/versionHistory";
+import {
+  fetchDesignVersions,
+  deleteDesignVersion
+} from "@/database/actions/versions/versionHistory";
+
+import { toast } from "sonner";
+import { version } from "os";
+
 
 type Versions = {
   id: string;
@@ -39,7 +47,8 @@ type Design = {
   imageUrl: string;
   thumbnail?: string;
   thumbnailPath?: string;
-  snapshot: any;
+  snapshot: string;
+  current_version_id: string;
   // Add other properties as needed
 };
 
@@ -131,7 +140,9 @@ export default function DesignDetailPage({
   const [thumbUrl, setThumbUrl] = useState<string | null>(null);
   const [versions, setVersions] = useState<Versions[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
+  const [page, setPage] = useState(0);
 
+  const pageSize = 6;
 
   // const [framesLoading, setFramesLoading] = useState(false); // separate from evaluation
   // const [exportedFrames, setExported] = useState<ExportedFrame[]>([]);
@@ -338,7 +349,9 @@ export default function DesignDetailPage({
             nodeId: latestVersion?.node_id || data.node_id || undefined,
             imageUrl: data.thumbnail_url || "/images/design-thumbnail.png",
             thumbnail: data.thumbnail_url || undefined,
-            snapshot: latestVersion?.snapshot || null
+            snapshot: latestVersion?.snapshot || null,
+            current_version_id: data.current_version_id,
+
           };
           setDesign(normalized);
 
@@ -526,6 +539,9 @@ export default function DesignDetailPage({
       .finally(() => setLoadingVersions(false))
   }, [design?.id])
 
+  useEffect(() => {
+    if (showVersions) setPage(0);
+  }, [showVersions, versions.length])
   if (designLoading)
     return (
       <div className="flex items-center justify-center h-screen">
@@ -540,6 +556,7 @@ export default function DesignDetailPage({
         <p>Design not found.</p>
       </div>
     );
+
 
   return (
     <div>
@@ -576,12 +593,21 @@ export default function DesignDetailPage({
           </label>
 
           {/* Version History */}
-          <button
-            onClick={() => setShowVersions(true)}
-            className="cursor-pointer p-2 rounded hover:bg-[#ED5E20]/15"
-          >
-            <IconHistory size={22} />
-          </button>
+          <div className="relative group">
+            <button
+              onClick={() => setShowVersions(true)}
+              className="cursor-pointer p-2 rounded hover:bg-[#ED5E20]/15 hover:text-[#ED5E20] transition"
+              aria-label="Show Version History"
+            >
+              <IconHistory size={22} />
+            </button>
+            {/* Tooltip */}
+            <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
+              <div className="px-3 py-1 rounded bg-[#ED5E20] text-white text-xs font-semibold shadow-lg whitespace-nowrap">
+                Version History
+              </div>
+            </div>
+          </div>
 
           {/* Publish Button */}
           <button
@@ -758,7 +784,7 @@ export default function DesignDetailPage({
               </button>
             </h2>
             {loadingVersions ? (
-              <div>Loading versions...</div>
+              <div>Loading versions <Spinner /></div>
             ) : (
               <table className="min-w-full text-sm border">
                 <thead>
@@ -770,44 +796,231 @@ export default function DesignDetailPage({
                     <th className="p-2 border">Design Overview</th>
                     <th className="p-2 border">File Key</th>
                     <th className="p-2 border">Node ID</th>
+                    <th className="p-2 border text-center">Delete</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {versions.map((v) => (
-                    <tr key={v.id}>
-                      <td className="p-2 border text-center">{v.version}</td>
-                      <td className="p-2 border">
-                        {(() => {
-                          if (!v.ai_data) return "-";
-                          try {
-                            const ai = typeof v.ai_data === "string" ? JSON.parse(v.ai_data) : v.ai_data;
-                            return ai.overall_score !== undefined ? Math.round(ai.overall_score) : "-";
-                          } catch {
-                            return "-";
+                  {versions
+                    .slice(page * pageSize, (page + 1) * pageSize)
+                    .map((v) => {
+                      const isCurrent = v.id === design?.current_version_id;
+                      const isSelected = selectedVersion?.id === v.id;
+                      return (
+                        <tr
+                          key={v.id}
+                          className={
+                            "cursor-pointer transition " +
+                            (isCurrent
+                              ? "bg-[#ED5E20]/10 dark:bg-[#ED5E20]/20 font-bold ring-2 ring-[#ED5E20]"
+                              : isSelected
+                                ? "bg-blue-100 dark:bg-blue-900 ring-2 ring-blue-400"
+                                : "hover:bg-orange-50 dark:hover:bg-[#232323]")
                           }
-                        })()}
-                      </td>
-                      <td className="p-2 border">{v.ai_summary || "-"}</td>
-                      <td className="p-2 border">{v.created_at ? new Date(v.created_at).toLocaleString() : "-"}</td>
-                      <td className="p-2 border">
-                        {v.thumbnail_url && v.thumbnail_url.startsWith("http") ? (
-                          <Image src={v.thumbnail_url} alt="thumb"
-                            width={70}
-                            height={50}
-
-                            className="object-cover" />
-                        ) : (
-                          "-"
-                        )}
-                      </td>
-                      <td className="p-2 border">{v.file_key}</td>
-                      <td className="p-2 border">{v.node_id}</td>
-                    </tr>
-                  ))}
+                          onClick={() => {
+                            setSelectedVersion(v);
+                            let parsedAiData = null;
+                            try {
+                              parsedAiData = typeof v.ai_data === "string" ? JSON.parse(v.ai_data) : v.ai_data;
+                            } catch { }
+                            if (parsedAiData) {
+                              setEvalResult({
+                                nodeId: v.node_id,
+                                imageUrl: v.thumbnail_url,
+                                summary: v.ai_summary ?? parsedAiData.summary ?? "",
+                                heuristics: parsedAiData.heuristics ?? null,
+                                ai_status: "ok",
+                                overall_score: parsedAiData.overall_score ?? null,
+                                strengths: Array.isArray(parsedAiData.strengths) ? parsedAiData.strengths : [],
+                                weaknesses: Array.isArray(parsedAiData.weaknesses) ? parsedAiData.weaknesses : [],
+                                issues: Array.isArray(parsedAiData.issues) ? parsedAiData.issues : [],
+                                category_scores: parsedAiData.category_scores ?? null,
+                                ai: parsedAiData,
+                              });
+                              setShowEval(true);
+                            }
+                            setShowVersions(false);
+                          }}
+                        >
+                          <td className="p-2 border text-center">
+                            {!isCurrent && v.version}
+                            {isCurrent && (
+                              <span
+                                className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-[#ED5E20] to-orange-400 text-white text-xs font-semibold shadow-md animate-pulse"
+                                style={{
+                                  boxShadow: "0 2px 8px 0 rgba(237,94,32,0.18)",
+                                  letterSpacing: "0.03em",
+                                }}
+                              >
+                                <svg
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 20 20"
+                                  fill="none"
+                                  className="mr-1"
+                                >
+                                  <circle cx="10" cy="10" r="10" fill="#fff" fillOpacity="0.18" />
+                                  <path
+                                    d="M6 10.5l2.5 2.5L14 8"
+                                    stroke="#fff"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                                Current
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-2 border">
+                            {(() => {
+                              if (!v.ai_data) return "-";
+                              try {
+                                const ai = typeof v.ai_data === "string" ? JSON.parse(v.ai_data) : v.ai_data;
+                                return ai.overall_score !== undefined ? Math.round(ai.overall_score) : "-";
+                              } catch {
+                                return "-";
+                              }
+                            })()}
+                          </td>
+                          <td className="p-2 border">{v.ai_summary || "-"}</td>
+                          <td className="p-2 border">{v.created_at ? new Date(v.created_at).toLocaleString() : "-"}</td>
+                          <td className="p-2 border">
+                            {v.thumbnail_url && v.thumbnail_url.startsWith("http") ? (
+                              <Image src={v.thumbnail_url} alt="thumb"
+                                width={70}
+                                height={50}
+                                className="object-cover" />
+                            ) : (
+                              "-"
+                            )}
+                          </td>
+                          <td className="p-2 border">{v.file_key}</td>
+                          <td className="p-2 border">{v.node_id}</td>
+                          <td className="p-2 border text-center">
+                            {!isCurrent && (
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  toast(() => {
+                                    // Generate a unique id for this toast to use with dismiss
+                                    const toastId = `delete-version-${v.id}`;
+                                    return (
+                                      <div className="flex flex-col items-center justify-center gap-2 p-4 ml-8">
+                                        <span className="text-base font-semibold text-[#ED5E20] text-center">
+                                          Delete version <span className="font-bold">v{v.version}</span>?
+                                        </span>
+                                        <span className="mt-1 text-xs text-gray-500 text-center">
+                                          This action cannot be undone.
+                                        </span>
+                                        <div className="flex gap-6 mt-4 justify-center w-full">
+                                          <button
+                                            onClick={async () => {
+                                              toast.dismiss(toastId);
+                                              try {
+                                                await deleteDesignVersion(v.id);
+                                                setVersions(versions.filter(ver => ver.id !== v.id));
+                                                toast.success(
+                                                  <span>
+                                                    <span className="font-bold text-[#ED5E20]">v{v.version}</span> deleted successfully!
+                                                  </span>
+                                                );
+                                              } catch (err: unknown) {
+                                                toast.error(
+                                                  <span>
+                                                    <span className="font-bold text-[#ED5E20]">v{v.version}</span> could not be deleted.<br />
+                                                    Please try again.
+                                                  </span>
+                                                );
+                                              }
+                                            }}
+                                            className="px-6 py-2 rounded-full bg-gradient-to-r from-[#ED5E20] to-orange-400 text-white font-bold shadow-lg hover:scale-105 hover:from-orange-500 hover:to-[#ED5E20] transition-all duration-200 cursor-pointer"
+                                          >
+                                            Yes, Delete
+                                          </button>
+                                          <button
+                                            onClick={() => toast.dismiss(toastId)}
+                                            className="px-6 py-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-semibold shadow hover:bg-gray-200 dark:hover:bg-gray-700 hover:scale-105 transition-all duration-200 cursor-pointer"
+                                          >
+                                            Cancel
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  }, { duration: 10000, id: `delete-version-${v.id}` });
+                                }}
+                                className="text-red-500 hover:text-white hover:bg-red-500 rounded-full p-1 cursor-pointer transition-all duration-200"
+                                title="Delete version"
+                              >
+                                <IconTrash size={18} />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             )}
-            <div className="flex justify-end mb-4 mt-5">
+            {versions.length > pageSize && (
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 px-2">
+                {/* Progress Bar */}
+                <div className="w-full sm:w-1/2 h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden shadow-inner">
+                  <div
+                    className="h-full bg-gradient-to-r from-[#ED5E20] to-orange-400 transition-all duration-500"
+                    style={{
+                      width: `${((page + 1) / Math.ceil(versions.length / pageSize)) * 100}%`,
+                    }}
+                  />
+                </div>
+                {/* Pagination Controls */}
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    disabled={page === 0}
+                    className={`group relative flex items-center justify-center px-4 py-2 rounded-full
+                      bg-white/80 dark:bg-[#232323]/80 shadow-lg border border-[#ED5E20]/30
+                      text-[#ED5E20] dark:text-[#ED5E20] font-bold text-base
+                      transition-all duration-300
+                      hover:bg-[#ED5E20] hover:text-white hover:scale-110 active:scale-95
+                      disabled:opacity-40 disabled:cursor-not-allowed
+                      outline-none focus:ring-2 focus:ring-[#ED5E20]/40
+                      cursor-pointer
+                      `}
+                    aria-label="Previous Page"
+                  >
+                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" className="mr-1">
+                      <path d="M15 19l-7-7 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    Back
+                    <span className="absolute -inset-1 rounded-full pointer-events-none group-hover:animate-pulse" />
+                  </button>
+                  <span className="mx-2 text-sm font-semibold tracking-wide bg-gradient-to-r from-[#ED5E20]/80 to-orange-400/80 text-white px-4 py-1 rounded-full shadow">
+                    Page {page + 1} of {Math.ceil(versions.length / pageSize)}
+                  </span>
+                  <button
+                    onClick={() => setPage((p) => Math.min(Math.ceil(versions.length / pageSize) - 1, p + 1))}
+                    disabled={(page + 1) * pageSize >= versions.length}
+                    className={`
+                      group relative flex items-center justify-center px-4 py-2 rounded-full
+                      bg-white/80 dark:bg-[#232323]/80 shadow-lg border border-[#ED5E20]/30
+                      text-[#ED5E20] dark:text-[#ED5E20] font-bold text-base
+                      transition-all duration-300
+                      hover:bg-[#ED5E20] hover:text-white hover:scale-110 active:scale-95
+                      disabled:opacity-40 disabled:cursor-not-allowed
+                      outline-none focus:ring-2 focus:ring-[#ED5E20]/40
+                      cursor-pointer`}
+                    aria-label="Next Page"
+                  >
+                    Next
+                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" className="ml-1">
+                      <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span className="absolute -inset-1 rounded-full pointer-events-none group-hover:animate-pulse" />
+                  </button>
+                </div>
+              </div>
+            )}
+            {/* <div className="flex justify-end mb-4 mt-5">
               <button
                 onClick={() => setShowVersions(false)}
                 className=" mt-2 relative px-6 py-2 rounded-full bg-white/70
@@ -840,7 +1053,7 @@ export default function DesignDetailPage({
                 </svg>
                 <span className="z-10 tracking-wide drop-shadow">Close</span>
               </button>
-            </div>
+            </div> */}
           </div>
         </div>
       )}
