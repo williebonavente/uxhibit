@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { Mistral } from "@mistralai/mistralai"
 import { createClient } from "@/utils/supabase/server";
-// import { creteClient } from "@supabase/supabase-js";
 export const runtime = "nodejs";
 
 const FIGMA_TOKEN = process.env.FIGMA_ACCESS_TOKEN!;
@@ -268,6 +267,7 @@ export async function POST(req: Request) {
             // Prepare the data to match your schema
             const versionData = {
                 design_id: designId,
+                file_key: fileKey,
                 node_id: nid,
                 thumbnail_url: imageUrl,
                 ai_summary: ai.summary || null, // Ensure not undefined
@@ -301,6 +301,23 @@ export async function POST(req: Request) {
             } else {
                 savedVersion = inserted;
                 console.log("Successfully saved AI evaluation:", inserted);
+                // After successfully saving the version
+                if (savedVersion?.id) {
+                    // Update the design's current_version_id
+                    const { error: updateError } = await supabase
+                        .from("designs")
+                        .update({
+                            current_version_id: savedVersion.id,
+                            thumbnail_url: imageUrl
+                        })
+                        .eq("id", designId);
+
+                    if (updateError) {
+                        console.error("Failed to update design with current version:", updateError);
+                    } else {
+                        console.log("Updated design with current version:", savedVersion.id);
+                    }
+                }
             }
         } catch (err) {
             console.error("Error in Supabase save:", err);
@@ -311,7 +328,6 @@ export async function POST(req: Request) {
             hasDesignId: !!designId
         });
     }
-
 
     return NextResponse.json({
         nodeId: nid,

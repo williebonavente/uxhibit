@@ -121,6 +121,7 @@ export default function Evaluate() {
     }
 
     setSubmitting(true);
+    const loadingToast = toast.loading("Running AI evaluation...");
     try {
       // First save the design
       const saveRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/designs`, {
@@ -144,7 +145,6 @@ export default function Evaluate() {
       }
 
       // Then trigger AI evaluation
-      const loadingToast = toast.loading("Running AI evaluation...");
       const evalRes = await fetch("/api/ai/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -187,8 +187,8 @@ export default function Evaluate() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-80px)] flex flex-col items-center justify-center px-4 py-8">
-      <div className="w-full max-w-3xl relative overflow-hidden rounded-2xl shadow-xl">
+    <div className="min-h-[calc(100vh-80px)] flex flex-col items-center justify-center px-4 py-8 z-0">
+      <div className="w-full max-w-3xl relative overflow-hidden rounded-2xl shadow-xl z-0">
         <Image
           src="/images/gradient-evaluate.png"
           alt="Background"

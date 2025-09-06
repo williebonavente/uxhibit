@@ -29,7 +29,7 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const PUBLIC_PATHS = new Set<string>(["/"]);
+  const PUBLIC_PATHS = new Set<string>(["/", "/login"]);
 
   function isPublicPath(path: string) {
     if (PUBLIC_PATHS.has(path)) return true;

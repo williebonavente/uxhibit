@@ -19,10 +19,20 @@ const nextConfig: NextConfig = {
         hostname: "figma-alpha-api.s3.us-west-2.amazonaws.com",
         pathname: "/images/**",
       },
-
+      {
+        protocol: "https",
+        hostname: "**.supabase.co",
+        pathname: "/storage/v1/object/sign/**",
+      }
     ],
-    domains: ["i.pravatar.cc"],
+    domains: [
+      "i.pravatar.cc",
+      "sbsxkbapdmlnyhvjvsei.supabase.co",
+      "www.figma.com"
+    ],
+    unoptimized: true // Add this for signed URLs
   },
 };
+
 export default nextConfig;
 

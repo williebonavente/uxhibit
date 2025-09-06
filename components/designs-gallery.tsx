@@ -5,8 +5,8 @@ import { IconEye, IconHeart, IconTrash } from "@tabler/icons-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import Image from "next/image";
-// CHANGED: import Supabase client (instead of localStorage)
 import { createClient } from "@/utils/supabase/client";
+import { Spinner } from '@/components/ui/shadcn-io/spinner';
 
 type DesignRow = {
   id: string;
@@ -125,17 +125,100 @@ export default function DesignsGallery() {
           <button
             className="px-4 py-2 rounded bg-red-500 text-white hover:bg-red-600 font-semibold w-full sm:w-auto"
             onClick={async () => {
-              const { error } = await supabase
-                .from("designs")
-                .delete()
-                .eq("id", id);
-              if (error) toast.error("Delete failed");
-              else {
-                setDesigns((d) => d.filter((x) => x.id !== id));
-                toast.success("Deleted");
+              try {
+                // First get design info for logging and storage cleanup
+                const { data: design } = await supabase
+                  .from("designs")
+                  .select(`
+                  title, 
+                  thumbnail_url,
+                  design_versions!design_versions_design_id_fkey (
+                    id,
+                    thumbnail_url
+                  )
+                `)
+                  .eq("id", id)
+                  .single();
+
+                // Collect all storage paths to delete
+                const storagePaths: string[] = [];
+
+                // Add main design thumbnail if it's a storage path
+                if (design?.thumbnail_url && !design.thumbnail_url.startsWith('http')) {
+                  storagePaths.push(design.thumbnail_url);
+                }
+
+                // Add version thumbnails if they're storage paths
+                design?.design_versions?.forEach(version => {
+                  if (version.thumbnail_url && !version.thumbnail_url.startsWith('http')) {
+                    storagePaths.push(version.thumbnail_url);
+                  }
+                });
+
+                // Delete storage files first
+                if (storagePaths.length > 0) {
+                  const { error: storageError } = await supabase
+                    .storage
+                    .from('design-thumbnails')
+                    .remove(storagePaths);
+
+                  if (storageError) {
+                    console.error('Failed to delete storage files:', storageError);
+                    // Continue with DB deletion even if storage fails
+                  }
+                }
+
+                // Clear current_version_id first
+                const { error: updateError } = await supabase
+                  .from("designs")
+                  .update({ current_version_id: null })
+                  .eq("id", id);
+
+                if (updateError) {
+                  console.error('Failed to clear current version:', updateError);
+                  throw updateError;
+                }
+
+                // Delete design versions
+                const { error: versionsError } = await supabase
+                  .from("design_versions")
+                  .delete()
+                  .eq("design_id", id);
+
+                if (versionsError) {
+                  console.error('Failed to delete versions:', versionsError);
+                  throw versionsError;
+                }
+
+                // Finally delete the design
+                const { error: deleteError } = await supabase
+                  .from("designs")
+                  .delete()
+                  .eq("id", id);
+
+                if (deleteError) {
+                  console.error('Delete failed:', {
+                    error: deleteError,
+                    designId: id,
+                    designTitle: design?.title
+                  });
+                  toast.error(`Delete failed: ${deleteError.message}`);
+                } else {
+                  console.log('Design, versions, and files deleted successfully:', {
+                    designId: id,
+                    designTitle: design?.title,
+                    deletedFiles: storagePaths
+                  });
+                  setDesigns((d) => d.filter((x) => x.id !== id));
+                  toast.success("Design deleted successfully");
+                }
+              } catch (err) {
+                console.error('Unexpected error during delete:', err);
+                toast.error("An unexpected error occurred");
+              } finally {
+                setShowOverlay(false);
+                toast.dismiss();
               }
-              setShowOverlay(false);
-              toast.dismiss();
             }}
           >
             Delete
@@ -150,11 +233,14 @@ export default function DesignsGallery() {
       }
     );
   };
-
   if (loading) {
-    return <p className="mt-4 text-gray-400 text-sm">Loading designs...</p>;
+    return (
+      <div className="flex items-center justify-center h-40">
+        <Spinner className="w-6 h-6 text-[#ED5E20]" />
+        <span className="ml-3 text-base font-medium text-[#ED5E20]">Loading designs</span>
+      </div>
+    );
   }
-
   if (designs.length === 0) {
     return (
       <p className="mt-4 text-gray-400 text-sm">No designs uploaded yet.</p>

@@ -34,6 +34,7 @@ import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { type User } from "@supabase/supabase-js";
 import { Skeleton } from "./ui/skeleton";
+import { AlertCircle, Bug, UserRound } from "lucide-react";
 
 
 export function NavUser({ user }: { user: User | null }) {
@@ -42,9 +43,9 @@ export function NavUser({ user }: { user: User | null }) {
   const [loading, setLoading] = useState(true)
   const [fullname, setFullName] = useState<string | null>(null)
   const [email, setEmail] = useState<string | null>(null)
-  const [username, setUsername] = useState<string | null>(null)
-  const [website, setWebsite] = useState<string | null>(null)
-  const [age, setAge] = useState<string | null>(null)
+  // const [username, setUsername] = useState<string | null>(null)
+  // const [website, setWebsite] = useState<string | null>(null)
+  // const [age, setAge] = useState<string | null>(null)
   const [avatar_url, setAvatarUrl] = useState<string | null>(null)
   // Add state for pending avatar 
   const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
@@ -134,6 +135,17 @@ export function NavUser({ user }: { user: User | null }) {
       }
     }
   };
+
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [open]);
 
   const router = useRouter();
   async function handleLogOut() {
@@ -238,8 +250,17 @@ export function NavUser({ user }: { user: User | null }) {
                 </DropdownMenuItem>
                 {/* removed billing */}
                 <DropdownMenuItem>
+                  {/* TODO: Insert the function Notifications somewhere down the road */}
                   <IconNotification />
                   Notifications
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <UserRound />
+                  About Us
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Bug />
+                  Report a Bug
                 </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
@@ -249,7 +270,7 @@ export function NavUser({ user }: { user: User | null }) {
         </SidebarMenuItem>
       </SidebarMenu>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
           {/* Blurred, darkened background */}
           <div
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
@@ -257,10 +278,9 @@ export function NavUser({ user }: { user: User | null }) {
           />
           {/* Centered form */}
           <div
-            className=" relative z-10 bg-white dark:bg-[#141414] rounded-xl shadow-lg 
-              w-full max-w-xs sm:max-w-md mx-auto
-            p-3 sm:p-8
-          overflow-y-auto max-h-[90vh]"
+            className="relative z-[102] bg-white dark:bg-[#141414] rounded-xl shadow-lg 
+                      w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-xl xl:max-w-[530px] mx-auto
+                      p-3 sm:p-8 overflow-y-auto max-h-[90vh]"
           >
             {/* Adjusted font size and margin for mobile */}
             <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4 text-center">
@@ -314,8 +334,6 @@ export function NavUser({ user }: { user: User | null }) {
                     }
                     imageUrl = filePath;
                   }
-
-
                   // Update profile in DB
                   const { error } = await supabase
                     .from("profiles")
@@ -423,20 +441,38 @@ export function NavUser({ user }: { user: User | null }) {
                     type="number"
                     min={10}
                     max={80}
-                    value={profile.age === 0 ? "" : profile.age ?? ""}
+                    value={profile?.age || ''}
                     onChange={e => {
                       const raw = e.target.value;
-                      if (raw === "") {
-                        setProfile({ ...profile, age: "" });
+
+                      // Allow empty input
+                      if (raw === '') {
+                        setProfile(prev => prev ? { ...prev, age: '' } : prev);
                         return;
                       }
-                      const value = Number(raw);
-                      // Only update if value is a valid number and in range
-                      if (!isNaN(value) && value >= 10 && value <= 80) {
-                        setProfile({ ...profile, age: value });
+
+                      // Store the raw input first to allow typing
+                      const tempValue = parseInt(raw, 10);
+                      if (!isNaN(tempValue)) {
+                        // Only show error for 3+ digits but still allow typing
+                        if (raw.length > 3) {
+                          toast.error("Invalid age. Please enter a number between 10-80.");
+                        }
+                        // Update state with the current input
+                        setProfile(prev => prev ? { ...prev, age: tempValue } : prev);
                       }
                     }}
-                    placeholder="Enter your age (10-80)"
+                    // Validate on blur instead
+                    onBlur={e => {
+                      const value = parseInt(e.target.value, 10);
+                      if (!isNaN(value)) {
+                        if (value > 80 || value < 10) {
+                          toast.error("Age must be between 10-80 years");
+                          setProfile(prev => prev ? { ...prev, age: '' } : prev);
+                        }
+                      }
+                    }}
+                    placeholder="Enter your age"
                   />
                 </div>
 
@@ -449,7 +485,7 @@ export function NavUser({ user }: { user: User | null }) {
                 </div>
 
                 {/* Footer buttons are now responsive: stack on mobile, row on desktop */}
-                <footer className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-4 mt-6 sm:mt-16">
+                <footer className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-4 mt-12">
                   <Button
                     type="button"
                     variant="outline"

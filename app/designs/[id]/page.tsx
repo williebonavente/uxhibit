@@ -15,6 +15,21 @@ import {
   IconHistory,
 } from "@tabler/icons-react";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/shadcn-io/spinner/index";
+import { fetchDesignVersions } from "@/database/actions/versions/versionHistory";
+
+type Versions = {
+  id: string;
+  design_id: string;
+  version: number;
+  file_key: string;
+  node_id: string;
+  thumbnail_url: string;
+  ai_summary: string;
+  ai_data: string;
+  created_at: string;
+};
+
 
 type Design = {
   id: string;
@@ -109,15 +124,18 @@ export default function DesignDetailPage({
   const [project, setProject] = useState<any>(null);
   const [selectedVersion, setSelectedVersion] = useState<any>(null);
   const [design, setDesign] = useState<Design | null>(null);
-  // const [loading, setLoading] = useState(false);
   const [designLoading, setDesignLoading] = useState(true);
-  // const [framesLoading, setFramesLoading] = useState(false); // separate from evaluation
-  // const [exportedFrames, setExported] = useState<ExportedFrame[]>([]);
   const [evalResult, setEvalResult] = useState<EvalResponse | null>(null);
   const [loadingEval, setLoadingEval] = useState(false);
   const [evalError, setEvalError] = useState<string | null>(null);
   const [thumbUrl, setThumbUrl] = useState<string | null>(null);
+  const [versions, setVersions] = useState<Versions[]>([]);
+  const [loadingVersions, setLoadingVersions] = useState(false);
 
+
+  // const [framesLoading, setFramesLoading] = useState(false); // separate from evaluation
+  // const [exportedFrames, setExported] = useState<ExportedFrame[]>([]);
+  // const [loading, setLoading] = useState(false);
   // async function refreshSignedThumb(path: string) {
   //   const supabase = createClient();
   //   const { data: signed, error } = await supabase.storage
@@ -203,6 +221,7 @@ export default function DesignDetailPage({
   //     setFramesLoading(false);
   //   }
   // }
+
 
   // Save updated project back to localStorage
   const saveProject = (updated: any) => {
@@ -417,12 +436,12 @@ export default function DesignDetailPage({
     }
   }, [id]);
 
-useEffect(() => {
+  useEffect(() => {
     const supabase = createClient();
     async function loadSavedEvaluation() {
       try {
         if (!design?.id) return;
-        
+
         // Get latest evaluation data
         const { data, error } = await supabase
           .from("design_versions")
@@ -448,8 +467,8 @@ useEffect(() => {
         let parsedAiData = null;
         if (data?.ai_data) {
           try {
-            parsedAiData = typeof data.ai_data === 'string' 
-              ? JSON.parse(data.ai_data) 
+            parsedAiData = typeof data.ai_data === 'string'
+              ? JSON.parse(data.ai_data)
               : data.ai_data;
 
             console.log('Parsed saved AI data:', parsedAiData);
@@ -485,10 +504,33 @@ useEffect(() => {
     loadSavedEvaluation();
   }, [design?.id]); // Only re-run when design.id changes
 
+  // Design Version scrolling - mess
+  useEffect(() => {
+    if (showVersions) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    // Clean up in case the component unmounts while modal is open
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showVersions]);
+
+  useEffect(() => {
+    if (!design?.id) return;
+    setLoadingVersions(true);
+    fetchDesignVersions(design.id)
+      .then(setVersions)
+      .catch((e: string) => console.error("Failed to fetch versions", e))
+      .finally(() => setLoadingVersions(false))
+  }, [design?.id])
+
   if (designLoading)
     return (
       <div className="flex items-center justify-center h-screen">
-        <p>Loading Design...</p>
+        <Spinner className="w-8 h-8 text-[#ED5E20]" />
+        <span className="ml-4 text-lg font-medium text-[#ED5E20]">Loading Design...</span>
       </div>
     );
 
@@ -685,38 +727,118 @@ useEffect(() => {
       {/* VERSION HISTORY MODAL */}
       {showVersions && (
         <div className="fixed inset-0 flex items-center justify-center">
-          {/* Background overlay */}
           <div
-            className="absolute inset-0 bg-black/50 transition-opacity"
-            onClick={() => setShowVersions(false)} // click outside to close
+            className="absolute inset-0 bg-black/50 transition-opacity backdrop-blur-xl"
+            onClick={() => setShowVersions(false)}
           ></div>
-
-          {/* Modal content */}
-          <div className="relative bg-white dark:bg-accent rounded-lg p-6 w-96 max-h-[80vh] overflow-y-auto shadow-xl">
-            <h2 className="text-lg font-semibold mb-3">Version History</h2>
-            <ul className="space-y-2">
-              {project?.versions?.map((v: any) => (
-                <li
-                  key={v.version}
-                  onClick={() => {
-                    setSelectedVersion(v);
-                    setShowVersions(false);
-                  }}
-                  className={`p-2 border rounded-md cursor-pointer ${selectedVersion?.version === v.version
-                    ? "bg-orange-200 dark:bg-orange-700"
-                    : "bg-gray-100 dark:bg-gray-700"
-                    }`}
-                >
-                  v{v.version} - {v.timestamp} ({v.fileName})
-                </li>
-              ))}
-            </ul>
-            <div className="mt-4 text-right">
+          <div className="relative bg-gradient-to-br from-white/95 to-orange-100/20
+                        dark:from-[#18181b]/95 dark:to-[#ed5e20]/10 rounded-2xl p-10 w-[1100px] max-h-[85vh]
+                        overflow-y-auto shadow-2xl border border-[#ED5E20]/30 backdrop-blur-md transition-all duration-300
+                        ring-1 ring-[#ED5E20]/10 flex flex-col"
+            style={{
+              boxShadow: "0 8px 40px 0 rgba(237,94,32,0.10), 0 1.5px 8px 0 rgba(0,0,0,0.18)",
+            }}
+          >
+            <h2 className="text-lg font-semibold mb-3 relative flex items-center justify-center">
+              <span className="mx-auto">Version History</span>
               <button
                 onClick={() => setShowVersions(false)}
-                className="px-3 py-1 rounded-md bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-500 cursor-pointer"
+                aria-label="Minimize"
+                className="absolute right-0 ml-2 rounded-full p-2 bg-white/70 dark:bg-[#232323]/80 shadow-lg border border-[#ED5E20]/30
+                          backdrop-blur hover:bg-[#ED5E20]/90 hover:text-white transition-all duration-200 text-[#ED5E20]
+                          dark:text-[#ED5E20] text-lg flex items-center justify-center scale-110 hover:scale-125 active:scale-95
+                          outline-none focus:ring-2 focus:ring-[#ED5E20]/40 cursor-pointer"
+                style={{
+                  boxShadow: "0 2px 12px 0 rgba(237,94,32,0.15)",
+                }}
               >
-                Close
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
+                  <rect x="5" y="11" width="14" height="2" rx="1" fill="currentColor" />
+                </svg>
+              </button>
+            </h2>
+            {loadingVersions ? (
+              <div>Loading versions...</div>
+            ) : (
+              <table className="min-w-full text-sm border">
+                <thead>
+                  <tr className="bg-gray-100 dark:bg-gray-700">
+                    <th className="p-2 border">Version</th>
+                    <th className="p-2 border">Score</th>
+                    <th className="p-2 border">AI Summary</th>
+                    <th className="p-2 border">Evaluated at</th>
+                    <th className="p-2 border">Design Overview</th>
+                    <th className="p-2 border">File Key</th>
+                    <th className="p-2 border">Node ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {versions.map((v) => (
+                    <tr key={v.id}>
+                      <td className="p-2 border text-center">{v.version}</td>
+                      <td className="p-2 border">
+                        {(() => {
+                          if (!v.ai_data) return "-";
+                          try {
+                            const ai = typeof v.ai_data === "string" ? JSON.parse(v.ai_data) : v.ai_data;
+                            return ai.overall_score !== undefined ? Math.round(ai.overall_score) : "-";
+                          } catch {
+                            return "-";
+                          }
+                        })()}
+                      </td>
+                      <td className="p-2 border">{v.ai_summary || "-"}</td>
+                      <td className="p-2 border">{v.created_at ? new Date(v.created_at).toLocaleString() : "-"}</td>
+                      <td className="p-2 border">
+                        {v.thumbnail_url && v.thumbnail_url.startsWith("http") ? (
+                          <Image src={v.thumbnail_url} alt="thumb"
+                            width={70}
+                            height={50}
+
+                            className="object-cover" />
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                      <td className="p-2 border">{v.file_key}</td>
+                      <td className="p-2 border">{v.node_id}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            <div className="flex justify-end mb-4 mt-5">
+              <button
+                onClick={() => setShowVersions(false)}
+                className=" mt-2 relative px-6 py-2 rounded-full bg-white/70
+                dark:bg-[#232323]/80 shadow-xl border-2 border-[#ED5E20]/40 backdrop-blur
+                text-[#ED5E20] dark:text-[#ED5E20] font-bold text-lg flex items-center gap-2
+                transition-all duration-300 hover:bg-[#ED5E20] hover:text-white hover:scale-110 active:scale-95
+                outline-none focus:ring-2 focus:ring-[#ED5E20]/40 overflow-hidden
+                group z-10
+                cursor-pointer"
+                style={{
+                  boxShadow: "0 4px 24px 0 rgba(237,94,32,0.18), 0 1.5px 8px 0 rgba(0,0,0,0.10)",
+                }}
+              >
+                <span className="absolute inset-0 rounded-full pointer-events-none z-0
+                before:content-[''] before:absolute before:inset-0 before:rounded-full
+                before:bg-gradient-to-r before:from-[#ED5E20]/60 before:to-[#ffb37b]/40
+                before:blur-lg before:opacity-0 group-hover:opacity-100 before:transition-opacity before:duration-300
+                animate-pulse
+                " />
+                <svg
+                  width="22"
+                  height="22"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  className="z-10"
+                >
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" />
+                  <path d="M15 9L9 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <path d="M9 9L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                <span className="z-10 tracking-wide drop-shadow">Close</span>
               </button>
             </div>
           </div>
