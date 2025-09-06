@@ -23,7 +23,6 @@ import {
 } from "@/database/actions/versions/versionHistory";
 
 import { toast } from "sonner";
-import { version } from "os";
 
 
 type Versions = {
@@ -49,17 +48,21 @@ type Design = {
   thumbnailPath?: string;
   snapshot: string;
   current_version_id: string;
+  is_active: boolean;
   // Add other properties as needed
 };
 
-
+type Snapshot = {
+  generation: string;
+  occupation: string;
+}
 type EvaluateInput = {
   designId: string;
   fileKey: string
   nodeId?: string;
   scale?: number;
   fallbackImageUrl?: string;
-  snapshot?: any; // Add this line to include snapshot data
+  snapshot?: Snapshot;
 }
 
 type ExportedFrame = {
@@ -98,6 +101,21 @@ type EvalResponse = {
   } | null;
 };
 
+type PublishedDesign = {
+  id: string;
+  design_id: string;
+  user_id: string;
+  published_version_id: string;
+  published_at: string;
+  title: string;
+  description: string;
+  thumbnail_url: string;
+  ai_summary: string;
+  ai_data: string;
+  is_active: boolean;
+  num_of_hearts: number;
+  num_of_views: number;
+}
 export async function evaluateDesign(input: EvaluateInput): Promise<EvalResponse> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   console.log('Calling evaluate with:', input);
@@ -130,7 +148,7 @@ export default function DesignDetailPage({
 
   const [showEval, setShowEval] = useState(true); // toggle evaluation sidebar
   const [showVersions, setShowVersions] = useState(false); // toggle version history modal
-  const [project, setProject] = useState<any>(null);
+  // const [project, setProject] = useState<PublishedDesign | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<any>(null);
   const [design, setDesign] = useState<Design | null>(null);
   const [designLoading, setDesignLoading] = useState(true);
@@ -140,6 +158,7 @@ export default function DesignDetailPage({
   const [thumbUrl, setThumbUrl] = useState<string | null>(null);
   const [versions, setVersions] = useState<Versions[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
+  const [versionChanged, setVersionChanged] = useState(0);
   const [page, setPage] = useState(0);
 
   const pageSize = 6;
@@ -233,63 +252,187 @@ export default function DesignDetailPage({
   //   }
   // }
 
+  // TODO: Handle file reupload → create new version
 
-  // Save updated project back to localStorage
-  const saveProject = (updated: any) => {
-    const stored = JSON.parse(localStorage.getItem("designs") || "[]");
-    const newData = stored.map((d: any) => (d.id === id ? updated : d));
-    localStorage.setItem("designs", JSON.stringify(newData));
-    setProject(updated);
+  // const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const file = e.target.files?.[0];
+  //   if (!file || !project) return;
 
-    // Always select the latest version
-    if (updated.versions?.length > 0) {
-      setSelectedVersion(updated.versions[updated.versions.length - 1]);
-    } else {
-      setSelectedVersion(null);
-    }
-  };
+  //   const reader = new FileReader();
+  //   reader.onload = () => {
+  //     const currentVersions = project.published_version_id|| [];
+  //     const newVersionNumber = currentVersions.length + 1; // auto increment
 
-  // Handle file reupload → create new version
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !project) return;
+  //     const newVersion = {
+  //       version: newVersionNumber,
+  //       timestamp: new Date().toLocaleString(),
+  //       fileName: file.name,
+  //       fileData: reader.result, // base64 for preview
+  //       evaluation: `Evaluation for version ${newVersionNumber}`, // placeholder text
+  //     };
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const currentVersions = project.versions || [];
-      const newVersionNumber = currentVersions.length + 1; // auto increment
+  //     const updatedProject = {
+  //       ...project,
+  //       versions: [...currentVersions, newVersion],
+  //     };
 
-      const newVersion = {
-        version: newVersionNumber,
-        timestamp: new Date().toLocaleString(),
-        fileName: file.name,
-        fileData: reader.result, // base64 for preview
-        evaluation: `Evaluation for version ${newVersionNumber}`, // placeholder text
-      };
-
-      const updatedProject = {
-        ...project,
-        versions: [...currentVersions, newVersion],
-      };
-
-      // Save and set as current project + select this version
-      saveProject(updatedProject);
-    };
-    reader.readAsDataURL(file);
-    router.push("/evaluate");
-  };
+  //     // Save and set as current project + select this version
+  //     setProject(updatedProject);
+  //   };
+  //   reader.readAsDataURL(file);
+  //   router.push("/evaluate");
+  // };
 
   // Publish project (latest version)
-  const publishProject = () => {
-    if (!project) return;
-    const updated = {
-      ...project,
-      published: true,
-      publishedVersion: project.versions?.[project.versions.length - 1] || null,
-    };
-    saveProject(updated);
-    alert(`Project "${project.project_name}" published!`);
-  };
+  // async function syncPublishedState(): Promise<void> {
+  //   const supabase = createClient();
+  //   const { data: userData } = await supabase.auth.getUser();
+  //   const userId = userData?.user?.id;
+
+  //   // Guard clause: don't run if IDs are missing
+  //   if (!design?.id || !userId) return;
+  //   // Fetch the full published design row for this user/design
+  //   const { data: published, error } = await supabase
+  //     .from("published_designs")
+  //     .select("*")
+  //     .eq("design_id", design?.id)
+  //     .eq("user_id", userId)
+  //     .eq("is_active", true)
+  //     .maybeSingle();
+
+  //   if (error) {
+  //     console.error("Failed to sync published state:", error);
+  //     return;
+  //   }
+
+  //   if (published) {
+  //     setProject(published); // <-- Use the published row as the new project state
+  //   } else if (project) {
+  //     setProject({
+  //       ...project,
+  //       is_active: false,
+  //       published_version_id: "",
+  //       published_at: "",
+  //       title: project.title || "",
+  //       description: project.description || "",
+  //       thumbnail_url: project.thumbnail_url || "",
+  //       ai_summary: "",
+  //       ai_data: "",
+  //       num_of_hearts: 0,
+  //       num_of_views: 0,
+  //     });
+  //   }
+  // }
+
+  async function syncPublishedState(): Promise<void> {
+    const supabase = createClient();
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData?.user?.id;
+
+    // Exit early if required IDs are missing
+    if (!design?.id || !userId) return;
+
+    // Query for the published record for this user and design
+    const { data: published, error } = await supabase
+      .from("published_designs")
+      .select("*")
+      .eq("design_id", design.id)
+      .eq("user_id", userId)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Failed to sync published state:", error);
+      return;
+    }
+
+    // Update the design state with the published status
+    setDesign((prev) =>
+      prev
+        ? {
+          ...prev,
+          is_active: !!published,
+          published_version_id: published?.published_version_id || "",
+          published_at: published?.published_at || "",
+        }
+        : prev
+    );
+  }
+
+
+  async function publishProject() {
+    const supabase = createClient();
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData?.user?.id;
+
+    // Check if a published record already exists
+    const { data: existing, error: fetchError } = await supabase
+      .from("published_designs")
+      .select("*")
+      .eq("design_id", design?.id)
+      .eq("user_id", userId)
+      .single();
+
+    if (fetchError && fetchError.code !== "PGRST116") {
+      toast.error("Failed to check publish status.");
+      return;
+    }
+
+    let error;
+    if (existing) {
+      // Update is_active to true
+      ({ error } = await supabase
+        .from("published_designs")
+        .update({
+          is_active: true,
+          published_at: new Date().toISOString(),
+          published_version_id: design?.current_version_id,
+        })
+        .eq("id", existing.id));
+    } else {
+      // Insert new row
+      ({ error } = await supabase
+        .from("published_designs")
+        .insert({
+          design_id: design?.id,
+          user_id: userId,
+          published_version_id: design?.current_version_id,
+          published_at: new Date().toISOString(),
+          is_active: true,
+        }));
+    }
+
+    if (!error) {
+      toast.success("Design published to the community!");
+    } else {
+      toast.error(`Failed to publish design: ${error.message || "Unknown error"}`);
+    }
+  }
+
+  async function unpublishProject() {
+    const supabase = createClient();
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData?.user?.id;
+
+    // Set is_active to false
+    const { error } = await supabase
+      .from("published_designs")
+      .update({ is_active: false })
+      .eq("design_id", design?.id)
+      .eq("user_id", userId);
+
+    if (!error) {
+      toast.success("Design unpublished!");
+    } else {
+      toast.error(`Failed to unpublish design: ${error.message || "Unknown error"}`);
+    }
+  }
+
+  useEffect(() => {
+    if (design) {
+      syncPublishedState();
+    }
+  }, [design?.id]);
 
   useEffect(() => {
     async function loadDesign() {
@@ -435,20 +578,6 @@ export default function DesignDetailPage({
     return () => clearInterval(idRef);
   }, [design?.thumbnail]);
 
-  // Fetch project data from localStorage by id
-  useEffect(() => {
-    const stored = JSON.parse(localStorage.getItem("designs") || "[]");
-    const found = stored.find((d: any) => d.id === id);
-    if (found) {
-      setProject(found);
-      if (found.versions?.length > 0) {
-        setSelectedVersion(found.versions[found.versions.length - 1]); // latest version
-      } else {
-        setSelectedVersion(null);
-      }
-    }
-  }, [id]);
-
   useEffect(() => {
     const supabase = createClient();
     async function loadSavedEvaluation() {
@@ -542,6 +671,17 @@ export default function DesignDetailPage({
   useEffect(() => {
     if (showVersions) setPage(0);
   }, [showVersions, versions.length])
+
+  useEffect(() => {
+    if (!design?.id) return;
+    setLoadingVersions(true);
+    fetchDesignVersions(design.id)
+      .then(setVersions)
+      .catch((e: string) => console.error("Failed to fetch versions", e))
+      .finally(() => setLoadingVersions(false));
+  }, [design?.id, versionChanged]);
+
+
   if (designLoading)
     return (
       <div className="flex items-center justify-center h-screen">
@@ -572,13 +712,14 @@ export default function DesignDetailPage({
           </Link>
           <h1 className="text-xl font-medium">
             {design.project_name}
-            {selectedVersion ? `(v${selectedVersion.version})` : ""}
+            {/* Only show version if NOT current */}
+            {selectedVersion && selectedVersion.id !== design.current_version_id
+              ? ` (v${selectedVersion.version})`
+              : ""}
           </h1>
         </div>
-
         <div className="flex gap-3 items-center">
-          {/* Upload New Version */}
-          <Input
+          {/* <Input
             type="file"
             accept=".fig"
             id="fileUpload"
@@ -590,7 +731,8 @@ export default function DesignDetailPage({
             className="cursor-pointer p-2 rounded hover:bg-[#ED5E20]/15"
           >
             <IconUpload size={22} />
-          </label>
+          </label> */}
+
 
           {/* Version History */}
           <div className="relative group">
@@ -608,14 +750,27 @@ export default function DesignDetailPage({
               </div>
             </div>
           </div>
-
-          {/* Publish Button */}
-          <button
-            onClick={publishProject}
-            className="bg-[#ED5E20] text-white px-8 py-2 rounded-md hover:bg-orange-600 hover:cursor-pointer text-sm"
-          >
-            Publish
-          </button>
+          {design?.is_active ? (
+            <button
+              onClick={async () => {
+                await unpublishProject();
+                await syncPublishedState();
+              }}
+              className="bg-gray-300 text-gray-700 px-8 py-2 rounded-md hover:bg-gray-400 hover:cursor-pointer text-sm"
+            >
+              Unpublish
+            </button>
+          ) : (
+            <button
+              onClick={async () => {
+                await publishProject();
+                await syncPublishedState();
+              }}
+              className="bg-[#ED5E20] text-white px-8 py-2 rounded-md hover:bg-orange-600 hover:cursor-pointer text-sm"
+            >
+              Publish
+            </button>
+          )}
         </div>
       </div>
 
@@ -784,7 +939,15 @@ export default function DesignDetailPage({
               </button>
             </h2>
             {loadingVersions ? (
-              <div>Loading versions <Spinner /></div>
+              <div className="flex flex-col items-center justify-center py-12">
+                <Spinner className="w-10 h-10 text-[#ED5E20] animate-spin mb-4" />
+                <span className="text-lg font-semibold text-[#ED5E20] animate-pulse">
+                  Loading Version History...
+                </span>
+                <span className="text-sm text-gray-400 mt-2">
+                  Please wait while we fetch your design versions.
+                </span>
+              </div>
             ) : (
               <table className="min-w-full text-sm border">
                 <thead>
@@ -919,16 +1082,45 @@ export default function DesignDetailPage({
                                               try {
                                                 await deleteDesignVersion(v.id);
                                                 setVersions(versions.filter(ver => ver.id !== v.id));
+                                                setVersionChanged((v) => v + 1);
                                                 toast.success(
                                                   <span>
                                                     <span className="font-bold text-[#ED5E20]">v{v.version}</span> deleted successfully!
                                                   </span>
                                                 );
                                               } catch (err: unknown) {
+                                                const errorMsg =
+                                                  err instanceof Error
+                                                    ? err.message
+                                                    : typeof err === "string"
+                                                      ? err
+                                                      : JSON.stringify(err);
+
+                                                // Check for foreign key violation (published version)
+                                                let isPublishedConstraint = false;
+                                                try {
+                                                  const parsed = typeof err === "string" ? JSON.parse(err) : err;
+                                                  if (parsed && parsed.code === "23503") {
+                                                    isPublishedConstraint = true;
+                                                  }
+                                                } catch { }
+
                                                 toast.error(
                                                   <span>
                                                     <span className="font-bold text-[#ED5E20]">v{v.version}</span> could not be deleted.<br />
-                                                    Please try again.
+                                                    {isPublishedConstraint ? (
+                                                      <span>
+                                                        This version is currently published.<br />
+                                                        Please unpublish the design before deleting this version.
+                                                      </span>
+                                                    ) : (
+                                                      <>
+                                                        {errorMsg && (
+                                                          <span className="text-xs text-red-400">{errorMsg}<br /></span>
+                                                        )}
+                                                        Please try again.
+                                                      </>
+                                                    )}
                                                   </span>
                                                 );
                                               }
@@ -1020,40 +1212,6 @@ export default function DesignDetailPage({
                 </div>
               </div>
             )}
-            {/* <div className="flex justify-end mb-4 mt-5">
-              <button
-                onClick={() => setShowVersions(false)}
-                className=" mt-2 relative px-6 py-2 rounded-full bg-white/70
-                dark:bg-[#232323]/80 shadow-xl border-2 border-[#ED5E20]/40 backdrop-blur
-                text-[#ED5E20] dark:text-[#ED5E20] font-bold text-lg flex items-center gap-2
-                transition-all duration-300 hover:bg-[#ED5E20] hover:text-white hover:scale-110 active:scale-95
-                outline-none focus:ring-2 focus:ring-[#ED5E20]/40 overflow-hidden
-                group z-10
-                cursor-pointer"
-                style={{
-                  boxShadow: "0 4px 24px 0 rgba(237,94,32,0.18), 0 1.5px 8px 0 rgba(0,0,0,0.10)",
-                }}
-              >
-                <span className="absolute inset-0 rounded-full pointer-events-none z-0
-                before:content-[''] before:absolute before:inset-0 before:rounded-full
-                before:bg-gradient-to-r before:from-[#ED5E20]/60 before:to-[#ffb37b]/40
-                before:blur-lg before:opacity-0 group-hover:opacity-100 before:transition-opacity before:duration-300
-                animate-pulse
-                " />
-                <svg
-                  width="22"
-                  height="22"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  className="z-10"
-                >
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" />
-                  <path d="M15 9L9 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  <path d="M9 9L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
-                <span className="z-10 tracking-wide drop-shadow">Close</span>
-              </button>
-            </div> */}
           </div>
         </div>
       )}

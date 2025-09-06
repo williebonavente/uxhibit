@@ -67,7 +67,7 @@ async function handleFigmaLogin(e: React.MouseEvent) {
     const error = params.get('error')
 
     if (error === 'invalid_callback') {
-      toast.error("Invalid authenticatoin callback");
+      toast.error("Invalid authentication callback");
     } else if (error === 'auth_failed') {
       toast.error("Figma authentication failed.")
     }

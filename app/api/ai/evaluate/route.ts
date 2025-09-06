@@ -173,7 +173,6 @@ async function critiqueWithMistral(imageUrl: string, fileJson: any, heuristics: 
 
 export async function POST(req: Request) {
 
-    // const { fileKey, nodeId, scale = 3, fallbackImageUrl } = await req.json().catch(() => ({})); // added fallback
     const { fileKey, nodeId, scale = 3, fallbackImageUrl, designId, snapshot } = await req.json().catch(() => ({})); // added fallback + designId/snapshot
     if (!FIGMA_TOKEN || !fileKey) {
         return NextResponse.json({ error: "Missing params or token" }, { status: 400 });
@@ -271,11 +270,17 @@ export async function POST(req: Request) {
                 node_id: nid,
                 thumbnail_url: imageUrl,
                 ai_summary: ai.summary || null, // Ensure not undefined
-                ai_data: JSON.stringify(ai), // Convert to JSON string for jsonb
-                snapshot: snapshot ? JSON.stringify(snapshot) : null,
+                ai_data: ai, // Convert to JSON string for jsonb
+                snapshot: (() => {
+                    if (!snapshot) return null;
+                    if (typeof snapshot === "string") {
+                        try { return JSON.parse(snapshot); } catch { return null; }
+                    }
+                    return snapshot;
+                })(),
                 created_at: new Date().toISOString(),
                 version: nextVersion,
-                created_by: user.id  // Add this line
+                created_by: user.id
             };
 
             console.log('Saving version data:', versionData);
