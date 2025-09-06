@@ -15,16 +15,9 @@ export default function Home() {
             className="inline-flex items-center shrink-0 hover:scale-105 transition-transform"
           >
             <Image
-              src="/images/header-icon.png"
-              alt="UXhibit"
-              className="block dark:hidden w-[102px] h-[42px]"
-              width={102}
-              height={42}
-            />
-            <Image
               src="/images/dark-header-icon.png"
               alt="UXhibit (Dark)"
-              className="hidden dark:block w-[102px] h-[42px]"
+              className="w-[102px] h-[42px]"
               width={102}
               height={42}
             />

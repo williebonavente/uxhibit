@@ -10,6 +10,23 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 
+
+type DesignInfo = {
+  design_id: string;
+  project_name: string;
+  figma_link: string;
+  likes: number;
+  views: number;
+  liked: boolean;
+};
+
+type UserInfo = {
+  user_id: string; 
+  name: string;
+  user_avatar: string;
+  designs: DesignInfo[];
+};
+
 // Fetch this in database
 const dummyUsers = [
   {

@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Input } from './input'
-// import { IconEye, IconEyeOff } from '@tabler/icons-react';
+import { IconEye, IconEyeOff } from '@tabler/icons-react';
 
 export type PasswordInputProps = React.InputHTMLAttributes<HTMLInputElement>
 
@@ -14,13 +14,13 @@ export const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputPro
                     ref={ref}
                     type={show ? 'text' : 'password'}
                 />
-                {/* <button
+                <button
                     type="button"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-sx"
+                    className={`absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer text-sx ${show ? 'text-black dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}
                     onClick={() => setShow((s) => !s)}
                 >
                     {show ? <IconEyeOff size={18} /> : <IconEye size={18} />}
-                </button> */}
+                </button>
             </div>
         )
     }

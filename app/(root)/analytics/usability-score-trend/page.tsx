@@ -10,7 +10,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { generateUsabilityTrendReport } from "@/lib/trendPdfGenerator";
-import { useTheme } from "next-themes";
+// import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { IconLoader2, IconDownload } from "@tabler/icons-react";
 
@@ -52,9 +52,9 @@ export default function UsabilityScoreTrendPage() {
       <div className="p-2 m-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
         <p className="text-sm sm:text-base text-gray-700 dark:text-gray-200 w-full sm:mb-0 font-['Poppins']">
           Track how your design improves over time. Each submission is evaluated
-          using Jakob Nielsen's 10 heuristics, and your score is plotted here.
+          using Jakob Nielsen&apos;s 10 heuristics, and your score is plotted here.
           The line graph helps you see whether revisions are making your UI more
-          usable before it's added to your portfolio.
+          usable before it&apos;s added to your portfolio.
         </p>
         <button
           onClick={handleExportReport}
