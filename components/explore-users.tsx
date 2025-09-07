@@ -85,7 +85,7 @@ export default function ExplorePage() {
       // Fetch designs
       const { data: designsData, error: designsError } = await supabase
         .from("designs")
-        .select("id, owner_id, title, figma_link, thumbnail_url, num_of_hearts, num_of_views");
+        .select("id, owner_id, title, figma_link, thumbnail_url");
 
       console.log("Fetched designsData:", designsData);
       if (designsError) {
@@ -97,7 +97,7 @@ export default function ExplorePage() {
       // Fetch published designs (get design_id and owner_id)
       const { data: publishedData, error: publishedError } = await supabase
         .from("published_designs")
-        .select("design_id, user_id")
+        .select("design_id, user_id, num_of_hearts, num_of_views")
         .eq("is_active", true);
 
       if (publishedError) {
@@ -105,8 +105,12 @@ export default function ExplorePage() {
         return;
       }
 
-      // Only include published designs (if you want)
+      // Only include published designs
       const publishedDesignIds = publishedData?.map((p) => p.design_id) || [];
+
+      const publishedLookup = Object.fromEntries(
+        (publishedData || []).map((p) => [p.design_id, p])
+      )
       console.log("Published designs:", publishedDesignIds);
 
       // Group designs by user
@@ -115,16 +119,19 @@ export default function ExplorePage() {
         name: user.full_name,
         user_avatar: user.avatar_url,
         designs: (designsData || [])
-          .filter((d) => d.owner_id === user.id)
-          .map((d) => ({
-            design_id: d.id,
-            project_name: d.title,
-            figma_link: d.figma_link,
-            likes: d.num_of_hearts,
-            views: d.num_of_views,
-            liked: false,
-            thumbnail_url: d.thumbnail_url,
-          })),
+          .filter((d) => d.owner_id === user.id && publishedLookup[d.id])
+          .map((d) => {
+            const published = publishedLookup[d.id];
+            return {
+              design_id: d.id,
+              project_name: d.title,
+              figma_link: d.figma_link,
+              likes: published?.num_of_hearts ?? 0,
+              views: published?.num_of_views ?? 0,
+              liked: false,
+              thumbnail_url: d.thumbnail_url,
+            };
+          }),
       }));
       console.log("usersWithDesigns:", usersWithDesigns);
 

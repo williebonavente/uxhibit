@@ -37,28 +37,27 @@ export default function LoginForm() {
     },
   });
 
-async function handleFigmaLogin(e: React.MouseEvent) {
-  e.preventDefault();
-  try {
-    // Get the Figma auth URL
-    const authUrl = await getFigmaAuthUrl();
-    if (!authUrl) {
-      toast.error("Failed to initialize Figma login");
-      return;
-    }
+  async function handleFigmaLogin(e: React.MouseEvent) {
+    e.preventDefault();
+    try {
+      // Get the Figma auth URL
+      const authUrl = await getFigmaAuthUrl();
+      if (!authUrl) {
+        toast.error("Failed to initialize Figma login");
+        return;
+      }
 
-    // Store current URL for redirect after auth
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('preAuthPath', window.location.pathname);
+      // Store current URL for redirect after auth
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('preAuthPath', window.location.pathname);
+      }
+      // Redirect to Figma OAuth
+      window.location.href = authUrl;
+    } catch (error) {
+      console.error('Figma login error:', error);
+      toast.error("Failed to start Figma authentication");
     }
-
-    // Redirect to Figma OAuth
-    window.location.href = authUrl;
-  } catch (error) {
-    console.error('Figma login error:', error);
-    toast.error("Failed to start Figma authentication");
   }
-}
 
 
   useEffect(() => {
@@ -263,9 +262,7 @@ async function handleFigmaLogin(e: React.MouseEvent) {
                         hover:shadow-lg
                         active:scale-[.97]
                         focus:outline-none focus-visible:ring-4 focus-visible:ring-[#1E1E1E]/20
-                        bg-[#1E1E1E] dark:bg-[#2C2C2C]`}
-          >
-            {/* Inner glass layer */}
+                        bg-[#1E1E1E] dark:bg-[#2C2C2C]`}>
             <span
               aria-hidden
               className="absolute inset-[2px] rounded-[10px] 
@@ -273,13 +270,11 @@ async function handleFigmaLogin(e: React.MouseEvent) {
                             backdrop-blur-[2px]"
             />
 
-            {/* Border ring */}
             <span
               aria-hidden
               className="absolute inset-0 rounded-xl ring-1 ring-white/10 group-hover:ring-white/20"
             />
 
-            {/* Label with Figma Logo */}
             <span className="relative z-10 flex items-center gap-3">
               <Image
                 src="/images/figma-logo.png"

@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  IconCreditCard,
   IconDotsVertical,
   IconLogout,
   IconNotification,
@@ -34,7 +33,7 @@ import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { type User } from "@supabase/supabase-js";
 import { Skeleton } from "./ui/skeleton";
-import { AlertCircle, Bug, UserRound } from "lucide-react";
+import { AlertCircle, Bug, Settings, UserRound } from "lucide-react";
 
 
 export function NavUser({ user }: { user: User | null }) {
@@ -47,6 +46,7 @@ export function NavUser({ user }: { user: User | null }) {
   // const [website, setWebsite] = useState<string | null>(null)
   // const [age, setAge] = useState<string | null>(null)
   const [avatar_url, setAvatarUrl] = useState<string | null>(null)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   // Add state for pending avatar 
   const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -155,7 +155,6 @@ export function NavUser({ user }: { user: User | null }) {
       return;
     }
     toast.success("You have been logout.");
-    router.push("/auth/login");
   }
   if (loading) {
     return (
@@ -248,19 +247,22 @@ export function NavUser({ user }: { user: User | null }) {
                   {/* TODO: make the functional button here */}
                   Account
                 </DropdownMenuItem>
-                {/* removed billing */}
+                <DropdownMenuItem onClick={() => setShowDeleteDialog(true)}>
+                  <Settings />
+                  Settings
+                </DropdownMenuItem>
                 <DropdownMenuItem>
                   {/* TODO: Insert the function Notifications somewhere down the road */}
                   <IconNotification />
                   Notifications
                 </DropdownMenuItem>
                 <DropdownMenuItem>
-                  <UserRound />
-                  About Us
-                </DropdownMenuItem>
-                <DropdownMenuItem>
                   <Bug />
                   Report a Bug
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <UserRound />
+                  About Us
                 </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
@@ -417,7 +419,12 @@ export function NavUser({ user }: { user: User | null }) {
                   </div>
                   <label>Username</label>
                   <Input
-                    value={profile.username ?? "User"}
+                    value={profile.username ?? (profile.fullname
+                      ? profile.fullname
+                        .split(' ')
+                        .map(part => part.toLowerCase())
+                        .join('')
+                      : '')}
                     onChange={e => setProfile({ ...profile, username: e.target.value })}
                   />
                 </div>
@@ -428,7 +435,7 @@ export function NavUser({ user }: { user: User | null }) {
                     onChange={e => setProfile({ ...profile, fullname: e.target.value })}
                   />
                 </div>
-                <div>
+                <div className="cursor-not-allowed">
                   <label>Email</label>
                   <Input
                     value={email ?? "Cannot fetch User email"}
@@ -479,8 +486,9 @@ export function NavUser({ user }: { user: User | null }) {
                 <div>
                   <label >Gender</label>
                   <Input
-                    value={profile.gender}
+                    value={profile?.gender?.trim() || ""}
                     onChange={e => setProfile({ ...profile, gender: e.target.value })}
+                    placeholder="Specify your gender"
                   />
                 </div>
 
@@ -507,6 +515,46 @@ export function NavUser({ user }: { user: User | null }) {
         </div >
       )
       }
+      {showDeleteDialog && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40">
+          <div className="bg-white dark:bg-[#141414] rounded-xl shadow-lg p-8 max-w-sm w-full">
+            <h3 className="text-lg font-bold mb-4">Delete Account</h3>
+            <p className="mb-6 text-sm text-muted-foreground">
+              Are you sure you want to delete your account? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                className="bg-red-600 text-white hover:bg-red-700"
+                onClick={async () => {
+                  try {
+                    // Call your API route to delete the user
+                    const res = await fetch("/api/delete_user", {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                      },
+                      body: JSON.stringify({ userId: user?.id }),
+                    });
+                    if (res.ok) {
+                      toast.success("Account deleted.");
+                      router.push("/auth/login");
+                    } else {
+                      toast.error("Failed to delete account.");
+                    }
+                  } catch (err) {
+                    toast.error("Failed to delete account.");
+                  }
+                }}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
