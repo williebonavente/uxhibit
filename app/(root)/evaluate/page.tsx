@@ -80,7 +80,7 @@ export default function Evaluate() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: link }),
-      });
+      });   
       const data = await res.json();
       if (!res.ok) {
         toast.error(data?.error || "Parse failed");
@@ -171,7 +171,7 @@ export default function Evaluate() {
     } catch (error) {
       console.error("Submit failed:", error);
       toast.error("Submit failed");
-    } finally {
+    } finally {   
       setSubmitting(false);
     }
   }

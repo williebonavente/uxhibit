@@ -28,15 +28,14 @@ type Design = {
   // Add other properties as needed
 };
 
-
 type EvaluateInput = {
   designId: string;
-  fileKey: string
+  fileKey: string;
   nodeId?: string;
   scale?: number;
   fallbackImageUrl?: string;
   snapshot?: any; // Add this line to include snapshot data
-}
+};
 
 type ExportedFrame = {
   nodeId: string;
@@ -74,9 +73,11 @@ type EvalResponse = {
   } | null;
 };
 
-export async function evaluateDesign(input: EvaluateInput): Promise<EvalResponse> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  console.log('Calling evaluate with:', input);
+export async function evaluateDesign(
+  input: EvaluateInput
+): Promise<EvalResponse> {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  console.log("Calling evaluate with:", input);
 
   const res = await fetch(`${baseUrl}/api/ai/evaluate`, {
     method: "POST",
@@ -87,10 +88,10 @@ export async function evaluateDesign(input: EvaluateInput): Promise<EvalResponse
   });
 
   const data = await res.json();
-  console.log('Evaluate response:', data);
+  console.log("Evaluate response:", data);
 
   if (!res.ok) {
-    console.error('Evaluate failed:', data);
+    console.error("Evaluate failed:", data);
     throw new Error(data?.error || "Failed to evaluate");
   }
   return data as EvalResponse;
@@ -128,7 +129,10 @@ export default function DesignDetailPage({
 
   async function handleEvaluate() {
     if (!design?.id || !design?.fileKey) {
-      console.error('Missing required design data:', { id: design?.id, fileKey: design?.fileKey });
+      console.error("Missing required design data:", {
+        id: design?.id,
+        fileKey: design?.fileKey,
+      });
       setEvalError("Missing required design data");
       return;
     }
@@ -139,7 +143,7 @@ export default function DesignDetailPage({
     try {
       // Get signed URL if thumbnail is a storage path
       let imageUrlForAI = design.thumbnail;
-      if (imageUrlForAI && !imageUrlForAI.startsWith('http')) {
+      if (imageUrlForAI && !imageUrlForAI.startsWith("http")) {
         const supabase = createClient();
         const { data: signed } = await supabase.storage
           .from("design-thumbnails")
@@ -149,8 +153,8 @@ export default function DesignDetailPage({
           imageUrlForAI = signed.signedUrl;
         }
       }
-      console.log('Starting evaluation with:', {
-        designId: design.id,  // Make sure this exists
+      console.log("Starting evaluation with:", {
+        designId: design.id, // Make sure this exists
         fileKey: design.fileKey,
         nodeId: design.nodeId,
         thumbnail: design.thumbnail,
@@ -166,10 +170,10 @@ export default function DesignDetailPage({
         snapshot: design.snapshot || null,
       });
 
-      console.log('Evaluation successful:', data);
+      console.log("Evaluation successful:", data);
       setEvalResult(data);
     } catch (e: any) {
-      console.error('Evaluation failed:', e);
+      console.error("Evaluation failed:", e);
       setEvalError(e.message || "Failed to evaluate");
     } finally {
       setLoadingEval(false);
@@ -269,7 +273,8 @@ export default function DesignDetailPage({
         // Modify the query to include AI evaluation data
         const { data, error } = await supabase
           .from("designs")
-          .select(`
+          .select(
+            `
             id,
             title,
             figma_link,
@@ -288,10 +293,14 @@ export default function DesignDetailPage({
               created_at,
               version
             )
-          `)
+          `
+          )
           .eq("id", id)
-          .order('created_at', { foreignTable: 'design_versions', ascending: false })
-          .limit(1, { foreignTable: 'design_versions' })
+          .order("created_at", {
+            foreignTable: "design_versions",
+            ascending: false,
+          })
+          .limit(1, { foreignTable: "design_versions" })
           .single();
 
         if (!error && data) {
@@ -301,13 +310,14 @@ export default function DesignDetailPage({
           if (latestVersion?.ai_data) {
             try {
               // Handle both string and object formats
-              parsedAiData = typeof latestVersion.ai_data === 'string'
-                ? JSON.parse(latestVersion.ai_data)
-                : latestVersion.ai_data;
+              parsedAiData =
+                typeof latestVersion.ai_data === "string"
+                  ? JSON.parse(latestVersion.ai_data)
+                  : latestVersion.ai_data;
 
-              console.log('Parsed AI data:', parsedAiData);
+              console.log("Parsed AI data:", parsedAiData);
             } catch (e) {
-              console.error('Error parsing AI data:', e);
+              console.error("Error parsing AI data:", e);
             }
           }
 
@@ -319,14 +329,14 @@ export default function DesignDetailPage({
             nodeId: latestVersion?.node_id || data.node_id || undefined,
             imageUrl: data.thumbnail_url || "/images/design-thumbnail.png",
             thumbnail: data.thumbnail_url || undefined,
-            snapshot: latestVersion?.snapshot || null
+            snapshot: latestVersion?.snapshot || null,
           };
           setDesign(normalized);
 
           // Set the evaluation result if it exists
           if (latestVersion?.ai_data) {
             const aiData = latestVersion.ai_data;
-            console.log('Loading saved AI data:', aiData);
+            console.log("Loading saved AI data:", aiData);
 
             if (parsedAiData) {
               const evalData: EvalResponse = {
@@ -336,13 +346,17 @@ export default function DesignDetailPage({
                 heuristics: aiData.heuristics ?? null,
                 ai_status: "ok",
                 overall_score: aiData.overall_score ?? null,
-                strengths: Array.isArray(aiData.strengths) ? aiData.strengths : [],
-                weaknesses: Array.isArray(aiData.weaknesses) ? aiData.weaknesses : [],
+                strengths: Array.isArray(aiData.strengths)
+                  ? aiData.strengths
+                  : [],
+                weaknesses: Array.isArray(aiData.weaknesses)
+                  ? aiData.weaknesses
+                  : [],
                 issues: Array.isArray(aiData.issues) ? aiData.issues : [],
                 category_scores: aiData.category_scores ?? null,
-                ai: aiData
-              }
-              console.log('Setting evaluation result:', evalData);
+                ai: aiData,
+              };
+              console.log("Setting evaluation result:", evalData);
               setEvalResult(evalData);
             }
             setShowEval(true); // Show evaluation panel automatically
@@ -356,11 +370,11 @@ export default function DesignDetailPage({
             if (signed?.signedUrl) setThumbUrl(signed.signedUrl);
           }
         } else {
-          console.error('Failed to load design:', error);
+          console.error("Failed to load design:", error);
           setDesign(null);
         }
       } catch (err) {
-        console.error('Error loading design:', err);
+        console.error("Error loading design:", err);
         setDesign(null);
       } finally {
         setDesignLoading(false);
@@ -417,30 +431,32 @@ export default function DesignDetailPage({
     }
   }, [id]);
 
-useEffect(() => {
+  useEffect(() => {
     const supabase = createClient();
     async function loadSavedEvaluation() {
       try {
         if (!design?.id) return;
-        
+
         // Get latest evaluation data
         const { data, error } = await supabase
           .from("design_versions")
-          .select(`
+          .select(
+            `
             node_id, 
             thumbnail_url, 
             ai_summary, 
             ai_data, 
             snapshot, 
             created_at
-          `)
+          `
+          )
           .eq("design_id", design.id)
           .order("created_at", { ascending: false })
           .limit(1)
           .single();
 
         if (error) {
-          console.error('Failed to load evaluation:', error);
+          console.error("Failed to load evaluation:", error);
           return;
         }
 
@@ -448,13 +464,14 @@ useEffect(() => {
         let parsedAiData = null;
         if (data?.ai_data) {
           try {
-            parsedAiData = typeof data.ai_data === 'string' 
-              ? JSON.parse(data.ai_data) 
-              : data.ai_data;
+            parsedAiData =
+              typeof data.ai_data === "string"
+                ? JSON.parse(data.ai_data)
+                : data.ai_data;
 
-            console.log('Parsed saved AI data:', parsedAiData);
+            console.log("Parsed saved AI data:", parsedAiData);
           } catch (err) {
-            console.error('Error parsing saved AI data:', err);
+            console.error("Error parsing saved AI data:", err);
           }
         }
 
@@ -466,14 +483,20 @@ useEffect(() => {
             heuristics: parsedAiData.heuristics ?? null,
             ai_status: "ok",
             overall_score: parsedAiData.overall_score ?? null,
-            strengths: Array.isArray(parsedAiData.strengths) ? parsedAiData.strengths : [],
-            weaknesses: Array.isArray(parsedAiData.weaknesses) ? parsedAiData.weaknesses : [],
-            issues: Array.isArray(parsedAiData.issues) ? parsedAiData.issues : [],
+            strengths: Array.isArray(parsedAiData.strengths)
+              ? parsedAiData.strengths
+              : [],
+            weaknesses: Array.isArray(parsedAiData.weaknesses)
+              ? parsedAiData.weaknesses
+              : [],
+            issues: Array.isArray(parsedAiData.issues)
+              ? parsedAiData.issues
+              : [],
             category_scores: parsedAiData.category_scores ?? null,
-            ai: parsedAiData
+            ai: parsedAiData,
           };
 
-          console.log('Setting saved evaluation:', mapped);
+          console.log("Setting saved evaluation:", mapped);
           setEvalResult(mapped);
           setShowEval(true);
         }
@@ -554,17 +577,18 @@ useEffect(() => {
       <div className="flex h-screen">
         {/* LEFT PANEL */}
         {/* Design Area */}
-        <div className="w-full h-full border rounded-md bg-accent overflow-y-auto flex items-center justify-center">
+        <div className="flex-2 h-full border rounded-md bg-accent overflow-y-auto flex items-center justify-center">
           <Image
             src={
               thumbUrl
                 ? thumbUrl
                 : design.fileKey
-                  ? `/api/figma/thumbnail?fileKey=${design.fileKey}${design.nodeId
-                    ? `&nodeId=${encodeURIComponent(design.nodeId)}`
-                    : ""
+                ? `/api/figma/thumbnail?fileKey=${design.fileKey}${
+                    design.nodeId
+                      ? `&nodeId=${encodeURIComponent(design.nodeId)}`
+                      : ""
                   }`
-                  : "/images/design-thumbnail.png"
+                : "/images/design-thumbnail.png"
             }
             alt={design.project_name || "Design"}
             width={600}
@@ -589,13 +613,15 @@ useEffect(() => {
 
         {/* RIGHT PANEL (Evaluation Sidebar) */}
         {showEval && (
-          <div className="w-96 bg-gray-50 border rounded-md dark:bg-[#1A1A1A] p-5 overflow-y-auto flex flex-col h-screen">
+          <div className="flex-1 bg-gray-50 border rounded-md dark:bg-[#1A1A1A] p-5 overflow-y-auto flex flex-col h-screen">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold text-center flex-1">AI Evaluation</h2>
+              <h2 className="text-lg font-semibold text-center flex-1">
+                AI Evaluation
+              </h2>
               <button
                 onClick={handleEvaluate}
                 disabled={loadingEval}
-                className="px-4 py-1 text-sm rounded-md bg-[#ED5E20] text-white hover:bg-orange-600 disabled:opacity-50 cursor-pointer"
+                className="bg-[#ED5E20] text-white px-8 py-2 rounded-md hover:bg-orange-600 hover:cursor-pointer text-sm"
               >
                 {loadingEval ? "Evaluating..." : "Re-Evaluate"}
               </button>
@@ -611,9 +637,7 @@ useEffect(() => {
 
               {/* Error State */}
               {evalError && (
-                <div className="text-red-500 text-sm">
-                  Error: {evalError}
-                </div>
+                <div className="text-red-500 text-sm">Error: {evalError}</div>
               )}
 
               {/* Results */}
@@ -643,35 +667,55 @@ useEffect(() => {
                       <h3 className="font-medium mb-2">Strengths</h3>
                       <ul className="list-disc list-inside text-sm space-y-1">
                         {evalResult.strengths.map((s, i) => (
-                          <li key={i} className="text-neutral-600 dark:text-neutral-300">{s}</li>
+                          <li
+                            key={i}
+                            className="text-neutral-600 dark:text-neutral-300"
+                          >
+                            {s}
+                          </li>
                         ))}
                       </ul>
                     </div>
                   )}
 
                   {/* Weaknesses */}
-                  {evalResult.weaknesses && evalResult.weaknesses.length > 0 && (
-                    <div>
-                      <h3 className="font-medium mb-2">Weaknesses</h3>
-                      <ul className="list-disc list-inside text-sm space-y-1">
-                        {evalResult.weaknesses.map((w, i) => (
-                          <li key={i} className="text-neutral-600 dark:text-neutral-300">{w}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                  {evalResult.weaknesses &&
+                    evalResult.weaknesses.length > 0 && (
+                      <div>
+                        <h3 className="font-medium mb-2">Weaknesses</h3>
+                        <ul className="list-disc list-inside text-sm space-y-1">
+                          {evalResult.weaknesses.map((w, i) => (
+                            <li
+                              key={i}
+                              className="text-neutral-600 dark:text-neutral-300"
+                            >
+                              {w}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
                   {/* Category Scores */}
                   {evalResult.category_scores && (
                     <div>
                       <h3 className="font-medium mb-2">Category Scores</h3>
                       <div className="grid grid-cols-2 gap-2">
-                        {Object.entries(evalResult.category_scores).map(([category, score]) => (
-                          <div key={category} className="flex justify-between text-sm">
-                            <span className="capitalize">{category.replace(/_/g, " ")}</span>
-                            <span className="font-medium">{Math.round(score)}</span>
-                          </div>
-                        ))}
+                        {Object.entries(evalResult.category_scores).map(
+                          ([category, score]) => (
+                            <div
+                              key={category}
+                              className="flex justify-between text-sm"
+                            >
+                              <span className="capitalize">
+                                {category.replace(/_/g, " ")}
+                              </span>
+                              <span className="font-medium">
+                                {Math.round(score)}
+                              </span>
+                            </div>
+                          )
+                        )}
                       </div>
                     </div>
                   )}
@@ -702,10 +746,11 @@ useEffect(() => {
                     setSelectedVersion(v);
                     setShowVersions(false);
                   }}
-                  className={`p-2 border rounded-md cursor-pointer ${selectedVersion?.version === v.version
-                    ? "bg-orange-200 dark:bg-orange-700"
-                    : "bg-gray-100 dark:bg-gray-700"
-                    }`}
+                  className={`p-2 border rounded-md cursor-pointer ${
+                    selectedVersion?.version === v.version
+                      ? "bg-orange-200 dark:bg-orange-700"
+                      : "bg-gray-100 dark:bg-gray-700"
+                  }`}
                 >
                   v{v.version} - {v.timestamp} ({v.fileName})
                 </li>
