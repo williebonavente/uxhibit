@@ -3,7 +3,6 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import DesignsGallery from "@/components/designs-gallery";
 
-// Ensure per-user fresh data (already dynamic)
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 

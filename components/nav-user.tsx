@@ -33,7 +33,7 @@ import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { type User } from "@supabase/supabase-js";
 import { Skeleton } from "./ui/skeleton";
-import { AlertCircle, Bug, Settings, UserRound } from "lucide-react";
+import { Bug, Settings, UserRound } from "lucide-react";
 
 
 export function NavUser({ user }: { user: User | null }) {
@@ -147,6 +147,13 @@ export function NavUser({ user }: { user: User | null }) {
     };
   }, [open]);
 
+  function generateUsername(fullname: string) {
+    if (!fullname) return "";
+    return fullname
+      .split(" ")
+      .join("")
+      .toLowerCase();
+  }
   const router = useRouter();
   async function handleLogOut() {
     const result = await logout();
@@ -336,11 +343,16 @@ export function NavUser({ user }: { user: User | null }) {
                     }
                     imageUrl = filePath;
                   }
+
+                  let username = profile.username;
+                  if (!username && profile.fullname) {
+                    username = generateUsername(profile.fullname);
+                  }
                   // Update profile in DB
                   const { error } = await supabase
                     .from("profiles")
                     .update({
-                      username: profile.username,
+                      username,
                       full_name: profile.fullname,
                       age: profile.age,
                       avatar_url: imageUrl,
@@ -419,12 +431,7 @@ export function NavUser({ user }: { user: User | null }) {
                   </div>
                   <label>Username</label>
                   <Input
-                    value={profile.username ?? (profile.fullname
-                      ? profile.fullname
-                        .split(' ')
-                        .map(part => part.toLowerCase())
-                        .join('')
-                      : '')}
+                    value={profile.username ?? generateUsername(profile.fullname)}
                     onChange={e => setProfile({ ...profile, username: e.target.value })}
                   />
                 </div>

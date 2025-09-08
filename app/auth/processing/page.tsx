@@ -16,7 +16,7 @@ export default function Processing() {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 const elapsed = Date.now() - startTime;
-                const minDelay = 8000; // 8 seconds
+                const minDelay = 3000; // 8 seconds
                 if (elapsed < minDelay) {
                     setTimeout(() => router.replace("/dashboard"), minDelay - elapsed);
                 } else {

@@ -1,5 +1,9 @@
 import { createClient } from "@/utils/supabase/client";  
 
+type Snapshot = {
+  age: string;
+  occupation: string;
+}
 type Versions = {
   id: string;
   design_id: string;
@@ -10,6 +14,7 @@ type Versions = {
   ai_summary: string;
   ai_data: string;
   created_at: string;
+  snapshot: Snapshot;
 };
 
 
@@ -22,6 +27,7 @@ export async function fetchDesignVersions(designId: string): Promise<Versions[]>
       id,
       design_id,
       version,
+      snapshot,
       file_key,
       node_id,
       thumbnail_url,

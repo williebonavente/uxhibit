@@ -128,7 +128,7 @@ export default function RegistrationForm({ user }: { user: User | null }) {
       }
 
       toast.success('Check your email to confirm your account');
-      // router.push('/auth/login');
+      router.push('/auth/login');
     } catch (e) {
       console.error('Unexpected registration error', e);
       toast.error(`Failed to submit the form. Please try again.${e}`);

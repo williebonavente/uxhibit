@@ -1,6 +1,12 @@
 import { createClient } from '@/utils/supabase/server'
+import { User } from 'lucide-react';
 import { NextRequest, NextResponse } from 'next/server'
 
+
+function generaterUsername(fullname: string) {
+  if (!fullname) return "";
+  return fullname.split(" ").join("").toLowerCase();
+}
 export async function GET(request: NextRequest) {
   console.log('--- Figma OAuth Callback Start ---');
   const requestUrl = new URL(request.url);
@@ -27,6 +33,38 @@ export async function GET(request: NextRequest) {
       console.warn('No code found in query parameters.');
     }
 
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (user) {
+      // try to get the profile
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id, username, full_name")
+        .eq("id", user.id)
+        .single();
+
+      // If profile does not exist ur username is empty, create/set it
+      if (!profile || !profile.username) {
+        // Get the full name from user metadata 
+        // (Figma returns it as "user_metadata.name" 
+        // or  "user_metadata.full_name" )
+        const fullname =
+          user.user_metadata?.full_name ||
+          user.user_metadata?.name ||
+          user.user_metadata?.name_full ||
+          "";
+
+        const username = generaterUsername(fullname);
+        // Upsert the profile with the generated username
+        await supabase.from("profiles").upsert([
+          {
+            id: user.id,
+            username,
+            full_name: fullname,
+          }
+        ]);
+      }
+    }
     return NextResponse.redirect(new URL('/auth/processing', requestUrl.origin));
   } catch (error) {
     console.error('Auth callback error:', error);

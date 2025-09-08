@@ -348,5 +348,6 @@ export async function POST(req: Request) {
         category_scores: ai?.category_scores ?? null,
         ai,
         savedVersion,
+        snapshot,
     });
 }

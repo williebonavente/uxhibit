@@ -15,20 +15,18 @@ type DesignRow = {
   file_key: string | null;
   node_id: string | null;
   current_version_id: string | null;
-  // Optional stats (add in DB if needed)
   likes?: number | null;
   views?: number | null;
 };
 
 export default function DesignsGallery() {
-  // CHANGED: strongly typed state
   const [designs, setDesigns] = useState<DesignRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showOverlay, setShowOverlay] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const supabase = createClient();
 
-  // CHANGED: helper to sign private path thumbnails
   const resolveThumbnail = useCallback(
     async (thumb: string | null) => {
       if (!thumb) return null;
@@ -41,13 +39,13 @@ export default function DesignsGallery() {
     [supabase]
   );
 
-  // CHANGED: load from database instead of localStorage
   const loadDesigns = useCallback(async () => {
+    if (!currentUserId) return; // Wait for user ID
     setLoading(true);
     const { data, error } = await supabase
       .from("designs")
-      // likes and view to be implemented
       .select("id,title,thumbnail_url,file_key,node_id,current_version_id")
+      .eq("owner_id", currentUserId) // <-- Only fetch your own designs
       .order("updated_at", { ascending: false });
     if (error) {
       console.error(error);
@@ -55,7 +53,6 @@ export default function DesignsGallery() {
       setLoading(false);
       return;
     }
-    // Sign thumbnails as needed (parallel)
     const withThumbs = await Promise.all(
       (data || []).map(async (d) => ({
         ...d,
@@ -64,11 +61,22 @@ export default function DesignsGallery() {
     );
     setDesigns(withThumbs);
     setLoading(false);
-  }, [supabase, resolveThumbnail]);
+  }, [supabase, resolveThumbnail, currentUserId]);
 
   useEffect(() => {
-    loadDesigns();
-  }, [loadDesigns]);
+    if (currentUserId) {
+      loadDesigns();
+    }
+  }, [loadDesigns, currentUserId]);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUserId(user?.id ?? null);
+    };
+    fetchUser();
+  }, []);
 
   // OPTIONAL REALTIME (uncomment if you enabled Realtime on table)
   // useEffect(() => {
@@ -82,7 +90,6 @@ export default function DesignsGallery() {
   //   return () => { supabase.removeChannel(channel); };
   // }, [supabase, loadDesigns]);
 
-  // CHANGED: update DB title instead of localStorage
   const handleNameChange = async (id: string, newName: string) => {
     setDesigns((ds) =>
       ds.map((d) => (d.id === id ? { ...d, title: newName } : d))

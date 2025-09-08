@@ -25,6 +25,11 @@ import {
 import { toast } from "sonner";
 
 
+type Snapshot = {
+  age: string;
+  occupation: string;
+}
+
 type Versions = {
   id: string;
   design_id: string;
@@ -34,6 +39,7 @@ type Versions = {
   thumbnail_url: string;
   ai_summary: string;
   ai_data: string;
+  snapshot: Snapshot;
   created_at: string;
 };
 
@@ -46,23 +52,19 @@ type Design = {
   imageUrl: string;
   thumbnail?: string;
   thumbnailPath?: string;
-  snapshot: string;
+  snapshot: Snapshot;
   current_version_id: string;
   is_active: boolean;
   // Add other properties as needed
 };
 
-type Snapshot = {
-  generation: string;
-  occupation: string;
-}
 type EvaluateInput = {
   designId: string;
   fileKey: string
   nodeId?: string;
   scale?: number;
   fallbackImageUrl?: string;
-  snapshot?: Snapshot;
+  snapshot: Snapshot;
 }
 
 type ExportedFrame = {
@@ -197,6 +199,7 @@ export default function DesignDetailPage({
           imageUrlForAI = signed.signedUrl;
         }
       }
+
       console.log('Starting evaluation with:', {
         designId: design.id,  // Make sure this exists
         fileKey: design.fileKey,
@@ -211,7 +214,7 @@ export default function DesignDetailPage({
         nodeId: design.nodeId,
         scale: 3,
         fallbackImageUrl: imageUrlForAI, // Use the signed URL here
-        snapshot: design.snapshot || null,
+        snapshot: typeof design?.snapshot === "string" ? JSON.parse(design.snapshot) : design?.snapshot,
       });
 
       console.log('Evaluation successful:', data);
@@ -619,6 +622,19 @@ export default function DesignDetailPage({
           }
         }
 
+        let snapshotParam = null;
+        if (data?.snapshot) {
+          try {
+            snapshotParam = typeof data.snapshot === "string"
+              ? JSON.parse(data.snapshot)
+              : data.snapshot;
+            console.log("Parsed snapshotParam:", snapshotParam);
+          } catch (err) {
+            console.error("Error parsing snapshotParam:", err, data.snapshot);
+            snapshotParam = null;
+          }
+        }
+
         if (parsedAiData) {
           const mapped: EvalResponse = {
             nodeId: data.node_id,
@@ -955,10 +971,10 @@ export default function DesignDetailPage({
                     <th className="p-2 border">Version</th>
                     <th className="p-2 border">Score</th>
                     <th className="p-2 border">AI Summary</th>
-                    <th className="p-2 border">Evaluated at</th>
-                    <th className="p-2 border">Design Overview</th>
-                    <th className="p-2 border">File Key</th>
+                    <th className="p-2 border">Parameter</th>
+                    <th className="p-2 border">Thumbnail</th>
                     <th className="p-2 border">Node ID</th>
+                    <th className="p-2 border">Evaluated at</th>
                     <th className="p-2 border text-center">Delete</th>
                   </tr>
                 </thead>
@@ -1046,7 +1062,42 @@ export default function DesignDetailPage({
                             })()}
                           </td>
                           <td className="p-2 border">{v.ai_summary || "-"}</td>
-                          <td className="p-2 border">{v.created_at ? new Date(v.created_at).toLocaleString() : "-"}</td>
+                          <td className="p-5 border align-middle">
+                            {(() => {
+                              let age = "-";
+                              let occupation = "-";
+                              try {
+                                const snap = typeof v.snapshot === "string" ? JSON.parse(v.snapshot) : v.snapshot;
+                                age = snap?.age ?? "-";
+                                occupation = snap?.occupation ?? "-";
+                              } catch { }
+                              // Use stronger contrast for current version
+                              const badgeAgeClass = isCurrent
+                                ? "bg-[#ED5E20] text-white border border-[#ED5E20]"
+                                : "bg-[#ED5E20]/10 text-[#ED5E20] border border-[#ED5E20]/30";
+                              const badgeOccClass = isCurrent
+                                ? "bg-orange-700 text-white border border-orange-700"
+                                : "bg-orange-400/10 text-orange-700 border border-orange-400/30";
+                              return (
+                                <div className="flex gap-2 items-center">
+                                  <span className={`inline-flex items-center px-4 py-0.5 min-w-[90px] justify-center rounded-full text-xs font-semibold ${badgeAgeClass}`}>
+                                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 16 16">
+                                      <path d="M7 2l-4 7h4v5l4-7H7V2z" />
+                                    </svg>
+                                    {typeof age === "string"
+                                      ? age.replace(/\s+/g, " ").trim()
+                                      : age}
+                                  </span>
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${badgeOccClass}`}>
+                                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 16 16">
+                                      <path d="M8 2a3 3 0 0 1 3 3c0 1.657-1.343 3-3 3S5 6.657 5 5a3 3 0 0 1 3-3zm0 7c2.21 0 4 1.343 4 3v2H4v-2c0-1.657 1.79-3 4-3z" />
+                                    </svg>
+                                    {occupation}
+                                  </span>
+                                </div>
+                              );
+                            })()}
+                          </td>
                           <td className="p-2 border">
                             {v.thumbnail_url && v.thumbnail_url.startsWith("http") ? (
                               <Image src={v.thumbnail_url} alt="thumb"
@@ -1057,8 +1108,8 @@ export default function DesignDetailPage({
                               "-"
                             )}
                           </td>
-                          <td className="p-2 border">{v.file_key}</td>
                           <td className="p-2 border">{v.node_id}</td>
+                          <td className="p-2 border">{v.created_at ? new Date(v.created_at).toLocaleString() : "-"}</td>
                           <td className="p-2 border text-center">
                             {!isCurrent && (
                               <button

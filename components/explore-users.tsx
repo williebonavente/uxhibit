@@ -11,7 +11,6 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { createClient } from "@/utils/supabase/client";
-// import { retrieveFileOutToJSON } from "@mistralai/mistralai/models/components";
 
 type DesignInfo = {
   design_id: string;
@@ -33,7 +32,9 @@ type UserInfo = {
 
 export default function ExplorePage() {
   const [search, setSearch] = useState("");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [users, setUsers] = useState<UserInfo[]>([]);
+  // TODO: ADD LATER THE LOADING FETCHING OR SOMETHIG CRAZY ANIMATION!!!
   const [loading, setLoading] = useState(true);
 
   function useSignedAvatarUrl(avatarPath: string | null) {
@@ -66,14 +67,17 @@ export default function ExplorePage() {
   }
 
   useEffect(() => {
+
     const fetchUsersWithDesigns = async () => {
       setLoading(true);
       const supabase = createClient();
 
       // Fetch users
-      const { data: usersData, error: usersError } = await supabase
-        .from("profiles")
-        .select("id, full_name, avatar_url");
+      const { data:
+        usersData,
+        error: usersError } = await supabase
+          .from("profiles")
+          .select("id, full_name, avatar_url");
 
       console.log("Fetched usersData:", usersData);
       if (usersError) {
@@ -119,7 +123,9 @@ export default function ExplorePage() {
         name: user.full_name,
         user_avatar: user.avatar_url,
         designs: (designsData || [])
-          .filter((d) => d.owner_id === user.id && publishedLookup[d.id])
+          .filter((d) =>
+            d.owner_id === user.id && publishedLookup[d.id] // Only published designs owned by the user
+          )
           .map((d) => {
             const published = publishedLookup[d.id];
             return {
@@ -130,6 +136,7 @@ export default function ExplorePage() {
               views: published?.num_of_views ?? 0,
               liked: false,
               thumbnail_url: d.thumbnail_url,
+              isPublished: !!published,
             };
           }),
       }));
@@ -140,14 +147,22 @@ export default function ExplorePage() {
     };
 
     fetchUsersWithDesigns();
-  }, []);
+  }, [currentUserId]);
 
+  useEffect(() => {
+    async function fetchUser() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUserId(user?.id ?? null);
+    }
+    fetchUser();
+  }, []);
 
   function UserAvatar({ avatarPath, alt }: { avatarPath: string | null, alt: string }) {
     const avatarUrl = useSignedAvatarUrl(avatarPath);
     return (
       <Image
-        src={avatarUrl ?? "/images/default-avatar.png"}
+        src={avatarUrl ?? "/images/default_avatar.png"}
         alt={alt}
         className="w-10 h-10 rounded-full"
         width={400}
@@ -243,13 +258,24 @@ export default function ExplorePage() {
                     <span className="flex items-center gap-1">
                       <button
                         onClick={() => handleToggleLike(user.user_id, design.design_id)}
-                        className="text-gray-500 hover:text-red-500 transition cursor-pointer"
-                        title="Like"
+                        className={`text-gray-500 hover:text-red-500 transition
+                            ${user.user_id === currentUserId
+                            ? "opacity-50 cursor-not-allowed"
+                            : "cursor-pointer"
+                          }`}
+                        title={user.user_id === currentUserId ? "You can't like your own design" : "Like"}
+                        disabled={user.user_id === currentUserId}
                       >
                         {design.liked ? (
-                          <IconHeartFilled size={20} className="text-red-500" />
+                          <IconHeartFilled
+                            size={20}
+                            className={`text-red-500 ${user.user_id === currentUserId ? "opacity-50" : ""}`}
+                          />
                         ) : (
-                          <IconHeart size={20} />
+                          <IconHeart
+                            size={20}
+                            className={`${user.user_id === currentUserId ? "opacity-50" : ""}`}
+                          />
                         )}
                       </button>
                       {design.likes}
