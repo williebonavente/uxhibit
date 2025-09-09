@@ -751,18 +751,20 @@ export default function DesignDetailPage({
 
 
           {/* Version History */}
-          <div className="relative group">
-            <button
-              onClick={() => setShowVersions(true)}
-              className="cursor-pointer p-2 rounded hover:bg-[#ED5E20]/15 hover:text-[#ED5E20] transition"
-              aria-label="Show Version History"
-            >
-              <IconHistory size={22} />
-            </button>
-            {/* Tooltip */}
-            <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
-              <div className="px-3 py-1 rounded bg-[#ED5E20] text-white text-xs font-semibold shadow-lg whitespace-nowrap">
-                Version History
+          <div className="flex gap-3 items-center">
+            <div className="relative group">
+              <button
+                onClick={() => setShowVersions(true)}
+                className="cursor-pointer p-2 rounded hover:bg-[#ED5E20]/15 hover:text-[#ED5E20] transition"
+                aria-label="Show Version History"
+              >
+                <IconHistory size={22} />
+              </button>
+              {/* Tooltip */}
+              <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
+                <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
+                  Version History
+                </div>
               </div>
             </div>
           </div>
@@ -772,8 +774,16 @@ export default function DesignDetailPage({
                 await unpublishProject();
                 await syncPublishedState();
               }}
-              className="bg-gray-300 text-gray-700 px-8 py-2 rounded-md hover:bg-gray-400 hover:cursor-pointer text-sm"
+              className="flex items-center gap-2 bg-gray-300 text-gray-700 
+                      px-8 py-2 rounded-full font-semibold shadow-md hover:bg-gray-400 
+                      hover:scale-105 transition-all duration-200 text-sm focus:outline-none 
+                      focus:ring-2 focus:ring-[#ED5E20]/40 cursor-pointer
+                      "
             >
+              <svg width="18" height="18" fill="none" viewBox="0 0 20 20">
+                <circle cx="10" cy="10" r="9" fill="#6B7280" fillOpacity="0.18" />
+                <path d="M6 6l8 8M14 6l-8 8" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" />
+              </svg>
               Unpublish
             </button>
           ) : (
@@ -782,8 +792,15 @@ export default function DesignDetailPage({
                 await publishProject();
                 await syncPublishedState();
               }}
-              className="bg-[#ED5E20] text-white px-8 py-2 rounded-md hover:bg-orange-600 hover:cursor-pointer text-sm"
+              className="flex items-center gap-2 bg-gradient-to-r from-[#ED5E20] 
+            to-orange-400 text-white px-8 py-2 rounded-full font-semibold shadow-md 
+            hover:from-orange-500 hover:to-[#ED5E20] hover:scale-105 transition-all duration-200 
+            text-sm focus:outline-none focus:ring-2 focus:ring-[#ED5E20]/40 animate-pulse cursor-pointer"
             >
+              <svg width="18" height="18" fill="none" viewBox="0 0 20 20">
+                <circle cx="10" cy="10" r="9" fill="#fff" fillOpacity="0.18" />
+                <path d="M6 10.5l2.5 2.5L14 8" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+              </svg>
               Publish
             </button>
           )}

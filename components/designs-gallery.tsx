@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/utils/supabase/client";
-import { Spinner } from '@/components/ui/shadcn-io/spinner';
+import { LoadingInspiration } from "./animation/loading-fetching";
 
 type DesignRow = {
   id: string;
@@ -17,6 +17,11 @@ type DesignRow = {
   current_version_id: string | null;
   likes?: number | null;
   views?: number | null;
+};
+
+type PublishedDesign = {
+  num_of_hearts: number;
+  num_of_views: number;
 };
 
 export default function DesignsGallery() {
@@ -44,9 +49,17 @@ export default function DesignsGallery() {
     setLoading(true);
     const { data, error } = await supabase
       .from("designs")
-      .select("id,title,thumbnail_url,file_key,node_id,current_version_id")
-      .eq("owner_id", currentUserId) // <-- Only fetch your own designs
+      .select(`id,
+              title,
+              thumbnail_url,
+              file_key,
+              node_id,
+              current_version_id,
+              published_designs(num_of_hearts, num_of_views) 
+              `)
+      .eq("owner_id", currentUserId) // Only fetch owner's designs
       .order("updated_at", { ascending: false });
+    console.log("Designs data:", data);
     if (error) {
       console.error(error);
       setDesigns([]);
@@ -54,10 +67,26 @@ export default function DesignsGallery() {
       return;
     }
     const withThumbs = await Promise.all(
-      (data || []).map(async (d) => ({
-        ...d,
-        thumbnail_url: await resolveThumbnail(d.thumbnail_url),
-      }))
+      (data || []).map(async (d) => {
+        let likes = 0;
+        let views = 0;
+        const pub = d.published_designs as PublishedDesign | PublishedDesign[] | null | undefined;
+        if (pub) {
+          if (Array.isArray(pub)) {
+            likes = pub[0]?.num_of_hearts ?? 0;
+            views = pub[0]?.num_of_views ?? 0;
+          } else {
+            likes = pub.num_of_hearts ?? 0;
+            views = pub.num_of_views ?? 0;
+          }
+        }
+        return {
+          ...d,
+          thumbnail_url: await resolveThumbnail(d.thumbnail_url),
+          likes,
+          views,
+        };
+      })
     );
     setDesigns(withThumbs);
     setLoading(false);
@@ -240,13 +269,11 @@ export default function DesignsGallery() {
       }
     );
   };
+
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-40">
-        <Spinner className="w-6 h-6 text-[#ED5E20]" />
-        <span className="ml-3 text-base font-medium text-[#ED5E20]">Loading designs</span>
-      </div>
-    );
+    return <LoadingInspiration
+      text={"Getting your creative designs..."}
+    />;
   }
   if (designs.length === 0) {
     return (

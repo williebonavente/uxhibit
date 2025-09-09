@@ -1,16 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   IconSearch,
-  IconHeart,
-  IconHeartFilled,
-  IconEye,
 } from "@tabler/icons-react";
 import Image from "next/image";
-import Link from "next/link";
 
 import { createClient } from "@/utils/supabase/client";
+import { toast } from "sonner";
+import { LoadingInspiration } from "./animation/loading-fetching";
+import { DesignCard } from "./design-card";
 
 type DesignInfo = {
   design_id: string;
@@ -34,8 +33,8 @@ export default function ExplorePage() {
   const [search, setSearch] = useState("");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [users, setUsers] = useState<UserInfo[]>([]);
-  // TODO: ADD LATER THE LOADING FETCHING OR SOMETHIG CRAZY ANIMATION!!!
   const [loading, setLoading] = useState(true);
+  const [animatingHeart, setAnimatingHeart] = useState<string | null>(null);
 
   function useSignedAvatarUrl(avatarPath: string | null) {
     const [signedUrl, setSignedUrl] = useState<string | null>(null);
@@ -66,88 +65,171 @@ export default function ExplorePage() {
     return signedUrl;
   }
 
-  useEffect(() => {
+  const fetchUsersWithDesigns = useCallback(async () => {
+    setLoading(true);
+    const supabase = createClient();
 
-    const fetchUsersWithDesigns = async () => {
-      setLoading(true);
-      const supabase = createClient();
+    // Fetch users
+    const { data:
+      usersData,
+      error: usersError } = await supabase
+        .from("profiles")
+        .select("id, full_name, avatar_url");
 
-      // Fetch users
-      const { data:
-        usersData,
-        error: usersError } = await supabase
-          .from("profiles")
-          .select("id, full_name, avatar_url");
-
-      console.log("Fetched usersData:", usersData);
-      if (usersError) {
-        console.error("Users fetch error:", usersError);
-        setLoading(false);
-        return;
-      }
-
-      // Fetch designs
-      const { data: designsData, error: designsError } = await supabase
-        .from("designs")
-        .select("id, owner_id, title, figma_link, thumbnail_url");
-
-      console.log("Fetched designsData:", designsData);
-      if (designsError) {
-        console.error("Designs fetch error:", designsError);
-        setLoading(false);
-        return;
-      }
-
-      // Fetch published designs (get design_id and owner_id)
-      const { data: publishedData, error: publishedError } = await supabase
-        .from("published_designs")
-        .select("design_id, user_id, num_of_hearts, num_of_views")
-        .eq("is_active", true);
-
-      if (publishedError) {
-        setLoading(false);
-        return;
-      }
-
-      // Only include published designs
-      const publishedDesignIds = publishedData?.map((p) => p.design_id) || [];
-
-      const publishedLookup = Object.fromEntries(
-        (publishedData || []).map((p) => [p.design_id, p])
-      )
-      console.log("Published designs:", publishedDesignIds);
-
-      // Group designs by user
-      const usersWithDesigns = usersData.map((user) => ({
-        user_id: user.id,
-        name: user.full_name,
-        user_avatar: user.avatar_url,
-        designs: (designsData || [])
-          .filter((d) =>
-            d.owner_id === user.id && publishedLookup[d.id] // Only published designs owned by the user
-          )
-          .map((d) => {
-            const published = publishedLookup[d.id];
-            return {
-              design_id: d.id,
-              project_name: d.title,
-              figma_link: d.figma_link,
-              likes: published?.num_of_hearts ?? 0,
-              views: published?.num_of_views ?? 0,
-              liked: false,
-              thumbnail_url: d.thumbnail_url,
-              isPublished: !!published,
-            };
-          }),
-      }));
-      console.log("usersWithDesigns:", usersWithDesigns);
-
-      setUsers(usersWithDesigns);
+    console.log("Fetched usersData:", usersData);
+    if (usersError) {
+      console.error("Users fetch error:", usersError);
       setLoading(false);
-    };
+      return;
+    }
 
-    fetchUsersWithDesigns();
+    // Fetch designs
+    const { data: designsData, error: designsError } = await supabase
+      .from("designs")
+      .select("id, owner_id, title, figma_link, thumbnail_url");
+
+    console.log("Fetched designsData:", designsData);
+    if (designsError) {
+      console.error("Designs fetch error:", designsError);
+      setLoading(false);
+      return;
+    }
+
+    // Fetch published designs (get design_id and owner_id)
+    const { data: publishedData, error: publishedError } = await supabase
+      .from("published_designs")
+      .select("design_id, user_id, num_of_hearts, num_of_views")
+      .eq("is_active", true);
+
+    if (publishedError) {
+      setLoading(false);
+      return;
+    }
+
+    // Only include published designs
+    const publishedDesignIds = publishedData?.map((p) => p.design_id) || [];
+
+    const publishedLookup = Object.fromEntries(
+      (publishedData || []).map((p) => [p.design_id, p])
+    )
+    console.log("Published designs:", publishedDesignIds);
+
+    let likedDesignIds: string[] = [];
+    if (currentUserId) {
+      const { data: likesData } = await supabase
+        .from("design_likes")
+        .select("design_id")
+        .eq("user_id", currentUserId);
+      likedDesignIds = (likesData || []).map(like => like.design_id);
+    }
+
+    // Group designs by user
+    const usersWithDesigns = usersData.map((user) => ({
+      user_id: user.id,
+      name: user.full_name,
+      user_avatar: user.avatar_url,
+      designs: (designsData || [])
+        .filter((d) =>
+          d.owner_id === user.id && publishedLookup[d.id] // Only published designs owned by the user
+        )
+        .map((d) => {
+          const published = publishedLookup[d.id];
+          return {
+            design_id: d.id,
+            project_name: d.title,
+            figma_link: d.figma_link,
+            likes: published?.num_of_hearts ?? 0,
+            views: published?.num_of_views ?? 0,
+            liked: likedDesignIds.includes(d.id),
+            thumbnail_url: d.thumbnail_url,
+            isPublished: !!published,
+          };
+        }),
+    }));
+    console.log("usersWithDesigns:", usersWithDesigns);
+
+    setUsers(usersWithDesigns);
+    setLoading(false);
   }, [currentUserId]);
+
+  const handleToggleLike = async (
+    currentUserId: string | null,
+    ownerUserId: string,
+    designId: string
+  ) => {
+    setAnimatingHeart(designId); // Start animation
+    setTimeout(() => setAnimatingHeart(null), 400) // Remove animation
+    if (!currentUserId) return;
+
+    // Find the design in the owner's card
+    const user = users.find((u) => u.user_id === ownerUserId);
+    const design = user?.designs.find((d) => d.design_id === designId);
+    const wasLiked = design?.liked ?? false;
+
+    // Optimistically update UI
+    const updatedUsers = users.map((user) => {
+      if (user.user_id !== ownerUserId) return user;
+      return {
+        ...user,
+        designs: user.designs.map((design) =>
+          design.design_id === designId
+            ? {
+              ...design,
+              liked: !design.liked,
+              likes: design.liked ? design.likes - 1 : design.likes + 1,
+            }
+            : design
+        ),
+      };
+    });
+    setUsers(updatedUsers);
+
+    const supabase = createClient();
+    let error;
+
+    if (wasLiked) {
+      // Unlike (delete from design_likes)
+      const { error: delError } = await supabase
+        .from("design_likes")
+        .delete()
+        .eq("user_id", currentUserId)
+        .eq("design_id", designId);
+      error = delError;
+    } else {
+      // Like (insert into design_likes)
+      const { error: insError } = await supabase
+        .from("design_likes")
+        .insert([{ user_id: currentUserId, design_id: designId }]);
+      error = insError;
+      if (error && error.code === "23505") {
+        setUsers(users); // revert to previous state
+        // toast.error("You have already liked this design.");
+        toast.error("Please wait a moment...");
+        return;
+      }
+    }
+
+    // Always update the heart count in published_designs
+    const { count } = await supabase
+      .from("design_likes")
+      .select("*", { count: "exact", head: true })
+      .eq("design_id", designId);
+
+    await supabase
+      .from("published_designs")
+      .update({ num_of_hearts: count ?? 0 })
+      .eq("design_id", designId);
+
+    if (error) {
+      setUsers(users); // revert to previous state
+      toast.error("Failed to update like!");
+    }
+  };
+
+
+  useEffect(() => {
+    fetchUsersWithDesigns();
+  }, [fetchUsersWithDesigns]);
 
   useEffect(() => {
     async function fetchUser() {
@@ -171,25 +253,6 @@ export default function ExplorePage() {
     );
   }
 
-  const handleToggleLike = (userId: string, designId: string) => {
-    const updatedUsers = users.map((user) => {
-      if (user.user_id !== userId) return user;
-      return {
-        ...user,
-        designs: user.designs.map((design) =>
-          design.design_id === designId
-            ? {
-              ...design,
-              liked: !design.liked,
-              likes: design.liked ? design.likes - 1 : design.likes + 1,
-            }
-            : design
-        ),
-      };
-    });
-    setUsers(updatedUsers);
-  };
-
   const filteredUsers = users
     .map((user) => ({
       ...user,
@@ -201,6 +264,10 @@ export default function ExplorePage() {
     }))
     .filter((user) => user.designs.length > 0);
 
+
+  if (loading) {
+    return <LoadingInspiration />
+  }
   return (
     <div className="p-t-10 space-y-5">
       {/* Search */}
@@ -226,66 +293,15 @@ export default function ExplorePage() {
           {/* User Designs */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
             {user.designs.map((design) => (
-              <div
+              <DesignCard
                 key={design.design_id}
-                className="bg-accent dark:bg-[#1A1A1A] rounded-xl shadow-md space-y-0 flex flex-col h-full p-2"
-              >
-                {/* TODO: REPLACE THIS LATER WITH THE ACTUAL AI EVALUATION!!!! */}
-                <Link
-                  href={design.figma_link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <div className="relative w-full aspect-video rounded-lg border overflow-hidden">
-
-                    {/* Thumbnail Links */}
-                    <Image
-                      src={design.thumbnail_url || "/images/design-thumbnail.png"}
-                      alt="Design thumbnail"
-                      className="object-cover"
-                      width={400}
-                      height={400}
-                    />
-                  </div>
-                </Link>
-                <div className="p-3 space-y-2 group relative">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="w-full text-lg truncate">
-                      {design.project_name}
-                    </h3>
-                  </div>
-                  <div className="text-sm text-gray-500 flex items-center justify-between">
-                    <span className="flex items-center gap-1">
-                      <button
-                        onClick={() => handleToggleLike(user.user_id, design.design_id)}
-                        className={`text-gray-500 hover:text-red-500 transition
-                            ${user.user_id === currentUserId
-                            ? "opacity-50 cursor-not-allowed"
-                            : "cursor-pointer"
-                          }`}
-                        title={user.user_id === currentUserId ? "You can't like your own design" : "Like"}
-                        disabled={user.user_id === currentUserId}
-                      >
-                        {design.liked ? (
-                          <IconHeartFilled
-                            size={20}
-                            className={`text-red-500 ${user.user_id === currentUserId ? "opacity-50" : ""}`}
-                          />
-                        ) : (
-                          <IconHeart
-                            size={20}
-                            className={`${user.user_id === currentUserId ? "opacity-50" : ""}`}
-                          />
-                        )}
-                      </button>
-                      {design.likes}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <IconEye size={20} /> {design.views}
-                    </span>
-                  </div>
-                </div>
-              </div>
+                design={design}
+                user={user}
+                currentUserId={currentUserId}
+                animatingHeart={animatingHeart}
+                handleToggleLike={handleToggleLike}
+                fetchUsersWithDesigns={fetchUsersWithDesigns}
+              />
             ))}
           </div>
         </div>
