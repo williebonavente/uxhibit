@@ -168,6 +168,7 @@ export default function DesignsGallery() {
                   .select(`
                   title, 
                   thumbnail_url,
+                  published_designs(id), 
                   design_versions!design_versions_design_id_fkey (
                     id,
                     thumbnail_url
@@ -175,6 +176,14 @@ export default function DesignsGallery() {
                 `)
                   .eq("id", id)
                   .single();
+
+                // Check if published (adjust this logic to your schema)
+                if (design?.published_designs && design.published_designs.length > 0) {
+                  toast.error("This design cannot be deleted since it is currently published.");
+                  setShowOverlay(false);
+                  toast.dismiss();
+                  return;
+                }
 
                 // Collect all storage paths to delete
                 const storagePaths: string[] = [];
