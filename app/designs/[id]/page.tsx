@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 // import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
   fetchDesignVersions,
   deleteDesignVersion
 } from "@/database/actions/versions/versionHistory";
+
 
 import { toast } from "sonner";
 
@@ -101,6 +102,7 @@ type EvalResponse = {
     }[];
     category_scores?: Record<string, number>;
   } | null;
+  savedVersion?: { id: string } & Partial<Versions>;
 };
 
 type PublishedDesign = {
@@ -216,6 +218,25 @@ export default function DesignDetailPage({
         fallbackImageUrl: imageUrlForAI, // Use the signed URL here
         snapshot: typeof design?.snapshot === "string" ? JSON.parse(design.snapshot) : design?.snapshot,
       });
+
+
+      // Assume the API returns the new version's ID as data.versionId or similar
+      const newVersionId = data.savedVersion?.id; // adjust according to your API response
+      if (newVersionId) {
+        setDesign((prev) =>
+          prev
+            ? {
+              ...prev,
+              current_version_id: newVersionId,
+            }
+            : prev
+        );
+        const supabase = createClient();
+        await supabase
+          .from("designs")
+          .update({ current_version_id: newVersionId })
+          .eq("id", design.id);
+      }
 
       console.log('Evaluation successful:', data);
       setEvalResult(data);
@@ -431,6 +452,18 @@ export default function DesignDetailPage({
     }
   }
 
+  const handleShowVersions = async () => {
+    setShowVersions(true);
+    setLoadingVersions(true);
+    if (design?.id) {
+      fetchDesignVersions(design.id)
+        .then(setVersions)
+        .catch((e: string) => console.error("Failed to fetch versions", e))
+        .finally(() => setLoadingVersions(false));
+    } else {
+      setLoadingVersions(false);
+    }
+  }
   useEffect(() => {
     if (design) {
       syncPublishedState();
@@ -675,14 +708,15 @@ export default function DesignDetailPage({
     };
   }, [showVersions]);
 
+  // Initial fetch
   useEffect(() => {
     if (!design?.id) return;
     setLoadingVersions(true);
     fetchDesignVersions(design.id)
       .then(setVersions)
       .catch((e: string) => console.error("Failed to fetch versions", e))
-      .finally(() => setLoadingVersions(false))
-  }, [design?.id])
+      .finally(() => setLoadingVersions(false));
+  }, [design?.id]);
 
   useEffect(() => {
     if (showVersions) setPage(0);
@@ -735,26 +769,12 @@ export default function DesignDetailPage({
           </h1>
         </div>
         <div className="flex gap-3 items-center">
-          {/* <Input
-            type="file"
-            accept=".fig"
-            id="fileUpload"
-            onChange={handleFileUpload}
-            className="hidden"
-          />
-          <label
-            htmlFor="fileUpload"
-            className="cursor-pointer p-2 rounded hover:bg-[#ED5E20]/15"
-          >
-            <IconUpload size={22} />
-          </label> */}
-
 
           {/* Version History */}
           <div className="flex gap-3 items-center">
             <div className="relative group">
               <button
-                onClick={() => setShowVersions(true)}
+                onClick={handleShowVersions}
                 className="cursor-pointer p-2 rounded hover:bg-[#ED5E20]/15 hover:text-[#ED5E20] transition"
                 aria-label="Show Version History"
               >

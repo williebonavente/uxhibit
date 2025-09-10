@@ -99,27 +99,33 @@ export function DesignCard({
                     <span className="relative flex items-center gap-2">
                         <button
                             onClick={() => handleToggleLike(currentUserId, user.user_id, design.design_id)}
+                            disabled={user.user_id === currentUserId || animatingHeart === design.design_id}
                             className={`text-gray-500 hover:text-red-500 transition
-                ${user.user_id === currentUserId
+                            ${user.user_id === currentUserId
                                     ? "opacity-50 cursor-not-allowed"
                                     : "cursor-pointer"
                                 }`}
-                            title={user.user_id === currentUserId ? "You can't like your own design" : "Like"}
-                            disabled={user.user_id === currentUserId}
+                            title={
+                                user.user_id === currentUserId
+                                    ? "You can't like your own design"
+                                    : animatingHeart === design.design_id
+                                        ? (design.liked ? "Unliking..." : "Liking...")
+                                        : (design.liked ? "Unlike" : "Like")
+                            }
                         >
                             {design.liked ? (
                                 <IconHeartFilled
                                     size={20}
                                     className={`text-red-500 transition-transform duration-300
-                    ${animatingHeart === design.design_id ? "scale-125" : ""}
-                    ${user.user_id === currentUserId ? "opacity-50" : ""}`}
+                                    ${animatingHeart === design.design_id ? "scale-125" : ""}
+                                    ${user.user_id === currentUserId ? "opacity-50" : ""}`}
                                 />
                             ) : (
                                 <IconHeart
                                     size={20}
                                     className={`transition-transform duration-300
-                    ${animatingHeart === design.design_id ? "scale-125" : ""}
-                    ${user.user_id === currentUserId ? "opacity-50" : ""}`}
+                                    ${animatingHeart === design.design_id ? "scale-125" : ""}
+                                    ${user.user_id === currentUserId ? "opacity-50" : ""}`}
                                 />
                             )}
                             <SparkleEffect show={animatingHeart === design.design_id} />

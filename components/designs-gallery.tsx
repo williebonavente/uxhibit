@@ -17,11 +17,13 @@ type DesignRow = {
   current_version_id: string | null;
   likes?: number | null;
   views?: number | null;
+  is_published: boolean;
 };
 
 type PublishedDesign = {
   num_of_hearts: number;
   num_of_views: number;
+  is_published: boolean;
 };
 
 export default function DesignsGallery() {
@@ -85,6 +87,9 @@ export default function DesignsGallery() {
           thumbnail_url: await resolveThumbnail(d.thumbnail_url),
           likes,
           views,
+          is_published: Array.isArray(d.published_designs)
+            ? d.published_designs.length > 0
+            : !!d.published_designs,
         };
       })
     );
@@ -322,6 +327,15 @@ export default function DesignsGallery() {
             </div>
           </Link>
           <div className="p-3 space-y-2 group relative">
+            {/* Warning if published */}
+            {design.is_published && (
+              <div className="flex items-center gap-1 text-yellow-600 text-xs mb-1">
+                <svg width="16" height="16" fill="currentColor" className="inline-block">
+                  <path d="M8 1.333a6.667 6.667 0 1 0 0 13.334A6.667 6.667 0 0 0 8 1.333zm0 12A5.333 5.333 0 1 1 8 2.667a5.333 5.333 0 0 1 0 10.666zm-.667-8h1.334v4H7.333zm0 5.333h1.334v1.334H7.333z" />
+                </svg>
+                <span>Currently published</span>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-2">
               <input
                 type="text"

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
-import Image from "next/image";
+// import Image from "next/image";
 import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
-
+import { UserAvatar } from "./explore-users";
 
 type User = {
     id: string;
@@ -41,7 +41,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
 
     const supabase = createClient();
 
-    const [replies, setReplies] = useState<Comment[]>(comment.replies || []);
+    // const [replies, setReplies] = useState<Comment[]>(comment.replies || []);
     const [replyText, setReplyText] = useState("");
     const [editText, setEditText] = useState(comment.text);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -90,6 +90,45 @@ export const CommentItem: React.FC<CommentItemProps> = ({
     }
 
     const handleDelete = async () => {
+        // Warn if this comment has replies
+        if (comment.replies && comment.replies.length > 0) {
+            let confirmed = false;
+            await new Promise((resolve) => {
+                toast(
+                    <div>
+                        <div>
+                            This comment has replies.<br />
+                            Deleting it will also remove all its replies.<br />
+                            <b>Are you sure you want to continue?</b>
+                        </div>
+                        <div className="flex gap-2 mt-3">
+                            <button
+                                className="bg-red-500 text-white px-3 py-1 rounded"
+                                onClick={() => {
+                                    confirmed = true;
+                                    toast.dismiss();
+                                    resolve(true);
+                                }}
+                            >
+                                Delete
+                            </button>
+                            <button
+                                className="bg-gray-300 text-black px-3 py-1 rounded"
+                                onClick={() => {
+                                    toast.dismiss();
+                                    resolve(false);
+                                }}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>,
+                    { duration: 999999, position: "top-center" }
+                );
+            });
+            if (!confirmed) return;
+        }
+
         // Delete from Supabase
         const { error } = await supabase
             .from("comments")
@@ -109,7 +148,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
         if (!replyText.trim() || !currentUserId) return;
 
         // Insert reply into Supabase
-        const { data, error } = await supabase
+        const { error } = await supabase
             .from("comments")
             .insert([
                 {
@@ -119,35 +158,10 @@ export const CommentItem: React.FC<CommentItemProps> = ({
                     local_time: new Date().toLocaleTimeString(),
                 },
             ])
-            .select()
-            .single();
-
         if (error) {
             toast.error("Failed to add reply!");
             return;
         }
-
-        // Fetch user profile from Supabase
-        const { data: userProfile } = await supabase
-            .from("profiles")
-            .select("full_name, avatar_url")
-            .eq("id", currentUserId)
-            .single();
-
-        const replyToAdd: Comment = {
-            id: data.id,
-            text: data.text,
-            user: {
-                id: currentUserId,
-                fullName: userProfile?.full_name || "Default User",
-                avatarUrl: userProfile?.avatar_url || "/images/default_avatar.png",
-            },
-            replies: [],
-            createdAt: new Date(data.created_at),
-            localTime: data.local_time,
-        };
-
-        setReplies([replyToAdd, ...replies]);
         setReplyText("");
         setReplyingToId(null);
     };
@@ -167,12 +181,9 @@ export const CommentItem: React.FC<CommentItemProps> = ({
         <div className="border rounded-lg p-3 mb-2">
             {/* Main comment */}
             <div className="flex items-center gap-2 mb-1">
-                <Image
-                    src={comment.user.avatarUrl || "/images/default_avatar.png"}
+                <UserAvatar
+                    avatarPath={comment.user.avatarUrl}
                     alt={comment.user.fullName}
-                    width={32}
-                    height={32}
-                    className="w-8 h-8 rounded-full"
                 />
                 <span className="font-semibold">{comment.user.fullName}</span>
                 <span className="text-xs text-gray-400 ml-2">
@@ -264,9 +275,9 @@ export const CommentItem: React.FC<CommentItemProps> = ({
             )}
 
             {/* Render replies recursively */}
-            {replies.length > 0 && (
+            {comment.replies && comment.replies.length > 0 && (
                 <div className="ml-8 mt-2">
-                    {replies.map((reply) => (
+                    {comment.replies.map((reply) => (
                         <CommentItem key={reply.id}
                             comment={reply}
                             editingId={editingId}

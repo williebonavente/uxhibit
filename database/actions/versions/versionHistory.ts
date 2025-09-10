@@ -18,7 +18,6 @@ type Versions = {
 };
 
 
-// Add this function to fetch all versions for a design
 export async function fetchDesignVersions(designId: string): Promise<Versions[]>  {
   const supabase = createClient();
   const { data, error } = await supabase

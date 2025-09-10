@@ -242,8 +242,6 @@ export async function POST(req: Request) {
     }
 
     let savedVersion = null;
-    // TODO: Supabase saving here!!
-    // Add Supabase saving here
     if (ai && designId) {
         try {
             console.log('Attempting to save AI evaluation:', {
