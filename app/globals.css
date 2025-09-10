@@ -249,7 +249,9 @@
   width: 100%;
   border-radius: 0.75rem;
   /* rounded-xl = 0.75rem */
-  background: linear-gradient(to right, #19181D, #B22A13, #ED5E20, #FFA600);
+  /* background: linear-gradient(to right, #19181D, #B22A13, #ED5E20, #FFA600); */
+  background: url('/images/header-1.webp') no-repeat center center;
+  background-size: cover; /* make sure it fills */
   display: flex;
   flex-direction: row;
   align-items: center;
