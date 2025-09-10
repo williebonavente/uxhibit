@@ -286,7 +286,14 @@ export default function DesignsGallery() {
   }
   if (designs.length === 0) {
     return (
-      <p className="mt-4 text-gray-400 text-sm">No designs uploaded yet.</p>
+      <div className="mt-15 flex flex-col items-center justify-center text-center">
+        <img
+          src="/images/empty-design.svg"
+          alt="No designs illustration"
+          className="w-45 h-45 object-contain mx-auto opacity-25"
+        />
+        <p className="text-[#6A6F6F]/50 text-md">No designs uploaded yet.</p>
+      </div>
     );
   }
 

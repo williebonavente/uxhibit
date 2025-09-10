@@ -188,7 +188,7 @@ export default function Evaluate() {
 
   return (
     <div className="min-h-[calc(100vh-80px)] flex flex-col items-center justify-center px-4 py-8 z-0">
-      <div className="w-full max-w-3xl relative overflow-hidden rounded-2xl shadow-xl z-0">
+      <div className="w-full max-w-3xl relative overflow-hidden rounded-xl shadow-xl z-0">
         <Image
           src="/images/gradient-evaluate.png"
           alt="Background"
