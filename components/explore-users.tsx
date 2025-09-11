@@ -12,7 +12,7 @@ import { LoadingInspiration } from "./animation/loading-fetching";
 import { DesignCard } from "./design-card";
 import { CommentItem } from "./comments-user";
 import { Comment } from "./comments-user";
-import { useRef } from "react";
+// import { useRef } from "react";
 
 
 type DesignInfo = {
@@ -90,7 +90,7 @@ export default function ExplorePage() {
   const [comments, setComments] = useState<Comment[]>(initialComments);
   const [newCommentText, setNewCommentText] = useState("");
   const [currentUserProfile, setCurrentUserProfile] = useState<{ fullName: string; avatarUrl: string } | null>(null);
-  const fetchTimeout = useRef<NodeJS.Timeout | null>(null);
+  // const fetchTimeout = useRef<NodeJS.Timeout | null>(null);
 
 
   const fetchUsersWithDesigns = useCallback(async () => {

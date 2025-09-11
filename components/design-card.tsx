@@ -75,7 +75,8 @@ export function DesignCard({
             key={design.design_id}
         >
             <Link
-                href={design.figma_link}
+                // href={design.figma_link}
+                href={`designs/${design.design_id}`}
                 target="_blank"
                 rel="noopener noreferrer"
             >
