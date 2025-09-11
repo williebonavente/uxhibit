@@ -846,15 +846,26 @@ export default function DesignDetailPage({
         {/* RIGHT PANEL (Evaluation Sidebar) */}
         {showEval && (
           <div className="flex-1 bg-gray-50 border rounded-md dark:bg-[#1A1A1A] p-5 overflow-y-auto flex flex-col h-screen">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold text-center flex-1">AI Evaluation</h2>
-            </div>
-
-            <div className="flex-1 overflow-y-auto pr-5 space-y-5">
+            <div className="flex-1 overflow-y-auto pr-5 space-y-5 relative">
               {/* Loading State */}
               {loadingEval && (
-                <div className="text-center text-neutral-500">
-                  Running evaluation...
+                <div className="absolute inset-0 flex items-center justify-center z-10 bg-white/70 dark:bg-[#1A1A1A]/80">
+                  <div className="flex flex-col items-center justify-center text-center animate-pulse">
+                    <Image
+                      src="/images/smart-evaluation-underway.svg"
+                      alt="Running evaluation illuistration"
+                      height={150}
+                      width={150}
+                      className="object-contain mb-6"
+                      priority
+                    />
+                    <h2 className="text-lg font-semibold text-[#ED5E20] mb-2">
+                      Smart Evaluation Underway!
+                    </h2>
+                    <p className="text-gray-500 text-sm mb-4">
+                      This may take a few minutes...
+                    </p>
+                  </div>
                 </div>
               )}
 

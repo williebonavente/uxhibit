@@ -284,21 +284,39 @@ export default function DesignsGallery() {
   };
 
   if (loading) {
-    return <LoadingInspiration
-      text={"Getting your creative designs..."}
-    />;
+    return (
+      <div className="flex flex-col items-center justify-center text-center py-24 animate-pulse">
+        <Image
+          src="/images/loading-your-designs.svg"
+          alt="Loading designs illustration"
+          height={150}
+          width={150}
+          className="object-contain mb-6"
+          priority
+        />
+        <p className="text-gray-500 text-sm mb-4">
+          Loading your desings...
+        </p>
+      </div>
+    );
   }
   if (designs.length === 0) {
     return (
-      <div className="mt-15 flex flex-col items-center justify-center text-center">
+      <div className="flex flex-col items-center justify-center text-center py-24">
         <Image
-          src="/images/empty-design.svg"
+          src="/images/your-gallery-is-waiting-for-its-first-design.svg"
           alt="No designs illustration"
-          height={180}
-          width={180}
-          className="object-contain mx-auto opacity-25"
+          height={150}
+          width={150}
+          className="object-contain mb-6"
+          priority
         />
-        <p className="text-[#6A6F6F]/50 text-md">No designs uploaded yet.</p>
+        <h2 className="text-lg font-semibold text-[#ED5E20] mb-2">
+          No Designs Yet
+        </h2>
+        <p className="text-gray-500 text-sm mb-4">
+          Your gallery is waiting for its first design!
+        </p>
       </div>
     );
   }

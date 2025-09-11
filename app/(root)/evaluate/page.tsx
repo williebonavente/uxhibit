@@ -45,7 +45,7 @@ export default function Evaluate() {
       "backdrop-blur-sm",
     ].join(" ");
   const router = useRouter();
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
   const supabase = createClient();
   // const [ageChosen, setAgeChosen] = useState(false);
@@ -92,7 +92,7 @@ export default function Evaluate() {
         name: data.name || "Untitled",
         thumbnail: data.nodeImageUrl || data.thumbnailUrl || null,
       });
-      toast.success("Design parsed");
+      // toast.success("Design parsed");
       setStep(3);
     } catch {
       toast.error("Network error");
@@ -121,7 +121,7 @@ export default function Evaluate() {
     }
 
     setSubmitting(true);
-    const loadingToast = toast.loading("Running AI evaluation...");
+    // const loadingToast = toast.loading("Running AI evaluation...");
     try {
       // First save the design
       const saveRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/designs`, {
@@ -159,12 +159,12 @@ export default function Evaluate() {
 
       if (!evalRes.ok) {
         console.error("AI evaluation failed:", await evalRes.json());
-        toast.dismiss(loadingToast);
+        // toast.dismiss(loadingToast);
         toast.error("AI evaluation failed");
         // Continue anyway since design was saved
       } else {
-        toast.dismiss(loadingToast);
-        toast.success("Design and AI evaluation completed");
+        // toast.dismiss(loadingToast);
+        // toast.success("Design and AI evaluation completed");
       }
 
       router.push(`/designs/${saved.design.id}`);
@@ -187,24 +187,24 @@ export default function Evaluate() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-80px)] flex flex-col items-center justify-center px-4 py-8 z-0">
-      <div className="w-full max-w-3xl relative overflow-hidden rounded-xl shadow-xl z-0">
+   
+      <div className="relative min-h-screen flex items-center justify-center rounded-2xl overflow-hidden mt-5">
         <Image
           src="/images/gradient-evaluate.png"
           alt="Background"
           fill
           priority
-          className="object-cover"
-          sizes="(min-width:1280px) 1024px, 100vw"
+          className="object-cover w-screen h-screen"
+          sizes="100vw"
         />
         {/* CHANGED: layered glass overlays for readability (lighter in light mode, subtle in dark) */}
         <div className="absolute inset-0">
           {/* base blur + tint */}
-          <div className="absolute inset-0 backdrop-blur-md bg-white/35 dark:bg-black/40" />
+          <div className="absolute inset-0 backdrop-blur-md bg-white/35 dark:bg-black/40 " />
           {/* gradient to increase contrast behind center content */}
-          <div className="absolute inset-0 bg-gradient-to-b from-white/70 via-white/40 to-white/20 dark:from-black/60 dark:via-black/50 dark:to-black/40" />
+          <div className="absolute inset-0 bg-gradient-to-b from-white/70 via-white/40 to-white/20 dark:from-black/60 dark:via-black/50 dark:to-black/40 rounded-2xl" />
           {/* slight inner ring for glass edge definition */}
-          <div className="absolute inset-0 ring-1 ring-white/40 dark:ring-white/10 rounded-2xl pointer-events-none" />
+          <div className="absolute inset-0 ring-1 ring-white/40 dark:ring-white/10 pointer-events-none" />
         </div>
 
         <div
@@ -213,7 +213,7 @@ export default function Evaluate() {
         >
           {/* Step Indicator */}
           <div className="flex items-center justify-center gap-4 text-xs font-medium tracking-wide">
-            {[1, 2, 3].map((n) => (
+            {[1, 2, 3, 4].map((n) => (
               <div key={n} className={`flex items-center gap-2`}>
                 <span
                   className={`h-7 w-7 rounded-full flex items-center justify-center text-[11px]
@@ -233,8 +233,9 @@ export default function Evaluate() {
                   {n === 1 && "Parameters"}
                   {n === 2 && "Upload"}
                   {n === 3 && "Review"}
+                  {n === 4 && "AI Evaluation"}
                 </span>
-                {n < 3 && (
+                {n < 4 && (
                   <div className="h-px w-10 bg-gradient-to-r from-transparent via-neutral-300/60 dark:via-neutral-600/50 to-transparent" />
                 )}
               </div>
@@ -506,7 +507,10 @@ export default function Evaluate() {
                   </button>
                 <button
                   disabled={submitting}
-                  onClick={handleSubmit}
+                  onClick={() => {
+                    handleSubmit();
+                    setStep(4);
+                  }}
                   className="group relative inline-flex items-center justify-center
                     px-9 py-2.5 rounded-xl text-sm font-semibold tracking-wide
                     transition-all duration-300
@@ -549,8 +553,29 @@ export default function Evaluate() {
               </div>
             </div>
           )}
+
+          {/* STEP 4: Running AI Evaluation */}
+          {step === 4 && (
+            <div className="space-y-6">
+              <div className="flex flex-col items-center justify-center text-center py-24 animate-pulse">
+                <Image
+                  src="/images/smart-evaluation-underway.svg"
+                  alt="Running evaluation illuistration"
+                  height={150}
+                  width={150}
+                  className="object-contain mb-6"
+                  priority
+                />
+                <h2 className="text-lg font-semibold text-[#ED5E20] mb-2">
+                  Smart Evaluation Underway!
+                </h2>
+                <p className="text-gray-500 text-sm mb-4">
+                  This may take a few minutes...
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
-    </div>
   );
 }
