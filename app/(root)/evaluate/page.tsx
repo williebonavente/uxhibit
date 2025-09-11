@@ -121,8 +121,10 @@ export default function Evaluate() {
     }
 
     setSubmitting(true);
+    const loadingToast = toast.loading("Running AI evaluation...");
     try {
-      const saveRes = await fetch("/api/designs", {
+      // First save the design
+      const saveRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/designs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -134,7 +136,6 @@ export default function Evaluate() {
           age,
           occupation,
           snapshot: { age, occupation },
-          ai: null,
         }),
       });
       const saved = await saveRes.json();
@@ -142,9 +143,33 @@ export default function Evaluate() {
         toast.error(saved?.error || "Save failed");
         return;
       }
-      toast.success("Design submitted");
+
+      // Then trigger AI evaluation
+      const evalRes = await fetch("/api/ai/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          designId: saved.design.id,
+          fileKey: parsed.fileKey,
+          nodeId: parsed.nodeId,
+          thumbnail_url: parsed.thumbnail,
+          snapshot: { age, occupation }
+        }),
+      });
+
+      if (!evalRes.ok) {
+        console.error("AI evaluation failed:", await evalRes.json());
+        toast.dismiss(loadingToast);
+        toast.error("AI evaluation failed");
+        // Continue anyway since design was saved
+      } else {
+        toast.dismiss(loadingToast);
+        toast.success("Design and AI evaluation completed");
+      }
+
       router.push(`/designs/${saved.design.id}`);
-    } catch {
+    } catch (error) {
+      console.error("Submit failed:", error);
       toast.error("Submit failed");
     } finally {
       setSubmitting(false);
@@ -162,8 +187,8 @@ export default function Evaluate() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-80px)] flex flex-col items-center justify-center px-4 py-8">
-      <div className="w-full max-w-3xl relative overflow-hidden rounded-2xl shadow-xl">
+    <div className="min-h-[calc(100vh-80px)] flex flex-col items-center justify-center px-4 py-8 z-0">
+      <div className="w-full max-w-3xl relative overflow-hidden rounded-xl shadow-xl z-0">
         <Image
           src="/images/gradient-evaluate.png"
           alt="Background"
@@ -201,8 +226,8 @@ export default function Evaluate() {
                 </span>
                 <span
                   className={`hidden sm:inline ${step === n
-                      ? "text-neutral-900 dark:text-neutral-100"
-                      : "text-neutral-500 dark:text-neutral-400"
+                    ? "text-neutral-900 dark:text-neutral-100"
+                    : "text-neutral-500 dark:text-neutral-400"
                     }`}
                 >
                   {n === 1 && "Parameters"}
@@ -317,16 +342,16 @@ export default function Evaluate() {
               <div className="flex flex-col sm:flex-row justify-between gap-4 pt-2">
                 <Button
                   onClick={resetAll}
-                  className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-lg text-sm font-medium cursor-pointer
-                                                border border-neutral-300/70 dark:border-neutral-600/60
-                                                bg-white/60 dark:bg-neutral-800/50
-                                                text-neutral-700 dark:text-neutral-200
-                                                shadow-sm backdrop-blur
-                                                hover:bg-white/80 dark:hover:bg-neutral-800/70
-                                                hover:border-neutral-400 dark:hover:border-neutral-500
-                                                transition-colors
-                                                focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ED5E20]/60
-                                                focus:ring-offset-white dark:focus:ring-"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-lg text-sm font-medium
+                    border border-neutral-300/70 dark:border-neutral-600/60 
+                    bg-white/60 dark:bg-neutral-800/50
+                    text-neutral-700 dark:text-neutral-200
+                    shadow-sm backdrop-blur
+                    hover:bg-white/80 dark:hover:bg-neutral-800/70
+                    hover:border-neutral-400 dark:hover:border-neutral-500
+                    transition-colors
+                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ED5E20]/60
+                    focus:ring-offset-white dark:focus:ring-"
                   type="button"
                 >
                   <svg
@@ -340,87 +365,20 @@ export default function Evaluate() {
                   </svg>
                   Reset
                 </Button>
+
                 <button
                   disabled={!canNextFrom1}
                   onClick={() => canNextFrom1 && setStep(2)}
-                  className={`
-    group relative inline-flex items-center justify-center
-    px-9 py-2.5 rounded-xl text-sm font-semibold tracking-wide
-    transition-all duration-300
-    focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40
-    ${canNextFrom1
-                      ? "cursor-pointer text-white"
-                      : "cursor-not-allowed text-neutral-300 dark:text-neutral-500"
-                    }
-    ${canNextFrom1
-                      ? "shadow-[0_4px_18px_-4px_rgba(237,94,32,0.55)] hover:shadow-[0_6px_26px_-6px_rgba(237,94,32,0.65)] active:scale-[.97]"
-                      : "shadow-none"
-                    }
-  `}
-                >
-                  {/* Glow / gradient base */}
-                  <span
-                    aria-hidden
-                    className={`
-                                                    absolute inset-0 rounded-xl
-                                                    ${canNextFrom1
-                        ? "bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b]"
-                        : "bg-gradient-to-r from-neutral-400 to-neutral-500 opacity-60"
-                      }
-                                            `}
-                  />
-                  {/* Inner glass layer */}
-                  <span
-                    aria-hidden
-                    className={`
-                                                 absolute inset-[2px] rounded-[10px]
-                                                    ${canNextFrom1
-                        ? "bg-[linear-gradient(145deg,rgba(255,255,255,0.28),rgba(255,255,255,0.07))] backdrop-blur-[2px]"
-                        : "bg-white/20 dark:bg-neutral-800/40"
-                      }
-                                            `}
-                  />
-                  {/* Animated sheen */}
-                  {canNextFrom1 && (
-                    <span
-                      aria-hidden
-                      className="absolute -left-1 -right-1 top-0 h-full overflow-hidden rounded-xl"
-                    >
-                      <span className="absolute inset-y-0 -left-full w-1/2 translate-x-0 bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70" />
-                    </span>
-                  )}
-                  {/* Border ring */}
-                  <span
-                    aria-hidden
-                    className={`
-                                            absolute inset-0 rounded-xl
-                                                ${canNextFrom1
-                        ? "ring-1 ring-white/30 dark:ring-white/10 group-hover:ring-white/50"
-                        : "ring-1 ring-neutral-400/30 dark:ring-neutral-600/40"
-                      }
-                                            `}
-                  />
-                  {/* Label */}
-                  <span className="relative z-10 flex items-center gap-2">
+                    className={`px-6 py-2 rounded-lg text-sm font-semibold text-white cursor-pointer
+                      ${canNextFrom1
+                        ? "bg-[#ED5E20] hover:bg-orange-600"
+                        : "bg-gray-400 cursor-not-allowed"
+                      }`}
+                  >
                     Next
-                    {canNextFrom1 && (
-                      <div>
-                        <svg
-                          className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M5 12h14" />
-                          <path d="M13 6l6 6-6 6" />
-                        </svg>
-                      </div>
-                    )}
-                  </span>
-                </button>
+                  </button>
+
+                
               </div>
             </div>
           )}
@@ -458,7 +416,7 @@ export default function Evaluate() {
               <div className="flex justify-between gap-4">
                 <button
                   onClick={() => setStep(1)}
-                  className="px-5 py-2 rounded-lg border text-sm text-neutral-600 dark:text-neutral-300 hover:bg-white/70 dark:hover:bg-neutral-800/60"
+                  className="px-5 py-2 rounded-lg border text-sm text-neutral-600 dark:text-neutral-300 hover:bg-white/70 dark:hover:bg-neutral-800/60 cursor-pointer"
                 >
                   Back
                 </button>
@@ -467,7 +425,7 @@ export default function Evaluate() {
                     type="button"
                     onClick={handleParse}
                     disabled={!canParse}
-                    className={`px-6 py-2 rounded-lg text-sm font-semibold text-white
+                    className={`px-6 py-2 rounded-lg text-sm font-semibold text-white cursor-pointer
                       ${canParse
                         ? "bg-[#ED5E20] hover:bg-orange-600"
                         : "bg-gray-400 cursor-not-allowed"
@@ -478,7 +436,7 @@ export default function Evaluate() {
                   <button
                     disabled={!parsed}
                     onClick={() => parsed && setStep(3)}
-                    className={`px-6 py-2 rounded-lg text-sm font-semibold text-white
+                    className={`px-6 py-2 rounded-lg text-sm font-semibold text-white cursor-pointer
                       ${parsed
                         ? "bg-[#ED5E20] hover:bg-orange-600"
                         : "bg-gray-400 cursor-not-allowed"
@@ -535,28 +493,58 @@ export default function Evaluate() {
               <div className="flex justify-between gap-4">
                 <button
                   onClick={() => setStep(2)}
-                  className="px-5 py-2 rounded-lg border text-sm text-neutral-600 dark:text-neutral-300 hover:bg-white/70 dark:hover:bg-neutral-800/60"
+                  className="px-5 py-2 rounded-lg border text-sm text-neutral-600 dark:text-neutral-300 hover:bg-white/70 dark:hover:bg-neutral-800/60 cursor-pointer"
                 >
                   Back
                 </button>
                 <div className="flex gap-3">
                   <button
                     onClick={() => setStep(1)}
-                    className="px-5 py-2 rounded-lg border text-sm text-neutral-600 dark:text-neutral-300 hover:bg-white/70 dark:hover:bg-neutral-800/60"
+                    className="px-5 py-2 rounded-lg border text-sm text-neutral-600 dark:text-neutral-300 hover:bg-white/70 dark:hover:bg-neutral-800/60 cursor-pointer"
                   >
-                    Edit Params
+                    Edit Parameters
                   </button>
-                  <button
-                    disabled={submitting}
-                    onClick={handleSubmit}
-                    className={`px-8 py-2 rounded-lg text-sm font-semibold text-white
-                      ${submitting
-                        ? "bg-gray-400 cursor-not-allowed"
-                        : "bg-[#ED5E20] hover:bg-orange-600"
-                      }`}
-                  >
-                    {submitting ? "Submitting..." : "Submit"}
-                  </button>
+                <button
+                  disabled={submitting}
+                  onClick={handleSubmit}
+                  className="group relative inline-flex items-center justify-center
+                    px-9 py-2.5 rounded-xl text-sm font-semibold tracking-wide
+                    transition-all duration-300
+                    focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40 cursor pointer"
+                >
+                  {/* Glow / gradient base */}
+                  <span
+                    aria-hidden
+                    className= "absolute inset-0 rounded-xl bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b] cursor-pointer"
+                  />
+                  
+                  {/* Inner glass layer */}
+                  <span
+                    aria-hidden
+                    className= "absolute inset-[2px] rounded-[10px] bg-[linear-gradient(145deg,rgba(255,255,255,0.28),rgba(255,255,255,0.07))] backdrop-blur-[2px] cursor-pointer"
+                  />
+                  
+                  {/* Animated sheen */}
+                  {!submitting && (
+                    <span
+                      aria-hidden
+                      className="absolute -left-1 -right-1 top-0 h-full overflow-hidden rounded-xl"
+                    >
+                      <span className="absolute inset-y-0 -left-full w-1/2 translate-x-0 bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70" />
+                    </span>
+                  )}
+                  
+                  {/* Border ring */}
+                  <span
+                    aria-hidden
+                    className= "absolute inset-0 rounded-xl ring-1 ring-white/30 group-hover:ring-white/50 cursor-pointer"
+                  />
+                  
+                  {/* Label */}
+                  <span className="relative z-10 flex items-center gap-2 cursor-pointer">
+                    Evaluate
+                  </span>
+                </button>
                 </div>
               </div>
             </div>

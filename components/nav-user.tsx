@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  IconCreditCard,
   IconDotsVertical,
   IconLogout,
   IconNotification,
@@ -34,6 +33,9 @@ import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { type User } from "@supabase/supabase-js";
 import { Skeleton } from "./ui/skeleton";
+import { Bug, Settings, UserRound } from "lucide-react";
+import { useDesignNotifications } from "../lib/notification"
+import { IconBell, IconX } from "@tabler/icons-react";
 
 
 export function NavUser({ user }: { user: User | null }) {
@@ -42,13 +44,18 @@ export function NavUser({ user }: { user: User | null }) {
   const [loading, setLoading] = useState(true)
   const [fullname, setFullName] = useState<string | null>(null)
   const [email, setEmail] = useState<string | null>(null)
-  const [username, setUsername] = useState<string | null>(null)
-  const [website, setWebsite] = useState<string | null>(null)
-  const [age, setAge] = useState<string | null>(null)
+  // const [username, setUsername] = useState<string | null>(null)
+  // const [website, setWebsite] = useState<string | null>(null)
+  // const [age, setAge] = useState<string | null>(null)
   const [avatar_url, setAvatarUrl] = useState<string | null>(null)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   // Add state for pending avatar 
   const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [showNotifModal, setShowNotifModal] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifLoading, setNotifLoading] = useState<string | null>(null);
+  const [notifPage, setNotifPage] = useState(1);
 
   const [open, setOpen] = useState(false);
   const [profile, setProfile] = useState<{
@@ -61,7 +68,19 @@ export function NavUser({ user }: { user: User | null }) {
     bio: string;
   } | null>(null);
 
+  const notifPerpage = 5;
 
+  const paginatedNotifcations = notifications.slice(
+    (notifPage - 1) * notifPage,
+    notifPage * notifPage
+  );
+  const totalPages = Math.ceil(notifications.length / notifPerpage);
+  const unreadNotifications = notifications.filter(n => !n.read);
+  const readNotifications = notifications.filter(n => n.read);
+
+  // TODO: BE DELTED
+  const heartNotification = useDesignNotifications(user?.id ?? null);
+  const hasHeartNotifications = heartNotification.length > 0;
 
   const getProfile = useCallback(async () => {
     try {
@@ -103,6 +122,20 @@ export function NavUser({ user }: { user: User | null }) {
 
   }, [user])
 
+  const getNotifications = useCallback(async () => {
+    const supabase = createClient();
+    const { data: notifications } = await supabase
+      .from("notifications")
+      .select(`
+      *,
+      designs(title),
+      from_user:profiles!notifications_from_user_id_fkey(full_name)
+    `)
+      .eq("to_user_id", user?.id)
+      .order("created_at", { ascending: false });
+    setNotifications(notifications ?? []);
+  }, [user?.id]);
+
   useEffect(() => {
     if (user?.email) {
       setEmail(user.email);
@@ -134,7 +167,115 @@ export function NavUser({ user }: { user: User | null }) {
       }
     }
   };
+  const handleDeleteNotification = async (notifId: string) => {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("notifications")
+      .delete()
+      .eq("id", notifId);
+    if (!error) {
+      setNotifications((prev) => prev.filter((n) => n.id !== notifId));
+      toast.success("Notification deleted.");
+    } else {
+      toast.error("Failed to delete notification.");
+    }
+  };
 
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (user?.id) {
+      getNotifications();
+    }
+  }, [user?.id, getNotifications]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel("realtime-notifications")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `to_user_id=eq.${user.id}`,
+        },
+        async (payload) => {
+          const notif = payload.new;
+          // Fetch sender name and design title
+          const { data: sender } = await supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", notif.from_user_id)
+            .single();
+          const { data: design } = await supabase
+            .from("designs")
+            .select("title")
+            .eq("id", notif.design_id)
+            .single();
+          toast(
+            <span className="flex items-center gap-2">
+              <IconBell className="text-yellow-500" size={20} />
+              <span>{sender?.full_name ?? "Someone"} loved your design!</span>
+            </span>,
+            {
+              description: design?.title
+                ? `Design: ${design.title}`
+                : undefined,
+              position: "top-center",
+              duration: 5000,
+            }
+          );
+          getNotifications();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, getNotifications]);
+
+  useEffect(() => {
+    setNotifPage(1);
+  }, [showNotifModal, notifications.length]);
+
+  // useEffect(() => {
+  //   if (showNotifModal && notifications.some(n => !n.read)) {
+  //     const supabase = createClient();
+  //     // Mark all as read in the DB
+  //     supabase
+  //       .from("notifications")
+  //       .update({ read: true })
+  //       .eq("to_user_id", user?.id)
+  //       .eq("read", false)
+  //       .then(() => {
+  //         // Update local state
+  //         setNotifications((prev) =>
+  //           prev.map((n) => ({ ...n, read: true }))
+  //         );
+  //       });
+  //   }
+  // }, [showNotifModal, notifications, user?.id]);
+  function generateUsername(fullname: string) {
+    if (!fullname) return "";
+    return fullname
+      .split(" ")
+      .join("")
+      .toLowerCase();
+  }
   const router = useRouter();
   async function handleLogOut() {
     const result = await logout();
@@ -143,8 +284,9 @@ export function NavUser({ user }: { user: User | null }) {
       return;
     }
     toast.success("You have been logout.");
-    router.push("/auth/login");
   }
+
+
   if (loading) {
     return (
       <div className="flex items-center justify-center mt-8h-32 gap-4">
@@ -233,13 +375,26 @@ export function NavUser({ user }: { user: User | null }) {
               <DropdownMenuGroup>
                 <DropdownMenuItem onClick={handleAccountClick}>
                   <IconUserCircle />
-                  {/* TODO: make the functional button here */}
                   Account
                 </DropdownMenuItem>
-                {/* removed billing */}
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowDeleteDialog(true)}>
+                  <Settings />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowNotifModal(true)}>
                   <IconNotification />
                   Notifications
+                  {notifications.some(n => !n.read) && (
+                    <span className="ml-2 inline-block w-2 h-2 bg-red-500 rounded-full"></span>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Bug />
+                  Report a Bug
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <UserRound />
+                  About Us
                 </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
@@ -249,7 +404,7 @@ export function NavUser({ user }: { user: User | null }) {
         </SidebarMenuItem>
       </SidebarMenu>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
           {/* Blurred, darkened background */}
           <div
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
@@ -257,12 +412,9 @@ export function NavUser({ user }: { user: User | null }) {
           />
           {/* Centered form */}
           <div
-            className="
-        relative z-10 bg-white dark:bg-[#141414] rounded-xl shadow-lg
-        w-full max-w-xs sm:max-w-md mx-auto
-        p-3 sm:p-8
-        overflow-y-auto max-h-[90vh]
-      "
+            className="relative z-[102] bg-white dark:bg-[#141414] rounded-xl shadow-lg 
+                      w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-xl xl:max-w-[530px] mx-auto
+                      p-3 sm:p-8 overflow-y-auto max-h-[90vh]"
           >
             {/* Adjusted font size and margin for mobile */}
             <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4 text-center">
@@ -317,16 +469,20 @@ export function NavUser({ user }: { user: User | null }) {
                     imageUrl = filePath;
                   }
 
-
+                  let username = profile.username;
+                  if (!username && profile.fullname) {
+                    username = generateUsername(profile.fullname);
+                  }
                   // Update profile in DB
                   const { error } = await supabase
                     .from("profiles")
                     .update({
-                      username: profile.username,
+                      username,
                       full_name: profile.fullname,
                       age: profile.age,
                       avatar_url: imageUrl,
                       bio: profile.bio,
+                      gender: profile.gender,
                     })
                     .eq("id", profile.id);
 
@@ -400,7 +556,7 @@ export function NavUser({ user }: { user: User | null }) {
                   </div>
                   <label>Username</label>
                   <Input
-                    value={profile.username ?? "User"}
+                    value={profile.username ?? generateUsername(profile.fullname)}
                     onChange={e => setProfile({ ...profile, username: e.target.value })}
                   />
                 </div>
@@ -411,7 +567,7 @@ export function NavUser({ user }: { user: User | null }) {
                     onChange={e => setProfile({ ...profile, fullname: e.target.value })}
                   />
                 </div>
-                <div>
+                <div className="cursor-not-allowed">
                   <label>Email</label>
                   <Input
                     value={email ?? "Cannot fetch User email"}
@@ -424,33 +580,52 @@ export function NavUser({ user }: { user: User | null }) {
                     type="number"
                     min={10}
                     max={80}
-                    value={profile.age === 0 ? "" : profile.age ?? ""}
+                    value={profile?.age || ''}
                     onChange={e => {
                       const raw = e.target.value;
-                      if (raw === "") {
-                        setProfile({ ...profile, age: "" });
+
+                      // Allow empty input
+                      if (raw === '') {
+                        setProfile(prev => prev ? { ...prev, age: '' } : prev);
                         return;
                       }
-                      const value = Number(raw);
-                      // Only update if value is a valid number and in range
-                      if (!isNaN(value) && value >= 10 && value <= 80) {
-                        setProfile({ ...profile, age: value });
+
+                      // Store the raw input first to allow typing
+                      const tempValue = parseInt(raw, 10);
+                      if (!isNaN(tempValue)) {
+                        // Only show error for 3+ digits but still allow typing
+                        if (raw.length > 3) {
+                          toast.error("Invalid age. Please enter a number between 10-80.");
+                        }
+                        // Update state with the current input
+                        setProfile(prev => prev ? { ...prev, age: tempValue } : prev);
                       }
                     }}
-                    placeholder="Enter your age (10-80)"
+                    // Validate on blur instead
+                    onBlur={e => {
+                      const value = parseInt(e.target.value, 10);
+                      if (!isNaN(value)) {
+                        if (value > 80 || value < 10) {
+                          toast.error("Age must be between 10-80 years");
+                          setProfile(prev => prev ? { ...prev, age: '' } : prev);
+                        }
+                      }
+                    }}
+                    placeholder="Enter your age"
                   />
                 </div>
 
                 <div>
                   <label >Gender</label>
                   <Input
-                    value={profile.gender}
+                    value={profile?.gender?.trim() || ""}
                     onChange={e => setProfile({ ...profile, gender: e.target.value })}
+                    placeholder="Specify your gender"
                   />
                 </div>
 
                 {/* Footer buttons are now responsive: stack on mobile, row on desktop */}
-                <footer className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-4 mt-6 sm:mt-16">
+                <footer className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-4 mt-12">
                   <Button
                     type="button"
                     variant="outline"
@@ -472,6 +647,369 @@ export function NavUser({ user }: { user: User | null }) {
         </div >
       )
       }
+      {showDeleteDialog && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40">
+          <div className="bg-white dark:bg-[#141414] rounded-xl shadow-lg p-8 max-w-sm w-full">
+            <h3 className="text-lg font-bold mb-4">Delete Account</h3>
+            <p className="mb-6 text-sm text-muted-foreground">
+              Are you sure you want to delete your account? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                className="bg-red-600 text-white hover:bg-red-700"
+                onClick={async () => {
+                  try {
+                    // Call your API route to delete the user
+                    const res = await fetch("/api/delete_user", {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                      },
+                      body: JSON.stringify({ userId: user?.id }),
+                    });
+                    if (res.ok) {
+                      toast.success("Account deleted.");
+                      router.push("/auth/login");
+                    } else {
+                      toast.error("Failed to delete account.");
+                    }
+                  } catch (err) {
+                    toast.error(`Failed to delete account.`, err);
+                  }
+                }}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showNotifModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setShowNotifModal(false)}
+          />
+
+          <div className="relative z-[301] bg-white dark:bg-[#141414] rounded-xl shadow-lg p-6 max-w-md w-full">
+            <button
+              onClick={() => setShowNotifModal(false)}
+              className="absolute top-3 right-3 text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-white text-xl font-bold focus:outline-none"
+              aria-label="Close"
+              type="button"
+            >
+              <IconX />
+            </button>
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+              <IconNotification /> Notifications
+            </h3>
+            {notifications.length === 0 ? (
+              <div className="text-muted-foreground text-sm">No new notifications.</div>
+            ) : (
+              <ul className="space-y-3 max-h-60 overflow-y-auto">
+                {/* Mark all as read button */}
+                {unreadNotifications.length > 0 && (
+                  <div className="flex justify-end mb-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={async () => {
+                        const supabase = createClient();
+                        await supabase
+                          .from("notifications")
+                          .update({ read: true })
+                          .eq("to_user_id", user?.id)
+                          .eq("read", false);
+                        setNotifications((prev) =>
+                          prev.map((n) => ({ ...n, read: true }))
+                        );
+                      }}
+                    >
+                      Mark all as read
+                    </Button>
+                  </div>
+                )}
+                {unreadNotifications.length === 0 && notifications.length > 0 && (
+                  <div className="flex justify-end mb-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={async () => {
+                        const supabase = createClient();
+                        await supabase
+                          .from("notifications")
+                          .update({ read: false })
+                          .eq("to_user_id", user?.id)
+                          .eq("read", true);
+                        setNotifications((prev) =>
+                          prev.map((n) => ({ ...n, read: false }))
+                        );
+                      }}
+                    >
+                      Mark all as unread
+                    </Button>
+                  </div>
+                )}
+
+
+                {/* Unread notifications */}
+                {unreadNotifications.length > 0 && (
+                  <>
+                    <li className="text-xs text-orange-600 font-semibold uppercase tracking-wide px-2 py-1">
+                      Unread
+                    </li>
+                    {unreadNotifications.map((notif) => (
+                      <li
+                        key={notif.id}
+                        className="flex items-center gap-2 text-sm group rounded px-2 py-1 bg-orange-50 
+                        dark:bg-orange-900/30 font-semibold cursor-pointer"
+                        onClick={async () => {
+                          if (notifLoading === notif.id) return;
+                          setNotifLoading(notif.id);
+
+                          if (!notif.read) {
+                            const supabase = createClient();
+                            const { error } = await supabase
+                              .from("notifications")
+                              .update({ read: true })
+                              .eq("id", notif.id);
+
+                            if (!error) {
+                              setNotifications((prev) =>
+                                prev.map((n) =>
+                                  n.id === notif.id ? { ...n, read: true } : n
+                                )
+                              );
+                              setNotifLoading(null);
+                              if (notif.design_id) {
+                                setShowNotifModal(false);
+                                // Use a small delay to ensure state is flushed before navigation
+                                setTimeout(() => {
+                                  router.push(`/designs/${notif.design_id}`);
+                                }, 500);
+                              }
+                            } else {
+                              setNotifLoading(null);
+                              toast.error("Failed to mark notification as read.");
+                            }
+                          } else {
+                            setNotifLoading(null);
+                            if (notif.design_id) {
+                              setShowNotifModal(false);
+                              router.push(`/designs/${notif.design_id}`);
+                            }
+                          }
+                        }}
+                      >
+                        {!notif.read && (
+                          <span className="inline-block w-2 h-2 bg-orange-500 rounded-full mr-2"></span>
+                        )}
+                        {notif.type === "heart" ? (
+                          <span className="text-red-500">♥</span>
+                        ) : (
+                          <span className="text-blue-500">💬</span>
+                        )}
+                        <span>
+                          {notif.type === "heart"
+                            ? <><b>{notif.from_user?.full_name ?? "Someone"}</b> loved your design <b>{notif.designs?.title ?? notif.design_id}</b></>
+                            : <><b>{notif.from_user?.full_name ?? "Someone"}</b> commented on your design <b>{notif.designs?.title ?? notif.design_id}</b></>
+                          }
+                        </span>
+                        <span className="ml-auto text-xs text-gray-400">
+                          {new Date(notif.created_at).toLocaleString()}
+                        </span>
+                        {/* Mark as read */}
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const supabase = createClient();
+                            const { error } = await supabase
+                              .from("notifications")
+                              .update({ read: true })
+                              .eq("id", notif.id);
+                            if (!error) {
+                              setNotifications((prev) =>
+                                prev.map((n) =>
+                                  n.id === notif.id ? { ...n, read: true } : n
+                                )
+                              );
+                              toast.success("Marked as read.");
+                            } else {
+                              toast.error("Failed to mark as read.");
+                            }
+                          }}
+                          className="ml-2 text-gray-400 hover:text-green-600 transition-opacity opacity-0 group-hover:opacity-100"
+                          title="Mark as read"
+                          aria-label="Mark as read"
+                          type="button"
+                        >
+                          <IconBell size={16} />
+                        </button>
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await handleDeleteNotification(notif.id);
+                          }}
+                          className="ml-2 text-gray-400 hover:text-red-600 transition-opacity opacity-0 group-hover:opacity-100"
+                          title="Delete notification"
+                          aria-label="Delete notification"
+                          type="button"
+                        >
+                          <IconX size={16} />
+                        </button>
+                      </li>
+                    ))}
+                  </>
+                )}
+
+                {/* Divider between unread and read */}
+                {unreadNotifications.length > 0 && readNotifications.length > 0 && (
+                  <li className="border-t border-gray-200 dark:border-gray-700 my-2"></li>
+                )}
+
+                {/* Read notifications */}
+                {readNotifications.length > 0 && (
+                  <>
+                    <li className="text-xs text-muted-foreground uppercase tracking-wide px-2 py-1">
+                      Read
+                    </li>
+                    {readNotifications.map((notif) => (
+                      <li
+                        key={notif.id}
+                        className="flex items-center gap-2 text-sm group rounded px-2 py-1 text-muted-foreground"
+                      >
+                        {notif.type === "heart" ? (
+                          <span className="text-red-500">♥</span>
+                        ) : (
+                          <span className="text-blue-500">💬</span>
+                        )}
+                        <span>
+                          {notif.type === "heart"
+                            ? <><b>{notif.from_user?.full_name ?? "Someone"}</b> loved your design <b>{notif.designs?.title ?? notif.design_id}</b></>
+                            : <><b>{notif.from_user?.full_name ?? "Someone"}</b> commented on your design <b>{notif.designs?.title ?? notif.design_id}</b></>
+                          }
+                        </span>
+                        <span className="ml-auto text-xs text-gray-400">
+                          {new Date(notif.created_at).toLocaleString()}
+                        </span>
+                        {/* Mark as Unread Button */}
+                        <button
+                          onClick={async () => {
+                            const supabase = createClient();
+                            const { error } = await supabase
+                              .from("notifications")
+                              .update({ read: false })
+                              .eq("id", notif.id);
+                            if (!error) {
+                              setNotifications((prev) =>
+                                prev.map((n) =>
+                                  n.id === notif.id ? { ...n, read: false } : n
+                                )
+                              );
+                              toast.success("Marked as unread.");
+                            } else {
+                              toast.error("Failed to mark as unread.");
+                            }
+                          }}
+                          className="ml-2 text-gray-400 hover:text-orange-500 transition-opacity opacity-0 group-hover:opacity-100"
+                          title="Mark as unread"
+                          aria-label="Mark as unread"
+                          type="button"
+                        >
+                          <IconBell size={16} />
+                        </button>
+                        <button
+                          onClick={async () => await handleDeleteNotification(notif.id)}
+                          className="ml-2 text-gray-400 hover:text-red-600 transition-opacity opacity-0 group-hover:opacity-100"
+                          title="Delete notification"
+                          aria-label="Delete notification"
+                          type="button"
+                        >
+                          <IconX size={16} />
+                        </button>
+
+                      </li>
+                    ))}
+                  </>
+                )}
+              </ul>
+
+            )}
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center gap-2 mt-4">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={notifPage === 1}
+                  onClick={() => setNotifPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </Button>
+                <span className="text-xs">
+                  Page {notifPage} of {totalPages}
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={notifPage === totalPages}
+                  onClick={() => setNotifPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+            {/* Remove all the notifications here */}
+            <div className="flex justify-end mt-4 gap-2">
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  toast(
+                    "Are you sure you want to delete all notifications?",
+                    {
+                      action: {
+                        label: "Yes, delete",
+                        onClick: async () => {
+                          const supabase = createClient();
+                          const { error } = await supabase
+                            .from("notifications")
+                            .delete()
+                            .eq("to_user_id", user?.id);
+                          if (!error) {
+                            setNotifications([]);
+                            toast.success("All notifications cleared!");
+                          } else {
+                            toast.error("Failed to clear notifications.");
+                          }
+                        },
+                      },
+                      cancel: {
+                        label: "Cancel",
+                        onClick: () => { },
+                      },
+                      duration: 7000,
+                      position: "top-center",
+                    }
+                  );
+                }}
+                disabled={notifications.length === 0}
+                className={`${notifications.length === 0 ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+                  }`}
+              >
+                Remove All
+              </Button>
+              <Button variant="outline" onClick={() => setShowNotifModal(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
     </>
   );
 }

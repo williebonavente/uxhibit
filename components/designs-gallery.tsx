@@ -5,8 +5,8 @@ import { IconEye, IconHeart, IconTrash } from "@tabler/icons-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import Image from "next/image";
-// CHANGED: import Supabase client (instead of localStorage)
 import { createClient } from "@/utils/supabase/client";
+import { LoadingInspiration } from "./animation/loading-fetching";
 
 type DesignRow = {
   id: string;
@@ -15,20 +15,25 @@ type DesignRow = {
   file_key: string | null;
   node_id: string | null;
   current_version_id: string | null;
-  // Optional stats (add in DB if needed)
   likes?: number | null;
   views?: number | null;
+  is_published: boolean;
+};
+
+type PublishedDesign = {
+  num_of_hearts: number;
+  num_of_views: number;
+  is_published: boolean;
 };
 
 export default function DesignsGallery() {
-  // CHANGED: strongly typed state
   const [designs, setDesigns] = useState<DesignRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showOverlay, setShowOverlay] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const supabase = createClient();
 
-  // CHANGED: helper to sign private path thumbnails
   const resolveThumbnail = useCallback(
     async (thumb: string | null) => {
       if (!thumb) return null;
@@ -41,34 +46,71 @@ export default function DesignsGallery() {
     [supabase]
   );
 
-  // CHANGED: load from database instead of localStorage
   const loadDesigns = useCallback(async () => {
+    if (!currentUserId) return; // Wait for user ID
     setLoading(true);
     const { data, error } = await supabase
       .from("designs")
-      // likes and view to be implemented
-      .select("id,title,thumbnail_url,file_key,node_id,current_version_id")
+      .select(`id,
+              title,
+              thumbnail_url,
+              file_key,
+              node_id,
+              current_version_id,
+              published_designs(num_of_hearts, num_of_views) 
+              `)
+      .eq("owner_id", currentUserId) // Only fetch owner's designs
       .order("updated_at", { ascending: false });
+    console.log("Designs data:", data);
     if (error) {
       console.error(error);
       setDesigns([]);
       setLoading(false);
       return;
     }
-    // Sign thumbnails as needed (parallel)
     const withThumbs = await Promise.all(
-      (data || []).map(async (d) => ({
-        ...d,
-        thumbnail_url: await resolveThumbnail(d.thumbnail_url),
-      }))
+      (data || []).map(async (d) => {
+        let likes = 0;
+        let views = 0;
+        const pub = d.published_designs as PublishedDesign | PublishedDesign[] | null | undefined;
+        if (pub) {
+          if (Array.isArray(pub)) {
+            likes = pub[0]?.num_of_hearts ?? 0;
+            views = pub[0]?.num_of_views ?? 0;
+          } else {
+            likes = pub.num_of_hearts ?? 0;
+            views = pub.num_of_views ?? 0;
+          }
+        }
+        return {
+          ...d,
+          thumbnail_url: await resolveThumbnail(d.thumbnail_url),
+          likes,
+          views,
+          is_published: Array.isArray(d.published_designs)
+            ? d.published_designs.length > 0
+            : !!d.published_designs,
+        };
+      })
     );
     setDesigns(withThumbs);
     setLoading(false);
-  }, [supabase, resolveThumbnail]);
+  }, [supabase, resolveThumbnail, currentUserId]);
 
   useEffect(() => {
-    loadDesigns();
-  }, [loadDesigns]);
+    if (currentUserId) {
+      loadDesigns();
+    }
+  }, [loadDesigns, currentUserId]);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUserId(user?.id ?? null);
+    };
+    fetchUser();
+  }, []);
 
   // OPTIONAL REALTIME (uncomment if you enabled Realtime on table)
   // useEffect(() => {
@@ -82,7 +124,6 @@ export default function DesignsGallery() {
   //   return () => { supabase.removeChannel(channel); };
   // }, [supabase, loadDesigns]);
 
-  // CHANGED: update DB title instead of localStorage
   const handleNameChange = async (id: string, newName: string) => {
     setDesigns((ds) =>
       ds.map((d) => (d.id === id ? { ...d, title: newName } : d))
@@ -125,17 +166,109 @@ export default function DesignsGallery() {
           <button
             className="px-4 py-2 rounded bg-red-500 text-white hover:bg-red-600 font-semibold w-full sm:w-auto"
             onClick={async () => {
-              const { error } = await supabase
-                .from("designs")
-                .delete()
-                .eq("id", id);
-              if (error) toast.error("Delete failed");
-              else {
-                setDesigns((d) => d.filter((x) => x.id !== id));
-                toast.success("Deleted");
+              try {
+                // First get design info for logging and storage cleanup
+                const { data: design } = await supabase
+                  .from("designs")
+                  .select(`
+                  title, 
+                  thumbnail_url,
+                  published_designs(id), 
+                  design_versions!design_versions_design_id_fkey (
+                    id,
+                    thumbnail_url
+                  )
+                `)
+                  .eq("id", id)
+                  .single();
+
+                // Check if published (adjust this logic to your schema)
+                if (design?.published_designs && design.published_designs.length > 0) {
+                  toast.error("This design cannot be deleted since it is currently published.");
+                  setShowOverlay(false);
+                  toast.dismiss();
+                  return;
+                }
+
+                // Collect all storage paths to delete
+                const storagePaths: string[] = [];
+
+                // Add main design thumbnail if it's a storage path
+                if (design?.thumbnail_url && !design.thumbnail_url.startsWith('http')) {
+                  storagePaths.push(design.thumbnail_url);
+                }
+
+                // Add version thumbnails if they're storage paths
+                design?.design_versions?.forEach(version => {
+                  if (version.thumbnail_url && !version.thumbnail_url.startsWith('http')) {
+                    storagePaths.push(version.thumbnail_url);
+                  }
+                });
+
+                // Delete storage files first
+                if (storagePaths.length > 0) {
+                  const { error: storageError } = await supabase
+                    .storage
+                    .from('design-thumbnails')
+                    .remove(storagePaths);
+
+                  if (storageError) {
+                    console.error('Failed to delete storage files:', storageError);
+                    // Continue with DB deletion even if storage fails
+                  }
+                }
+
+                // Clear current_version_id first
+                const { error: updateError } = await supabase
+                  .from("designs")
+                  .update({ current_version_id: null })
+                  .eq("id", id);
+
+                if (updateError) {
+                  console.error('Failed to clear current version:', updateError);
+                  throw updateError;
+                }
+
+                // Delete design versions
+                const { error: versionsError } = await supabase
+                  .from("design_versions")
+                  .delete()
+                  .eq("design_id", id);
+
+                if (versionsError) {
+                  console.error('Failed to delete versions:', versionsError);
+                  throw versionsError;
+                }
+
+                // Finally delete the design
+                const { error: deleteError } = await supabase
+                  .from("designs")
+                  .delete()
+                  .eq("id", id);
+
+                if (deleteError) {
+                  console.error('Delete failed:', {
+                    error: deleteError,
+                    designId: id,
+                    designTitle: design?.title
+                  });
+                  toast.error(`Delete failed: ${deleteError.message}`);
+                } else {
+                  console.log('Design, versions, and files deleted successfully:', {
+                    designId: id,
+                    designTitle: design?.title,
+                    deletedFiles: storagePaths
+                  });
+                  setDesigns((d) => d.filter((x) => x.id !== id));
+                  toast.success("Design deleted successfully");
+                }
+              } catch (err) {
+                console.error('Unexpected error during delete:', err);
+                toast.error("An unexpected error occurred");
+              } finally {
+                setShowOverlay(false);
+                toast.dismiss();
               }
-              setShowOverlay(false);
-              toast.dismiss();
             }}
           >
             Delete
@@ -152,12 +285,20 @@ export default function DesignsGallery() {
   };
 
   if (loading) {
-    return <p className="mt-4 text-gray-400 text-sm">Loading designs...</p>;
+    return <LoadingInspiration
+      text={"Getting your creative designs..."}
+    />;
   }
-
   if (designs.length === 0) {
     return (
-      <p className="mt-4 text-gray-400 text-sm">No designs uploaded yet.</p>
+      <div className="mt-15 flex flex-col items-center justify-center text-center">
+        <img
+          src="/images/empty-design.svg"
+          alt="No designs illustration"
+          className="w-45 h-45 object-contain mx-auto opacity-25"
+        />
+        <p className="text-[#6A6F6F]/50 text-md">No designs uploaded yet.</p>
+      </div>
     );
   }
 
@@ -179,12 +320,11 @@ export default function DesignsGallery() {
                   design.thumbnail_url
                     ? design.thumbnail_url
                     : design.file_key
-                    ? `/api/figma/thumbnail?fileKey=${design.file_key}${
-                        design.node_id
-                          ? `&nodeId=${encodeURIComponent(design.node_id)}`
-                          : ""
+                      ? `/api/figma/thumbnail?fileKey=${design.file_key}${design.node_id
+                        ? `&nodeId=${encodeURIComponent(design.node_id)}`
+                        : ""
                       }`
-                    : "/images/design-thumbnail.png"
+                      : "/images/design-thumbnail.png"
                 }
                 alt={design.title || "Design Preview"}
                 fill
@@ -194,6 +334,15 @@ export default function DesignsGallery() {
             </div>
           </Link>
           <div className="p-3 space-y-2 group relative">
+            {/* Warning if published */}
+            {design.is_published && (
+              <div className="flex items-center gap-1 text-yellow-600 text-xs mb-1">
+                <svg width="16" height="16" fill="currentColor" className="inline-block">
+                  <path d="M8 1.333a6.667 6.667 0 1 0 0 13.334A6.667 6.667 0 0 0 8 1.333zm0 12A5.333 5.333 0 1 1 8 2.667a5.333 5.333 0 0 1 0 10.666zm-.667-8h1.334v4H7.333zm0 5.333h1.334v1.334H7.333z" />
+                </svg>
+                <span>Currently published</span>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-2">
               <input
                 type="text"
@@ -202,7 +351,10 @@ export default function DesignsGallery() {
                 className="w-full bg-transparent text-lg focus:outline-none"
               />
               <button
-                className="text-gray-500 text-xl hover:text-red-500 transition cursor-pointer opacity-0 group-hover:opacity-100"
+                style={{
+                  cursor: "url('/cursors/cursor-pointer.svg') 3 3, pointer"
+                }}
+                className="text-gray-500 text-xl hover:text-red-500 transition opacity-0 group-hover:opacity-100"
                 title="Delete"
                 onClick={() => handleDelete(design.id)}
               >

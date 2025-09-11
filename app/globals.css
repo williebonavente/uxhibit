@@ -44,6 +44,7 @@
   font-display: swap;
 }
 
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -248,7 +249,9 @@
   width: 100%;
   border-radius: 0.75rem;
   /* rounded-xl = 0.75rem */
-  background: linear-gradient(to right, #19181D, #B22A13, #ED5E20, #FFA600);
+  /* background: linear-gradient(to right, #19181D, #B22A13, #ED5E20, #FFA600); */
+  background: url('/images/header-1.webp') no-repeat center center;
+  background-size: cover; /* make sure it fills */
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -332,3 +335,9 @@
 .text-balance {
   text-wrap:balance;
 }
+/* Hide Edge's deafult password reveal icon */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+    display: none;
+}
+

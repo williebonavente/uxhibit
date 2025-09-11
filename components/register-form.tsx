@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { z } from "zod";
+import { email, z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -19,23 +19,22 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { registerFormSchema } from "@/lib/validation-schemas";
 import MiddleHeaderIcon from "./middle-header-icon";
 import Image from "next/image";
-import { createClient } from "@/utils/supabase/client";
 import { type User } from "@supabase/supabase-js";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
 // import { Avatar } from '@radix-ui/react-avatar'
 
 export default function RegistrationForm({ user }: { user: User | null }) {
   const router = useRouter();
-  const supabase = createClient();
 
-  const [loading, setLoading] = useState(true);
-  const [fullname, setFullName] = useState<string | null>(null);
-  const [username, setUsername] = useState<string | null>(null);
-  const [website, setWebsite] = useState<string | null>(null);
-  const [age, setAge] = useState<string | null>(null);
-  const [avatar_url, setAvatarUrl] = useState<string | null>(null);
-  const [isCheck, setCheck] = useState<string | null>(null);
+  // const [loading, setLoading] = useState(true);
+  // const [fullname, setFullName] = useState<string | null>(null);
+  // const [username, setUsername] = useState<string | null>(null);
+  // const [website, setWebsite] = useState<string | null>(null);
+  // const [age, setAge] = useState<string | null>(null);
+  // const [avatar_url, setAvatarUrl] = useState<string | null>(null);
+  // const [isCheck, setCheck] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof registerFormSchema>>({
     defaultValues: {
@@ -88,9 +87,26 @@ export default function RegistrationForm({ user }: { user: User | null }) {
     typeof window !== "undefined"
       ? window.location.origin
       : process.env.NEXT_PUBLIC_SITE_URL || "";
+
   async function onSubmit(values: z.infer<typeof registerFormSchema>) {
+    const supabase = createClient();
+
     try {
-      const { data, error } = await supabase.auth.signUp({
+
+      const res = await fetch("/api/check_email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: values.email }),
+      });
+      console.log("Raw response:", res);
+      const emailCheck = await res.json();
+      console.log(emailCheck)
+      if (emailCheck.exists) {
+        toast.error("This email is already registered.");
+        return;
+      }
+
+      const { data: signUpData, error } = await supabase.auth.signUp({
         email: values.email,
         password: values.password,
         options: {
@@ -99,25 +115,26 @@ export default function RegistrationForm({ user }: { user: User | null }) {
             username: values.username,
             full_name: values.full_name,
             age: values.age,
-            // TODO: value, male, female, nonbinary, prefer not to say
-            // TODO: drop-down menu
             gender: values.gender,
           },
         },
       });
+      console.log('signUp response', { signUpData, error });
 
       if (error) {
-        toast.error(error.message || "Registration failed");
+        toast.error(error.message ?? "Registration failed");
+        console.log("Sign-up error details:", error);
         return;
       }
 
-      toast.success("Check your email to confirm your account");
-      router.push("/auth/login");
-    } catch (error) {
-      console.error("Form submission error", error);
-      toast.error("Failed to submit the form. Please try again.");
+      toast.success('Check your email to confirm your account');
+      router.push('/auth/login');
+    } catch (e) {
+      console.error('Unexpected registration error', e);
+      toast.error(`Failed to submit the form. Please try again.${e}`);
     }
   }
+
 
   return (
     <>
@@ -327,44 +344,6 @@ export default function RegistrationForm({ user }: { user: User | null }) {
                     </FormItem>
                   )}
                 />
-
-                {/* Website Field (optional)
-                <FormField
-                  control={form.control}
-                  name="website_url"
-                  render={({ field }) => (
-                    <FormItem className="grid gap-2">
-                      <FormControl>
-                        <Input
-                          id="website_url"
-                          placeholder="Website (optional)"
-                          className="w-full h-12 input-placeholder-lg input-lg input-colored lg:w-[513px] lg:h-[62px]"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                /> */}
-
-                {/* Avatar URL Field (optional) */}
-                {/* <FormField
-                  control={form.control}
-                  name="avatar_url"
-                  render={({ field }) => (
-                    <FormItem className="grid gap-2">
-                      <FormControl>
-                        <Input
-                          id="avatar_url"
-                          placeholder="Avatar URL (optional)"
-                          className="w-full h-12 input-placeholder-lg input-lg input-colored lg:w-[513px] lg:h-[62px]"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                /> */}
 
                 {/* Register Button */}
                 <Button
