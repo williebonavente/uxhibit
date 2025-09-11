@@ -12,6 +12,7 @@ import { LoadingInspiration } from "./animation/loading-fetching";
 import { DesignCard } from "./design-card";
 import { CommentItem } from "./comments-user";
 import { Comment } from "./comments-user";
+// import { useRef } from "react";
 
 
 type DesignInfo = {
@@ -31,6 +32,51 @@ type UserInfo = {
   designs: DesignInfo[];
 };
 
+export function UserAvatar({ avatarPath, alt }: { avatarPath: string | null, alt: string }) {
+  const avatarUrl = useSignedAvatarUrl(avatarPath);
+  return (
+    <Image
+      src={avatarUrl ?? "/images/default_avatar.png"}
+      alt={alt}
+      className="w-10 h-10 rounded-full"
+      width={400}
+      height={400}
+    />
+  );
+}
+
+export function useSignedAvatarUrl(avatarPath: string | null) {
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!avatarPath) {
+      setSignedUrl(null);
+      return;
+    }
+    // If it's already a full URL, use it directly
+    if (avatarPath.startsWith("http")) {
+      setSignedUrl(avatarPath);
+      return;
+    }
+    const supabase = createClient();
+
+    const fetchUrl = async () => {
+      const { data } = await supabase
+        .storage
+        .from("avatars")
+        .createSignedUrl(avatarPath, 60 * 60); // 1 hour
+      setSignedUrl(data?.signedUrl || null);
+    };
+
+    fetchUrl();
+
+    const interval = setInterval(fetchUrl, 55 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [avatarPath]);
+
+  return signedUrl;
+}
 export default function ExplorePage() {
 
   const initialComments: Comment[] = [];
@@ -44,121 +90,96 @@ export default function ExplorePage() {
   const [comments, setComments] = useState<Comment[]>(initialComments);
   const [newCommentText, setNewCommentText] = useState("");
   const [currentUserProfile, setCurrentUserProfile] = useState<{ fullName: string; avatarUrl: string } | null>(null);
+  // const fetchTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  function useSignedAvatarUrl(avatarPath: string | null) {
-    const [signedUrl, setSignedUrl] = useState<string | null>(null);
-
-    useEffect(() => {
-      if (!avatarPath) {
-        setSignedUrl(null);
-        return;
-      }
-      const supabase = createClient();
-
-      const fetchUrl = async () => {
-        const { data } = await supabase
-          .storage
-          .from("avatars")
-          .createSignedUrl(avatarPath, 60 * 60); // 1 hour
-        setSignedUrl(data?.signedUrl || null);
-      };
-
-      fetchUrl();
-
-      // Refresh every 55 minutes
-      const interval = setInterval(fetchUrl, 55 * 60 * 1000);
-
-      return () => clearInterval(interval);
-    }, [avatarPath]);
-
-    return signedUrl;
-  }
 
   const fetchUsersWithDesigns = useCallback(async () => {
     setLoading(true);
     const supabase = createClient();
-
-    // Fetch users
-    const { data:
-      usersData,
-      error: usersError } = await supabase
+    try {
+      // Fetch users
+      const { data: usersData, error: usersError } = await supabase
         .from("profiles")
         .select("id, full_name, avatar_url");
 
-    console.log("Fetched usersData:", usersData);
-    if (usersError) {
-      console.error("Users fetch error:", usersError);
+      console.log("Fetched usersData:", usersData);
+      if (usersError) {
+        console.error("Users fetch error:", usersError);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch designs
+      const { data: designsData, error: designsError } = await supabase
+        .from("designs")
+        .select("id, owner_id, title, figma_link, thumbnail_url");
+
+      console.log("Fetched designsData:", designsData);
+      if (designsError) {
+        console.error("Designs fetch error:", designsError);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch published designs (get design_id and owner_id)
+      const { data: publishedData, error: publishedError } = await supabase
+        .from("published_designs")
+        .select("design_id, user_id, num_of_hearts, num_of_views")
+        .eq("is_active", true);
+
+      if (publishedError) {
+        setLoading(false);
+        return;
+      }
+
+      // Only include published designs
+      const publishedDesignIds = publishedData?.map((p) => p.design_id) || [];
+
+      const publishedLookup = Object.fromEntries(
+        (publishedData || []).map((p) => [p.design_id, p])
+      )
+      console.log("Published designs:", publishedDesignIds);
+
+      let likedDesignIds: string[] = [];
+      if (currentUserId) {
+        const { data: likesData } = await supabase
+          .from("design_likes")
+          .select("design_id")
+          .eq("user_id", currentUserId);
+        likedDesignIds = (likesData || []).map(like => like.design_id);
+      }
+
+      // Group designs by user
+      const usersWithDesigns = usersData.map((user) => ({
+        user_id: user.id,
+        name: user.full_name,
+        user_avatar: user.avatar_url,
+        designs: (designsData || [])
+          .filter((d) =>
+            d.owner_id === user.id && publishedLookup[d.id]
+          )
+          .map((d) => {
+            const published = publishedLookup[d.id];
+            return {
+              design_id: d.id,
+              project_name: d.title,
+              figma_link: d.figma_link,
+              likes: published?.num_of_hearts ?? 0,
+              views: published?.num_of_views ?? 0,
+              liked: likedDesignIds.includes(d.id),
+              thumbnail_url: d.thumbnail_url,
+              isPublished: !!published,
+            };
+          }),
+      }));
+      console.log("usersWithDesigns:", usersWithDesigns);
+
+      setUsers(usersWithDesigns);
+    } catch (e) {
+      console.log(e);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    // Fetch designs
-    const { data: designsData, error: designsError } = await supabase
-      .from("designs")
-      .select("id, owner_id, title, figma_link, thumbnail_url");
-
-    console.log("Fetched designsData:", designsData);
-    if (designsError) {
-      console.error("Designs fetch error:", designsError);
-      setLoading(false);
-      return;
-    }
-
-    // Fetch published designs (get design_id and owner_id)
-    const { data: publishedData, error: publishedError } = await supabase
-      .from("published_designs")
-      .select("design_id, user_id, num_of_hearts, num_of_views")
-      .eq("is_active", true);
-
-    if (publishedError) {
-      setLoading(false);
-      return;
-    }
-
-    // Only include published designs
-    const publishedDesignIds = publishedData?.map((p) => p.design_id) || [];
-
-    const publishedLookup = Object.fromEntries(
-      (publishedData || []).map((p) => [p.design_id, p])
-    )
-    console.log("Published designs:", publishedDesignIds);
-
-    let likedDesignIds: string[] = [];
-    if (currentUserId) {
-      const { data: likesData } = await supabase
-        .from("design_likes")
-        .select("design_id")
-        .eq("user_id", currentUserId);
-      likedDesignIds = (likesData || []).map(like => like.design_id);
-    }
-
-    // Group designs by user
-    const usersWithDesigns = usersData.map((user) => ({
-      user_id: user.id,
-      name: user.full_name,
-      user_avatar: user.avatar_url,
-      designs: (designsData || [])
-        .filter((d) =>
-          d.owner_id === user.id && publishedLookup[d.id] // Only published designs owned by the user
-        )
-        .map((d) => {
-          const published = publishedLookup[d.id];
-          return {
-            design_id: d.id,
-            project_name: d.title,
-            figma_link: d.figma_link,
-            likes: published?.num_of_hearts ?? 0,
-            views: published?.num_of_views ?? 0,
-            liked: likedDesignIds.includes(d.id),
-            thumbnail_url: d.thumbnail_url,
-            isPublished: !!published,
-          };
-        }),
-    }));
-    console.log("usersWithDesigns:", usersWithDesigns);
-
-    setUsers(usersWithDesigns);
-    setLoading(false);
   }, [currentUserId]);
 
   const handleToggleLike = async (
@@ -167,7 +188,8 @@ export default function ExplorePage() {
     designId: string
   ) => {
     setAnimatingHeart(designId); // Start animation
-    setTimeout(() => setAnimatingHeart(null), 400) // Remove animation
+    setTimeout(() => setAnimatingHeart(null), 1000)
+
     if (!currentUserId) return;
 
     // Find the design in the owner's card
@@ -212,7 +234,6 @@ export default function ExplorePage() {
       error = insError;
       if (error && error.code === "23505") {
         setUsers(users); // revert to previous state
-        // toast.error("You have already liked this design.");
         toast.error("Please wait a moment...");
         return;
       }
@@ -280,10 +301,10 @@ export default function ExplorePage() {
   const handleDeleteComment = (id: string) => {
     setComments(comments.filter(comment => comment.id !== id));
   }
-
   useEffect(() => {
+    if (!currentUserId) return;
     fetchUsersWithDesigns();
-  }, [fetchUsersWithDesigns]);
+  }, [fetchUsersWithDesigns, currentUserId]);
 
   useEffect(() => {
     async function fetchUser() {
@@ -298,7 +319,7 @@ export default function ExplorePage() {
     if (!currentUserId) return;
     const fetchProfile = async () => {
       const supabase = createClient();
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("profiles")
         .select("full_name, avatar_url")
         .eq("id", currentUserId)
@@ -319,6 +340,7 @@ export default function ExplorePage() {
       const { data, error } = await supabase
         .from("comments")
         .select("id, text, user_id, created_at, local_time, parent_id")
+        .order("created_at", { ascending: false });
 
       if (error) {
         console.log("Supabase error:", error);
@@ -373,19 +395,31 @@ export default function ExplorePage() {
     };
 
     fetchComments();
+
+    // Subscribe to realtime changes
+
+    const supabase = createClient()
+    const channel = supabase
+      .channel('comments-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'comments',
+        },
+        (payload) => {
+          fetchComments();
+          console.log("Payload information", payload)
+        }
+      )
+      .subscribe();
+
+    // Cleanup on unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
-  function UserAvatar({ avatarPath, alt }: { avatarPath: string | null, alt: string }) {
-    const avatarUrl = useSignedAvatarUrl(avatarPath);
-    return (
-      <Image
-        src={avatarUrl ?? "/images/default_avatar.png"}
-        alt={alt}
-        className="w-10 h-10 rounded-full"
-        width={400}
-        height={400}
-      />
-    );
-  }
 
   const filteredUsers = users
     .map((user) => ({
@@ -397,7 +431,6 @@ export default function ExplorePage() {
       ),
     }))
     .filter((user) => user.designs.length > 0);
-
 
   if (loading) {
     return <LoadingInspiration />
