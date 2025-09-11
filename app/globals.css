@@ -250,6 +250,9 @@
   border-radius: 0.75rem;
   /* rounded-xl = 0.75rem */
   background: linear-gradient(to right, #19181D, #B22A13, #ED5E20, #FFA600);
+  /* background: linear-gradient(to right, #19181D, #B22A13, #ED5E20, #FFA600); */
+  background: url('/images/header-1.webp') no-repeat center center;
+  background-size: cover; /* make sure it fills */
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -293,7 +296,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  
+
   /* space-x- 2 gap between children, 0.5rem*/
 }
 /* ...existing code... */
@@ -338,4 +341,3 @@ input[type="password"]::-ms-reveal,
 input[type="password"]::-ms-clear {
     display: none;
 }
-

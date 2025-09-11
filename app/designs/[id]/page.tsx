@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 // import { Button } from "@/components/ui/button";
@@ -21,7 +21,6 @@ import {
   fetchDesignVersions,
   deleteDesignVersion
 } from "@/database/actions/versions/versionHistory";
-
 
 import { toast } from "sonner";
 
@@ -102,7 +101,6 @@ type EvalResponse = {
     }[];
     category_scores?: Record<string, number>;
   } | null;
-  savedVersion?: { id: string } & Partial<Versions>;
 };
 
 type PublishedDesign = {
@@ -218,25 +216,6 @@ export default function DesignDetailPage({
         fallbackImageUrl: imageUrlForAI, // Use the signed URL here
         snapshot: typeof design?.snapshot === "string" ? JSON.parse(design.snapshot) : design?.snapshot,
       });
-
-
-      // Assume the API returns the new version's ID as data.versionId or similar
-      const newVersionId = data.savedVersion?.id; // adjust according to your API response
-      if (newVersionId) {
-        setDesign((prev) =>
-          prev
-            ? {
-              ...prev,
-              current_version_id: newVersionId,
-            }
-            : prev
-        );
-        const supabase = createClient();
-        await supabase
-          .from("designs")
-          .update({ current_version_id: newVersionId })
-          .eq("id", design.id);
-      }
 
       console.log('Evaluation successful:', data);
       setEvalResult(data);
@@ -452,18 +431,6 @@ export default function DesignDetailPage({
     }
   }
 
-  const handleShowVersions = async () => {
-    setShowVersions(true);
-    setLoadingVersions(true);
-    if (design?.id) {
-      fetchDesignVersions(design.id)
-        .then(setVersions)
-        .catch((e: string) => console.error("Failed to fetch versions", e))
-        .finally(() => setLoadingVersions(false));
-    } else {
-      setLoadingVersions(false);
-    }
-  }
   useEffect(() => {
     if (design) {
       syncPublishedState();
@@ -708,15 +675,14 @@ export default function DesignDetailPage({
     };
   }, [showVersions]);
 
-  // Initial fetch
   useEffect(() => {
     if (!design?.id) return;
     setLoadingVersions(true);
     fetchDesignVersions(design.id)
       .then(setVersions)
       .catch((e: string) => console.error("Failed to fetch versions", e))
-      .finally(() => setLoadingVersions(false));
-  }, [design?.id]);
+      .finally(() => setLoadingVersions(false))
+  }, [design?.id])
 
   useEffect(() => {
     if (showVersions) setPage(0);
@@ -769,12 +735,26 @@ export default function DesignDetailPage({
           </h1>
         </div>
         <div className="flex gap-3 items-center">
+          {/* <Input
+            type="file"
+            accept=".fig"
+            id="fileUpload"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+          <label
+            htmlFor="fileUpload"
+            className="cursor-pointer p-2 rounded hover:bg-[#ED5E20]/15"
+          >
+            <IconUpload size={22} />
+          </label> */}
+
 
           {/* Version History */}
           <div className="flex gap-3 items-center">
             <div className="relative group">
               <button
-                onClick={handleShowVersions}
+                onClick={() => setShowVersions(true)}
                 className="cursor-pointer p-2 rounded hover:bg-[#ED5E20]/15 hover:text-[#ED5E20] transition"
                 aria-label="Show Version History"
               >
@@ -795,8 +775,8 @@ export default function DesignDetailPage({
                 await syncPublishedState();
               }}
               className="flex items-center gap-2 bg-gray-300 text-gray-700 
-                      px-8 py-2 rounded-full font-semibold shadow-md hover:bg-gray-400 
-                      hover:scale-105 transition-all duration-200 text-sm focus:outline-none 
+                      px-8 py-2 rounded-xl font-semibold shadow-md hover:bg-gray-400 
+                      transition-all duration-200 text-sm focus:outline-none 
                       focus:ring-2 focus:ring-[#ED5E20]/40 cursor-pointer
                       "
             >
@@ -813,8 +793,8 @@ export default function DesignDetailPage({
                 await syncPublishedState();
               }}
               className="flex items-center gap-2 bg-gradient-to-r from-[#ED5E20] 
-            to-orange-400 text-white px-8 py-2 rounded-full font-semibold shadow-md 
-            hover:from-orange-500 hover:to-[#ED5E20] hover:scale-105 transition-all duration-200 
+            to-orange-400 text-white px-8 py-2 rounded-xl font-semibold shadow-md 
+            hover:from-orange-500 hover:to-[#ED5E20] transition-all duration-200 
             text-sm focus:outline-none focus:ring-2 focus:ring-[#ED5E20]/40 animate-pulse cursor-pointer"
             >
               <svg width="18" height="18" fill="none" viewBox="0 0 20 20">
@@ -830,7 +810,7 @@ export default function DesignDetailPage({
       <div className="flex h-screen">
         {/* LEFT PANEL */}
         {/* Design Area */}
-        <div className="w-full h-full border rounded-md bg-accent overflow-y-auto flex items-center justify-center">
+        <div className="flex-2 h-full border rounded-md bg-accent overflow-y-auto flex items-center justify-center">
           <Image
             src={
               thumbUrl
@@ -865,19 +845,12 @@ export default function DesignDetailPage({
 
         {/* RIGHT PANEL (Evaluation Sidebar) */}
         {showEval && (
-          <div className="w-96 bg-gray-50 border rounded-md dark:bg-[#1A1A1A] p-5 overflow-y-auto flex flex-col h-screen">
+          <div className="flex-1 bg-gray-50 border rounded-md dark:bg-[#1A1A1A] p-5 overflow-y-auto flex flex-col h-screen">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold text-center flex-1">AI Evaluation</h2>
-              <button
-                onClick={handleEvaluate}
-                disabled={loadingEval}
-                className="px-4 py-1 text-sm rounded-md bg-[#ED5E20] text-white hover:bg-orange-600 disabled:opacity-50 cursor-pointer"
-              >
-                {loadingEval ? "Evaluating..." : "Re-Evaluate"}
-              </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="flex-1 overflow-y-auto pr-5 space-y-5">
               {/* Loading State */}
               {loadingEval && (
                 <div className="text-center text-neutral-500">
@@ -895,27 +868,28 @@ export default function DesignDetailPage({
               {/* Results */}
               {evalResult && !loadingEval && (
                 <>
+
+                  {/* Score */}
+                  {evalResult.overall_score && (
+                    <div className="p-3 rounded-lg bg-[#ED5E20]/10 justify-center items-center">
+                      <h3 className="font-medium mb-2 text-center">Overall Score</h3>
+                      <div className="text-2xl font-bold text-[#ED5E20] text-center">
+                        {Math.round(evalResult.overall_score)}/100
+                      </div>
+                    </div>
+                  )}
+
                   {/* Summary */}
-                  <div>
+                  <div className="p-3 rounded-lg bg-[#FFFF00]/10">
                     <h3 className="font-medium mb-2">Summary</h3>
                     <p className="text-sm text-neutral-600 dark:text-neutral-300">
                       {evalResult.summary}
                     </p>
                   </div>
 
-                  {/* Score */}
-                  {evalResult.overall_score && (
-                    <div>
-                      <h3 className="font-medium mb-2">Overall Score</h3>
-                      <div className="text-2xl font-bold text-[#ED5E20]">
-                        {Math.round(evalResult.overall_score)}/100
-                      </div>
-                    </div>
-                  )}
-
                   {/* Strengths */}
                   {evalResult.strengths && evalResult.strengths.length > 0 && (
-                    <div>
+                    <div className="p-3 rounded-lg bg-[#008000]/10">
                       <h3 className="font-medium mb-2">Strengths</h3>
                       <ul className="list-disc list-inside text-sm space-y-1">
                         {evalResult.strengths.map((s, i) => (
@@ -927,7 +901,7 @@ export default function DesignDetailPage({
 
                   {/* Weaknesses */}
                   {evalResult.weaknesses && evalResult.weaknesses.length > 0 && (
-                    <div>
+                    <div className="p-3 rounded-lg bg-[#FF0000]/10">
                       <h3 className="font-medium mb-2">Weaknesses</h3>
                       <ul className="list-disc list-inside text-sm space-y-1">
                         {evalResult.weaknesses.map((w, i) => (
@@ -939,20 +913,52 @@ export default function DesignDetailPage({
 
                   {/* Category Scores */}
                   {evalResult.category_scores && (
-                    <div>
+                    <div className="p-3 rounded-lg bg-[#ED5E20]/10">
                       <h3 className="font-medium mb-2">Category Scores</h3>
-                      <div className="grid grid-cols-2 gap-2">
-                        {Object.entries(evalResult.category_scores).map(([category, score]) => (
-                          <div key={category} className="flex justify-between text-sm">
-                            <span className="capitalize">{category.replace(/_/g, " ")}</span>
-                            <span className="font-medium">{Math.round(score)}</span>
-                          </div>
-                        ))}
-                      </div>
+                      <ul className="space-y-2 list-disc list-inside">
+                        {Object.entries(evalResult.category_scores).map(([category, score]) => {
+                          // Coloring logic
+                          let bg =
+                            "bg-gray-100 dark:bg-gray-800 text-neutral-600 dark:text-neutral-300";
+                          if (score >= 75) {
+                            bg =
+                              "bg-[#008000]/20 dark:bg-[#008000]/10 text-neutral-600 dark:text-neutral-300";
+                          } else if (score < 50) {
+                            bg =
+                              "bg-[#FF0000]/20 dark:bg-[#FF0000]/10 text-neutral-600 dark:text-neutral-300";
+                          } else {
+                            bg =
+                              "bg-[#FFFF00]/20 dark:bg-[#FFFF00]/10 text-neutral-600 dark:text-neutral-300";
+                          }
+
+                          return (
+                            <li
+                              key={category}
+                              className={`rounded-md px-3 py-2 flex justify-between items-center font-medium ${bg}`}
+                            >
+                              <span className="capitalize">
+                                {category.replace(/_/g, " ")}
+                              </span>
+                              <span>{Math.round(score)}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
                     </div>
                   )}
+
                 </>
               )}
+            </div>
+            
+            <div className="mt-auto pt-4">
+              <button
+                onClick={handleEvaluate}
+                disabled={loadingEval}
+                className="w-full px-4 py-2 text-sm rounded-md bg-[#ED5E20] text-white hover:bg-orange-600 disabled:opacity-50 cursor-pointer"
+              >
+                {loadingEval ? "Evaluating..." : "Re-Evaluate"}
+              </button>
             </div>
           </div>
         )}
@@ -960,34 +966,34 @@ export default function DesignDetailPage({
 
       {/* VERSION HISTORY MODAL */}
       {showVersions && (
-        <div className="fixed inset-0 flex items-center justify-center">
+        <div className="fixed inset-0 flex items-center justify-center pl-20 pr-20 cursor-pointer">
           <div
-            className="absolute inset-0 bg-black/50 transition-opacity backdrop-blur-xl"
+            className="absolute inset-0 bg-black/50 transition-opacity backdrop-blur-md"
             onClick={() => setShowVersions(false)}
           ></div>
-          <div className="relative bg-gradient-to-br from-white/95 to-orange-100/20
-                        dark:from-[#18181b]/95 dark:to-[#ed5e20]/10 rounded-2xl p-10 w-[1100px] max-h-[85vh]
-                        overflow-y-auto shadow-2xl border border-[#ED5E20]/30 backdrop-blur-md transition-all duration-300
-                        ring-1 ring-[#ED5E20]/10 flex flex-col"
-            style={{
-              boxShadow: "0 8px 40px 0 rgba(237,94,32,0.10), 0 1.5px 8px 0 rgba(0,0,0,0.18)",
-            }}
+          <div className="bg-gray-50 border dark:bg-[#1A1A1A] relative rounded-xl p-10 w-[1100px] max-h-[85vh]
+                        overflow-y-auto w-full"
           >
             <h2 className="text-lg font-semibold mb-3 relative flex items-center justify-center">
               <span className="mx-auto">Version History</span>
               <button
                 onClick={() => setShowVersions(false)}
-                aria-label="Minimize"
-                className="absolute right-0 ml-2 rounded-full p-2 bg-white/70 dark:bg-[#232323]/80 shadow-lg border border-[#ED5E20]/30
-                          backdrop-blur hover:bg-[#ED5E20]/90 hover:text-white transition-all duration-200 text-[#ED5E20]
-                          dark:text-[#ED5E20] text-lg flex items-center justify-center scale-110 hover:scale-125 active:scale-95
-                          outline-none focus:ring-2 focus:ring-[#ED5E20]/40 cursor-pointer"
-                style={{
-                  boxShadow: "0 2px 12px 0 rgba(237,94,32,0.15)",
-                }}
+                aria-label="Close"
+                className="cursor-pointer p-2 rounded hover:bg-[#ED5E20]/15 hover:text-[#ED5E20] transition"
               >
-                <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
-                  <rect x="5" y="11" width="14" height="2" rx="1" fill="currentColor" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </button>
             </h2>
@@ -1002,244 +1008,262 @@ export default function DesignDetailPage({
                 </span>
               </div>
             ) : (
-              <table className="min-w-full text-sm border">
-                <thead>
-                  <tr className="bg-gray-100 dark:bg-gray-700">
-                    <th className="p-2 border">Version</th>
-                    <th className="p-2 border">Score</th>
-                    <th className="p-2 border">AI Summary</th>
-                    <th className="p-2 border">Parameter</th>
-                    <th className="p-2 border">Thumbnail</th>
-                    <th className="p-2 border">Node ID</th>
-                    <th className="p-2 border">Evaluated at</th>
-                    <th className="p-2 border text-center">Delete</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {versions
-                    .slice(page * pageSize, (page + 1) * pageSize)
-                    .map((v) => {
-                      const isCurrent = v.id === design?.current_version_id;
-                      const isSelected = selectedVersion?.id === v.id;
-                      return (
-                        <tr
-                          key={v.id}
-                          className={
-                            "cursor-pointer transition " +
-                            (isCurrent
-                              ? "bg-[#ED5E20]/10 dark:bg-[#ED5E20]/20 font-bold ring-2 ring-[#ED5E20]"
-                              : isSelected
-                                ? "bg-blue-100 dark:bg-blue-900 ring-2 ring-blue-400"
-                                : "hover:bg-orange-50 dark:hover:bg-[#232323]")
-                          }
-                          onClick={() => {
-                            setSelectedVersion(v);
-                            let parsedAiData = null;
-                            try {
-                              parsedAiData = typeof v.ai_data === "string" ? JSON.parse(v.ai_data) : v.ai_data;
-                            } catch { }
-                            if (parsedAiData) {
-                              setEvalResult({
-                                nodeId: v.node_id,
-                                imageUrl: v.thumbnail_url,
-                                summary: v.ai_summary ?? parsedAiData.summary ?? "",
-                                heuristics: parsedAiData.heuristics ?? null,
-                                ai_status: "ok",
-                                overall_score: parsedAiData.overall_score ?? null,
-                                strengths: Array.isArray(parsedAiData.strengths) ? parsedAiData.strengths : [],
-                                weaknesses: Array.isArray(parsedAiData.weaknesses) ? parsedAiData.weaknesses : [],
-                                issues: Array.isArray(parsedAiData.issues) ? parsedAiData.issues : [],
-                                category_scores: parsedAiData.category_scores ?? null,
-                                ai: parsedAiData,
-                              });
-                              setShowEval(true);
+
+              <div className="border rounded-lg overflow-hidden">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="bg-[#ED5E20] dark:bg-[#ED5E20] text-white dark:text-white">
+                      <th className="p-2 border">Version</th>
+                      <th className="p-2 border">Score</th>
+                      <th className="p-2 border">AI Summary</th>
+                      <th className="p-2 border">Parameter</th>
+                      <th className="p-2 border">Thumbnail</th>
+                      <th className="p-2 border">Node ID</th>
+                      <th className="p-2 border">Evaluated at</th>
+                      <th className="p-2 border text-center">Delete</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {versions
+                      .slice(page * pageSize, (page + 1) * pageSize)
+                      .map((v) => {
+                        const isCurrent = v.id === design?.current_version_id;
+                        const isSelected = selectedVersion?.id === v.id;
+                        return (
+                          <tr
+                            key={v.id}
+                            className={
+                              "cursor-pointer transition " +
+                              (isCurrent
+                                ? "hover:bg-[#ED5E20]/10 dark:hover:bg-[#ED5E20]/10"
+                                : isSelected
+                                  ? "bg-[#ED5E20]/20 dark:bg-[#ED5E20]/20"
+                                  : "hover:bg-[#ED5E20]/10 dark:hover:bg-[#ED5E20]/10")
                             }
-                            setShowVersions(false);
-                          }}
-                        >
-                          <td className="p-2 border text-center">
-                            {!isCurrent && v.version}
-                            {isCurrent && (
-                              <span
-                                className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-[#ED5E20] to-orange-400 text-white text-xs font-semibold shadow-md animate-pulse"
-                                style={{
-                                  boxShadow: "0 2px 8px 0 rgba(237,94,32,0.18)",
-                                  letterSpacing: "0.03em",
-                                }}
-                              >
-                                <svg
-                                  width="14"
-                                  height="14"
-                                  viewBox="0 0 20 20"
-                                  fill="none"
-                                  className="mr-1"
-                                >
-                                  <circle cx="10" cy="10" r="10" fill="#fff" fillOpacity="0.18" />
-                                  <path
-                                    d="M6 10.5l2.5 2.5L14 8"
-                                    stroke="#fff"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  />
-                                </svg>
-                                Current
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-2 border">
-                            {(() => {
-                              if (!v.ai_data) return "-";
+                            onClick={() => {
+                              setSelectedVersion(v);
+                              let parsedAiData = null;
                               try {
-                                const ai = typeof v.ai_data === "string" ? JSON.parse(v.ai_data) : v.ai_data;
-                                return ai.overall_score !== undefined ? Math.round(ai.overall_score) : "-";
-                              } catch {
-                                return "-";
-                              }
-                            })()}
-                          </td>
-                          <td className="p-2 border">{v.ai_summary || "-"}</td>
-                          <td className="p-5 border align-middle">
-                            {(() => {
-                              let age = "-";
-                              let occupation = "-";
-                              try {
-                                const snap = typeof v.snapshot === "string" ? JSON.parse(v.snapshot) : v.snapshot;
-                                age = snap?.age ?? "-";
-                                occupation = snap?.occupation ?? "-";
+                                parsedAiData = typeof v.ai_data === "string" ? JSON.parse(v.ai_data) : v.ai_data;
                               } catch { }
-                              // Use stronger contrast for current version
-                              const badgeAgeClass = isCurrent
-                                ? "bg-[#ED5E20] text-white border border-[#ED5E20]"
-                                : "bg-[#ED5E20]/10 text-[#ED5E20] border border-[#ED5E20]/30";
-                              const badgeOccClass = isCurrent
-                                ? "bg-orange-700 text-white border border-orange-700"
-                                : "bg-orange-400/10 text-orange-700 border border-orange-400/30";
-                              return (
-                                <div className="flex gap-2 items-center">
-                                  <span className={`inline-flex items-center px-4 py-0.5 min-w-[90px] justify-center rounded-full text-xs font-semibold ${badgeAgeClass}`}>
-                                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 16 16">
-                                      <path d="M7 2l-4 7h4v5l4-7H7V2z" />
-                                    </svg>
-                                    {typeof age === "string"
-                                      ? age.replace(/\s+/g, " ").trim()
-                                      : age}
-                                  </span>
-                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${badgeOccClass}`}>
-                                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 16 16">
-                                      <path d="M8 2a3 3 0 0 1 3 3c0 1.657-1.343 3-3 3S5 6.657 5 5a3 3 0 0 1 3-3zm0 7c2.21 0 4 1.343 4 3v2H4v-2c0-1.657 1.79-3 4-3z" />
-                                    </svg>
-                                    {occupation}
-                                  </span>
-                                </div>
-                              );
-                            })()}
-                          </td>
-                          <td className="p-2 border">
-                            {v.thumbnail_url && v.thumbnail_url.startsWith("http") ? (
-                              <Image src={v.thumbnail_url} alt="thumb"
-                                width={70}
-                                height={50}
-                                className="object-cover" />
-                            ) : (
-                              "-"
-                            )}
-                          </td>
-                          <td className="p-2 border">{v.node_id}</td>
-                          <td className="p-2 border">{v.created_at ? new Date(v.created_at).toLocaleString() : "-"}</td>
-                          <td className="p-2 border text-center">
-                            {!isCurrent && (
-                              <button
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  toast(() => {
-                                    // Generate a unique id for this toast to use with dismiss
-                                    const toastId = `delete-version-${v.id}`;
-                                    return (
-                                      <div className="flex flex-col items-center justify-center gap-2 p-4 ml-8">
-                                        <span className="text-base font-semibold text-[#ED5E20] text-center">
-                                          Delete version <span className="font-bold">v{v.version}</span>?
-                                        </span>
-                                        <span className="mt-1 text-xs text-gray-500 text-center">
-                                          This action cannot be undone.
-                                        </span>
-                                        <div className="flex gap-6 mt-4 justify-center w-full">
-                                          <button
-                                            onClick={async () => {
-                                              toast.dismiss(toastId);
-                                              try {
-                                                await deleteDesignVersion(v.id);
-                                                setVersions(versions.filter(ver => ver.id !== v.id));
-                                                setVersionChanged((v) => v + 1);
-                                                toast.success(
-                                                  <span>
-                                                    <span className="font-bold text-[#ED5E20]">v{v.version}</span> deleted successfully!
-                                                  </span>
-                                                );
-                                              } catch (err: unknown) {
-                                                const errorMsg =
-                                                  err instanceof Error
-                                                    ? err.message
-                                                    : typeof err === "string"
-                                                      ? err
-                                                      : JSON.stringify(err);
+                              if (parsedAiData) {
+                                setEvalResult({
+                                  nodeId: v.node_id,
+                                  imageUrl: v.thumbnail_url,
+                                  summary: v.ai_summary ?? parsedAiData.summary ?? "",
+                                  heuristics: parsedAiData.heuristics ?? null,
+                                  ai_status: "ok",
+                                  overall_score: parsedAiData.overall_score ?? null,
+                                  strengths: Array.isArray(parsedAiData.strengths) ? parsedAiData.strengths : [],
+                                  weaknesses: Array.isArray(parsedAiData.weaknesses) ? parsedAiData.weaknesses : [],
+                                  issues: Array.isArray(parsedAiData.issues) ? parsedAiData.issues : [],
+                                  category_scores: parsedAiData.category_scores ?? null,
+                                  ai: parsedAiData,
+                                });
+                                setShowEval(true);
+                              }
+                              setShowVersions(false);
+                            }}
+                          >
+                            {/*VERSION*/}
+                            <td className="p-2 border text-center text-gray-700 dark:text-gray-200">
+                              {!isCurrent && v.version}
+                              {isCurrent && (
+                                <span
+                                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-[#ED5E20] to-orange-400 text-white text-xs font-semibold shadow-md animate-pulse"
+                                  style={{
+                                    boxShadow: "0 2px 8px 0 rgba(237,94,32,0.18)",
+                                    letterSpacing: "0.03em",
+                                  }}
+                                >
+                                  <svg
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 20 20"
+                                    fill="none"
+                                    className="mr-1"
+                                  >
+                                    <circle cx="10" cy="10" r="10" fill="#fff" fillOpacity="0.18" />
+                                    <path
+                                      d="M6 10.5l2.5 2.5L14 8"
+                                      stroke="#fff"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    />
+                                  </svg>
+                                  Current
+                                </span>
+                              )}
+                            </td>
 
-                                                // Check for foreign key violation (published version)
-                                                let isPublishedConstraint = false;
+                            {/*SCORE*/}
+                            <td className="p-2 border text-gray-700 dark:text-gray-200 text-center">
+                              {(() => {
+                                if (!v.ai_data) return "-";
+                                try {
+                                  const ai = typeof v.ai_data === "string" ? JSON.parse(v.ai_data) : v.ai_data;
+                                  return ai.overall_score !== undefined ? Math.round(ai.overall_score) : "-";
+                                } catch {
+                                  return "-";
+                                }
+                              })()}
+                            </td>
+
+                            {/*AI SUMMARY*/}
+                            <td className="p-2 border text-gray-700 dark:text-gray-200">{v.ai_summary || "-"}</td>
+
+                            {/*PARAMETERS*/}
+                            <td className="p-5 border align-middle text-gray-700 dark:text-gray-200">
+                              {(() => {
+                                let age = "-";
+                                let occupation = "-";
+                                try {
+                                  const snap = typeof v.snapshot === "string" ? JSON.parse(v.snapshot) : v.snapshot;
+                                  age = snap?.age ?? "-";
+                                  occupation = snap?.occupation ?? "-";
+                                } catch { }
+                                // Use stronger contrast for current version
+                                const badgeAgeClass = isCurrent
+                                  ? "bg-[#ED5E20] text-white border border-[#ED5E20]"
+                                  : "bg-[#ED5E20]/10 text-[#ED5E20] border border-[#ED5E20]/30";
+                                const badgeOccClass = isCurrent
+                                  ? "bg-orange-700 text-white border border-orange-700"
+                                  : "bg-orange-400/10 text-orange-700 border border-orange-400/30";
+                                return (
+                                  <div className="items-center space-y-1">
+                                    <span className={`w-full inline-flex items-center px-4 py-0.5 min-w-[90px] justify-center rounded-full text-xs font-semibold ${badgeAgeClass}`}>
+                                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M7 2l-4 7h4v5l4-7H7V2z" />
+                                      </svg>
+                                      {typeof age === "string"
+                                        ? age.replace(/\s+/g, " ").trim()
+                                        : age}
+                                    </span>
+                                    <span className={`w-full inline-flex items-center px-4 py-0.5 min-w-[90px] justify-center rounded-full text-xs font-semibold ${badgeOccClass}`}>
+                                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M8 2a3 3 0 0 1 3 3c0 1.657-1.343 3-3 3S5 6.657 5 5a3 3 0 0 1 3-3zm0 7c2.21 0 4 1.343 4 3v2H4v-2c0-1.657 1.79-3 4-3z" />
+                                      </svg>
+                                      {occupation}
+                                    </span>
+                                  </div>
+                                );
+                              })()}
+                            </td>
+
+                            {/*THUMBNAIL*/}
+                            <td className="p-2 border text-gray-700 dark:text-gray-200">
+                              {v.thumbnail_url && v.thumbnail_url.startsWith("http") ? (
+                                <Image src={v.thumbnail_url} alt="thumb"
+                                  width={70}
+                                  height={50}
+                                  className="object-cover" />
+                              ) : (
+                                "-"
+                              )}
+                            </td>
+
+                            {/*NODE ID*/}
+                            <td className="p-2 border text-gray-700 dark:text-gray-200 text-center">{v.node_id}</td>
+
+                            {/*EVALUATION TIME*/}
+                            <td className="p-2 border text-gray-700 dark:text-gray-200 text-center">{v.created_at ? new Date(v.created_at).toLocaleString() : "-"}</td>
+
+                            {/*DELETE*/}
+                            <td className="p-2 border text-center text-gray-700 dark:text-gray-200">
+                              {!isCurrent && (
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    toast(() => {
+                                      // Generate a unique id for this toast to use with dismiss
+                                      const toastId = `delete-version-${v.id}`;
+                                      return (
+                                        <div className="flex flex-col items-center justify-center gap-2 p-4 ml-8">
+                                          <span className="text-base font-semibold text-[#ED5E20] text-center">
+                                            Delete version <span className="font-bold">v{v.version}</span>?
+                                          </span>
+                                          <span className="mt-1 text-xs text-gray-500 text-center">
+                                            This action cannot be undone.
+                                          </span>
+                                          <div className="flex gap-6 mt-4 justify-center w-full">
+                                            <button
+                                              onClick={async () => {
+                                                toast.dismiss(toastId);
                                                 try {
-                                                  const parsed = typeof err === "string" ? JSON.parse(err) : err;
-                                                  if (parsed && parsed.code === "23503") {
-                                                    isPublishedConstraint = true;
-                                                  }
-                                                } catch { }
+                                                  await deleteDesignVersion(v.id);
+                                                  setVersions(versions.filter(ver => ver.id !== v.id));
+                                                  setVersionChanged((v) => v + 1);
+                                                  toast.success(
+                                                    <span>
+                                                      <span className="font-bold text-[#ED5E20]">v{v.version}</span> deleted successfully!
+                                                    </span>
+                                                  );
+                                                } catch (err: unknown) {
+                                                  const errorMsg =
+                                                    err instanceof Error
+                                                      ? err.message
+                                                      : typeof err === "string"
+                                                        ? err
+                                                        : JSON.stringify(err);
 
-                                                toast.error(
-                                                  <span>
-                                                    <span className="font-bold text-[#ED5E20]">v{v.version}</span> could not be deleted.<br />
-                                                    {isPublishedConstraint ? (
-                                                      <span>
-                                                        This version is currently published.<br />
-                                                        Please unpublish the design before deleting this version.
-                                                      </span>
-                                                    ) : (
-                                                      <>
-                                                        {errorMsg && (
-                                                          <span className="text-xs text-red-400">{errorMsg}<br /></span>
-                                                        )}
-                                                        Please try again.
-                                                      </>
-                                                    )}
-                                                  </span>
-                                                );
-                                              }
-                                            }}
-                                            className="px-6 py-2 rounded-full bg-gradient-to-r from-[#ED5E20] to-orange-400 text-white font-bold shadow-lg hover:scale-105 hover:from-orange-500 hover:to-[#ED5E20] transition-all duration-200 cursor-pointer"
-                                          >
-                                            Yes, Delete
-                                          </button>
-                                          <button
-                                            onClick={() => toast.dismiss(toastId)}
-                                            className="px-6 py-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-semibold shadow hover:bg-gray-200 dark:hover:bg-gray-700 hover:scale-105 transition-all duration-200 cursor-pointer"
-                                          >
-                                            Cancel
-                                          </button>
+                                                  // Check for foreign key violation (published version)
+                                                  let isPublishedConstraint = false;
+                                                  try {
+                                                    const parsed = typeof err === "string" ? JSON.parse(err) : err;
+                                                    if (parsed && parsed.code === "23503") {
+                                                      isPublishedConstraint = true;
+                                                    }
+                                                  } catch { }
+
+                                                  toast.error(
+                                                    <span>
+                                                      <span className="font-bold text-[#ED5E20]">v{v.version}</span> could not be deleted.<br />
+                                                      {isPublishedConstraint ? (
+                                                        <span>
+                                                          This version is currently published.<br />
+                                                          Please unpublish the design before deleting this version.
+                                                        </span>
+                                                      ) : (
+                                                        <>
+                                                          {errorMsg && (
+                                                            <span className="text-xs text-red-400">{errorMsg}<br /></span>
+                                                          )}
+                                                          Please try again.
+                                                        </>
+                                                      )}
+                                                    </span>
+                                                  );
+                                                }
+                                              }}
+                                              className="px-6 py-2 rounded-full bg-gradient-to-r from-[#ED5E20] to-orange-400 text-white font-bold shadow-lg hover:scale-105 hover:from-orange-500 hover:to-[#ED5E20] transition-all duration-200 cursor-pointer"
+                                            >
+                                              Yes, Delete
+                                            </button>
+                                            <button
+                                              onClick={() => toast.dismiss(toastId)}
+                                              className="px-6 py-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-semibold shadow hover:bg-gray-200 dark:hover:bg-gray-700 hover:scale-105 transition-all duration-200 cursor-pointer"
+                                            >
+                                              Cancel
+                                            </button>
+                                          </div>
                                         </div>
-                                      </div>
-                                    );
-                                  }, { duration: 10000, id: `delete-version-${v.id}` });
-                                }}
-                                className="text-red-500 hover:text-white hover:bg-red-500 rounded-full p-1 cursor-pointer transition-all duration-200"
-                                title="Delete version"
-                              >
-                                <IconTrash size={18} />
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
+                                      );
+                                    }, { duration: 10000, id: `delete-version-${v.id}` });
+                                  }}
+                                  className="text-red-500 hover:text-white hover:bg-red-500 rounded-full p-1 cursor-pointer transition-all duration-200"
+                                  title="Delete version"
+                                >
+                                  <IconTrash size={18} />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
             )}
             {versions.length > pageSize && (
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 px-2">
