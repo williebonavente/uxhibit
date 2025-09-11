@@ -9,6 +9,7 @@ import { LoadingInspiration } from "./animation/loading-fetching";
 import Image from "next/image";
 
 type DesignRow = {
+  is_published: any;
   id: string;
   title: string;
   thumbnail_url: string | null;
@@ -85,6 +86,9 @@ export default function DesignsGallery() {
           thumbnail_url: await resolveThumbnail(d.thumbnail_url),
           likes,
           views,
+          is_published: Array.isArray(d.published_designs)
+            ? d.published_designs.length > 0
+            : !!d.published_designs
         };
       })
     );
@@ -352,6 +356,20 @@ export default function DesignsGallery() {
                 <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm" />
               )}
             </div>
+            {design.is_published && (
+              <div className="flex items-center gap-1 text-green-600 text-xs mb-1 animate-pulse">
+                <svg
+                  width="16"
+                  height="16"
+                  fill="currentColor"
+                  className="inline-block drop-shadow-[0_0_4px_#22c55e]"
+                  style={{ filter: "drop-shadow(0 0 6px #22c55e)" }}
+                >
+                  <path d="M8 1.333a6.667 6.667 0 1 0 0 13.334A6.667 6.667 0 0 0 8 1.333zm0 12A5.333 5.333 0 1 1 8 2.667a5.333 5.333 0 0 1 0 10.666zm-.667-8h1.334v4H7.333zm0 5.333h1.334v1.334H7.333z" />
+                </svg>
+                <span>Currently published</span>
+              </div>
+            )}
             <div className="text-sm text-gray-500 flex items-center justify-between">
               <span className="flex items-center gap-1">
                 <IconHeart size={18} /> {design.likes ?? 0}
