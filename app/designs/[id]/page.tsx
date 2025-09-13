@@ -406,7 +406,25 @@ export default function DesignDetailPage({
     }
 
     if (!error) {
-      toast.success("Design published to the community!");
+      toast(
+        <div className="flex flex-col items-center justify-center text-center">
+          <Image
+            src="/images/your-creativity-is-out-in-the-world.svg"
+            alt="Published design illustration"
+            height={150}
+            width={150}
+            className="object-contain mt-3 mb-3"
+            priority
+          />
+          <h2 className="text-lg font-semibold text-[#ED5E20] mb-2">
+            Your creativity is out in the world!
+          </h2>
+        </div>,
+        {
+          position: "top-center",
+          className: "bg-white dark:bg-[#120F12] text-black dark:text-white rounded-2xl items-center justify-center text-center",
+        }
+      );
     } else {
       toast.error(`Failed to publish design: ${error.message || "Unknown error"}`);
     }
@@ -425,7 +443,25 @@ export default function DesignDetailPage({
       .eq("user_id", userId);
 
     if (!error) {
-      toast.success("Design unpublished!");
+      toast(
+        <div className="flex flex-col items-center justify-center text-center">
+          <Image
+            src="/images/your-design-is-back-in-draft-mode.svg"
+            alt="Unpublished design illustration"
+            height={150}
+            width={150}
+            className="object-contain mt-3 mb-3"
+            priority
+          />
+          <h2 className="text-lg font-semibold text-[#ED5E20] mb-2">
+            Your design is back in draft mode.
+          </h2>
+        </div>,
+        {
+          position: "top-center",
+          className: "bg-white dark:bg-[#120F12] text-black dark:text-white rounded-2xl items-center justify-center text-center",
+        }
+      );
     } else {
       toast.error(`Failed to unpublish design: ${error.message || "Unknown error"}`);
     }
@@ -701,8 +737,19 @@ export default function DesignDetailPage({
   if (designLoading)
     return (
       <div className="flex items-center justify-center h-screen">
-        <Spinner className="w-8 h-8 text-[#ED5E20]" />
-        <span className="ml-4 text-lg font-medium text-[#ED5E20]">Loading Design...</span>
+        <div className="flex flex-col items-center justify-center text-center py-24 animate-pulse">
+          <Image
+            src="/images/loading-your-designs.svg"
+            alt="Loading designs illustration"
+            height={150}
+            width={150}
+            className="object-contain mb-6"
+            priority
+          />
+          <p className="text-gray-500 text-sm mb-4">
+            Loading your desings...
+          </p>
+        </div>
       </div>
     );
 
@@ -966,7 +1013,11 @@ export default function DesignDetailPage({
               <button
                 onClick={handleEvaluate}
                 disabled={loadingEval}
-                className="w-full px-4 py-2 text-sm rounded-md bg-[#ED5E20] text-white hover:bg-orange-600 disabled:opacity-50 cursor-pointer"
+                className="w-full flex items-center gap-2 bg-gradient-to-r from-[#ED5E20] 
+                          to-orange-400 text-white px-8 py-2 rounded-xl font-semibold shadow-md 
+                          hover:from-orange-500 hover:to-[#ED5E20] transition-all duration-200 
+                          text-sm focus:outline-none focus:ring-2 focus:ring-[#ED5E20]/40
+                          cursor-pointer disabled:opacity-50 text-center justify-center"
               >
                 {loadingEval ? "Evaluating..." : "Re-Evaluate"}
               </button>

@@ -189,14 +189,25 @@ export default function Evaluate() {
   return (
    
       <div className="relative min-h-screen flex items-center justify-center rounded-2xl overflow-hidden mt-5">
-        <Image
-          src="/images/gradient-evaluate.png"
-          alt="Background"
-          fill
-          priority
-          className="object-cover w-screen h-screen"
-          sizes="100vw"
-        />
+        {/* Orange gradient background */}
+        <div
+          className="absolute inset-0 w-full h-full orange-gradient-bg opacity-45"
+          style={{
+            zIndex: 0,
+            background:
+              "linear-gradient(135deg, #ffb347 0%, #ed5e20 60%, #f97316 100%)",
+          }}
+        >
+          <style>
+            {`
+              @media (prefers-color-scheme: dark) {
+                .orange-gradient-bg {
+                  background: linear-gradient(135deg, #ed5e20 0%, #f59e0b 60%, #ffb347 100%);
+                }
+              }
+            `}
+          </style>
+        </div>
         {/* CHANGED: layered glass overlays for readability (lighter in light mode, subtle in dark) */}
         <div className="absolute inset-0">
           {/* base blur + tint */}
@@ -343,7 +354,7 @@ export default function Evaluate() {
               <div className="flex flex-col sm:flex-row justify-between gap-4 pt-2">
                 <Button
                   onClick={resetAll}
-                  className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-lg text-sm font-medium
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-sm font-medium
                     border border-neutral-300/70 dark:border-neutral-600/60 
                     bg-white/60 dark:bg-neutral-800/50
                     text-neutral-700 dark:text-neutral-200
@@ -352,7 +363,7 @@ export default function Evaluate() {
                     hover:border-neutral-400 dark:hover:border-neutral-500
                     transition-colors
                     focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ED5E20]/60
-                    focus:ring-offset-white dark:focus:ring-"
+                    focus:ring-offset-white dark:focus:ring- cursor-pointer"
                   type="button"
                 >
                   <svg
@@ -370,7 +381,7 @@ export default function Evaluate() {
                 <button
                   disabled={!canNextFrom1}
                   onClick={() => canNextFrom1 && setStep(2)}
-                    className={`px-6 py-2 rounded-lg text-sm font-semibold text-white cursor-pointer
+                    className={`px-6 py-2 rounded-xl text-sm font-semibold text-white cursor-pointer
                       ${canNextFrom1
                         ? "bg-[#ED5E20] hover:bg-orange-600"
                         : "bg-gray-400 cursor-not-allowed"
@@ -415,18 +426,39 @@ export default function Evaluate() {
                 </div>
               )}
               <div className="flex justify-between gap-4">
-                <button
+                <Button
                   onClick={() => setStep(1)}
-                  className="px-5 py-2 rounded-lg border text-sm text-neutral-600 dark:text-neutral-300 hover:bg-white/70 dark:hover:bg-neutral-800/60 cursor-pointer"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-sm font-medium
+                    border border-neutral-300/70 dark:border-neutral-600/60 
+                    bg-white/60 dark:bg-neutral-800/50
+                    text-neutral-700 dark:text-neutral-200
+                    shadow-sm backdrop-blur
+                    hover:bg-white/80 dark:hover:bg-neutral-800/70
+                    hover:border-neutral-400 dark:hover:border-neutral-500
+                    transition-colors
+                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ED5E20]/60
+                    focus:ring-offset-white dark:focus:ring- cursor-pointer"
+                  type="button"
                 >
+                  <svg
+                    className="h-4 w-4 opacity-80"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M13 17l-5-5 5-5" />
+                  </svg>
                   Back
-                </button>
+                </Button>
                 <div className="flex gap-3">
                   <button
                     type="button"
                     onClick={handleParse}
                     disabled={!canParse}
-                    className={`px-6 py-2 rounded-lg text-sm font-semibold text-white cursor-pointer
+                    className={`px-6 py-2 rounded-xl text-sm font-semibold text-white cursor-pointer
                       ${canParse
                         ? "bg-[#ED5E20] hover:bg-orange-600"
                         : "bg-gray-400 cursor-not-allowed"
@@ -434,10 +466,11 @@ export default function Evaluate() {
                   >
                     {parsing ? "Parsing..." : parsed ? "Re-Parse" : "Parse"}
                   </button>
+                  {/*
                   <button
                     disabled={!parsed}
                     onClick={() => parsed && setStep(3)}
-                    className={`px-6 py-2 rounded-lg text-sm font-semibold text-white cursor-pointer
+                    className={`px-6 py-2 rounded-xl text-sm font-semibold text-white cursor-pointer
                       ${parsed
                         ? "bg-[#ED5E20] hover:bg-orange-600"
                         : "bg-gray-400 cursor-not-allowed"
@@ -445,6 +478,7 @@ export default function Evaluate() {
                   >
                     Review
                   </button>
+                  */}
                 </div>
               </div>
             </div>
@@ -492,27 +526,71 @@ export default function Evaluate() {
                 </div>
               </div>
               <div className="flex justify-between gap-4">
-                <button
+                <Button
                   onClick={() => setStep(2)}
-                  className="px-5 py-2 rounded-lg border text-sm text-neutral-600 dark:text-neutral-300 hover:bg-white/70 dark:hover:bg-neutral-800/60 cursor-pointer"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-sm font-medium
+                    border border-neutral-300/70 dark:border-neutral-600/60 
+                    bg-white/60 dark:bg-neutral-800/50
+                    text-neutral-700 dark:text-neutral-200
+                    shadow-sm backdrop-blur
+                    hover:bg-white/80 dark:hover:bg-neutral-800/70
+                    hover:border-neutral-400 dark:hover:border-neutral-500
+                    transition-colors
+                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ED5E20]/60
+                    focus:ring-offset-white dark:focus:ring- cursor-pointer"
+                  type="button"
                 >
-                  Back
-                </button>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setStep(1)}
-                    className="px-5 py-2 rounded-lg border text-sm text-neutral-600 dark:text-neutral-300 hover:bg-white/70 dark:hover:bg-neutral-800/60 cursor-pointer"
+                  <svg
+                    className="h-4 w-4 opacity-80"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                   >
-                    Edit Parameters
-                  </button>
+                    <path d="M13 17l-5-5 5-5" />
+                  </svg>
+                  Back
+                </Button>
+                <div className="flex gap-3">
+                <Button
+                  onClick={() => setStep(1)}
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-sm font-medium
+                    border border-neutral-300/70 dark:border-neutral-600/60 
+                    bg-white/60 dark:bg-neutral-800/50
+                    text-neutral-700 dark:text-neutral-200
+                    shadow-sm backdrop-blur
+                    hover:bg-white/80 dark:hover:bg-neutral-800/70
+                    hover:border-neutral-400 dark:hover:border-neutral-500
+                    transition-colors
+                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ED5E20]/60
+                    focus:ring-offset-white dark:focus:ring- cursor-pointer"
+                  type="button"
+                >
+                  <svg
+                    className="h-4 w-4 opacity-80"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    {/* Pencil (edit) icon */}
+                    <path d="M15.232 5.232l-10 10V17h1.768l10-10a2 2 0 0 0-2.828-2.828z" />
+                    <path d="M17.414 2.586a2 2 0 0 1 0 2.828l-1.172 1.172-2.828-2.828 1.172-1.172a2 2 0 0 1 2.828 0z" />
+                  </svg>
+                  Edit Parameters
+                </Button>
                 <button
                   disabled={submitting}
                   onClick={() => {
                     handleSubmit();
                     setStep(4);
                   }}
-                  className="group relative inline-flex items-center justify-center
-                    px-9 py-2.5 rounded-xl text-sm font-semibold tracking-wide
+                  className="text-white group relative inline-flex items-center justify-center
+                    px-9 rounded-xl text-sm font-semibold tracking-wide
                     transition-all duration-300
                     focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40 cursor pointer"
                 >
@@ -560,7 +638,7 @@ export default function Evaluate() {
               <div className="flex flex-col items-center justify-center text-center py-24 animate-pulse">
                 <Image
                   src="/images/smart-evaluation-underway.svg"
-                  alt="Running evaluation illuistration"
+                  alt="Running evaluation illustration"
                   height={150}
                   width={150}
                   className="object-contain mb-6"
