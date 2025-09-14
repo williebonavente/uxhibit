@@ -5,19 +5,16 @@ import {
   //  isThemeRelevant,
   collectReasonableFrameIds
 } from "@/lib/figmaFrame/checker";
+import { FigmaNode, TextNode } from "@/lib/declaration/figmaInfo";
+import { normalizeDocument, getFrameTextNodes } from "@/utils/extractor/metadataExtractor";
+import { evaluateFrameAccessibility } from "@/utils/contrastChecker/frameAccessibility";
+import { evaluateFrameScores } from "@/lib/frameScorer/frameScorer";
+import { getFrameTextMap } from "@/utils/extractor/frameExtractor";
 
-export const runtime = "nodejs"; 
+export const runtime = "nodejs";
 
 const FIGMA_TOKEN = process.env.FIGMA_ACCESS_TOKEN as string;
 
-type FigmaNode = {
-  id: string;
-  name?: string;
-  type: string;
-  visible?: boolean;
-  absoluteBoundingBox?: { width: number; height: number };
-  children?: FigmaNode[];
-};
 
 function findParentFrame(node: FigmaNode, targetId: string, parent: FigmaNode | null = null): FigmaNode | null {
   if (node.id === targetId) {
@@ -45,6 +42,17 @@ async function fetchFigmaImage(fileKey: string, id: string): Promise<string | nu
   return null;
 }
 
+async function fetchFigmaNodeData(fileKey: string, ids: string[]): Promise<any> {
+  const idsParam = ids.map(encodeURIComponent).join(",");
+  const res = await fetch(
+    `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${idsParam}`,
+    { headers: { "X-Figma-Token": FIGMA_TOKEN } }
+  );
+  if (!res.ok) return null;
+  return res.json();
+}
+
+
 async function handle(url: string) {
   if (!FIGMA_TOKEN) return NextResponse.json({ error: "Missing FIGMA_ACCESS_TOKEN" }, { status: 500 });
   const parsed = parseFigmaUrl(url);
@@ -67,7 +75,6 @@ async function handle(url: string) {
   const pages: FigmaNode[] = fileJson?.document?.children ?? [];
 
   if (parsed.nodeId) {
-    // Find the page (CANVAS) containing the nodeId
     targetPages = pages.filter((page: FigmaNode) => {
       function containsNode(node: FigmaNode): boolean {
         if (node.id === parsed?.nodeId) return true;
@@ -118,6 +125,42 @@ async function handle(url: string) {
     }
   }
 
+  let frameMetadata: Record<string, any> = {};
+  let frameAccessibility: any[] = [];
+  let allTextNodes: Record<string, TextNode[]> = {};
+  let accessibilityResults: any = null;
+
+  if (allFrameIds.length > 0) {
+    const metadataJson = await fetchFigmaNodeData(parsed.fileKey, allFrameIds);
+    frameMetadata = metadataJson?.nodes || {};
+
+    // Accessibility evaluation
+    accessibilityResults = evaluateFrameAccessibility({
+      name: fileJson?.name ?? "",
+      role: fileJson?.role ?? "",
+      nodes: frameMetadata,
+    });
+
+    // Build FrameTextMap (text nodes grouped with bg color)
+    const frameTextMap = getFrameTextMap(frameMetadata);
+    const frameScores = evaluateFrameScores(frameTextMap);
+
+    const groupedTextNodes: Record<string, any[]> = {};
+    Object.values(frameTextMap).forEach(f => groupedTextNodes[f.frameId] = f.textNodes);
+
+
+    // assign variables to include in response
+    frameAccessibility = frameScores;
+    allTextNodes = groupedTextNodes;
+
+  }
+
+  const normalized = normalizeDocument({
+    name: fileJson?.name ?? "",
+    role: fileJson?.role ?? "",
+    nodes: frameMetadata,
+  });
+
   return NextResponse.json({
     fileKey: parsed.fileKey,
     nodeId: parsed.nodeId ?? null,
@@ -133,6 +176,11 @@ async function handle(url: string) {
       : "Parsed all frame images in the file.",
     extractedFrameId,
     extractedFrameImageUrl: frameImageUrl,
+    // frameMetadata,
+    normalizedFrames: normalized.frames,
+    textNodes: allTextNodes,
+    accessbilityScores: frameAccessibility,
+    accessibilityResults,
   });
 }
 

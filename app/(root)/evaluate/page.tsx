@@ -81,11 +81,10 @@ export default function Evaluate() {
       const data = await res.json();
 
       if (data) {
-        console.log("Extracted metadata from Figma parse:", data);
-        const frameEntries = Object.entries(data.frameImages || {});
-        frameEntries.forEach(([frameId, imageUrl]) => {
-          console.log("Frame ID:", frameId, "Image URL:", imageUrl);
-        });
+        console.log("Extracted metadata from Figma parse:", data.normalizedFrames);
+        console.log("Extracted text nodes from Figma parse", data.textNodes);
+        console.log("Extracted contrast evaluation score parse: ", data.accessbilityScores)
+        console.log("Extracted random sheesh", data.accessibilityResults);
       } else {
         console.log("No metadata found in Figma parse response.");
       }
