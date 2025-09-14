@@ -19,3 +19,10 @@ export const loginFormSchema = z.object({
     email: z.email('Invalid email'),
     password:z.string().min(6, "Password must be at least 6 characters.")
 })
+
+export const resetPasswordSchema = z.object({
+  email: z
+    .string()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+});
