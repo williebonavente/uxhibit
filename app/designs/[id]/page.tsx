@@ -4,18 +4,15 @@ import React from "react";
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-// import { Button } from "@/components/ui/button";
 import { createClient } from "@/utils/supabase/client";
-import { useRouter } from "next/navigation";
+// import { useRouter } from "next/navigation";
 import {
   IconArrowLeft,
   IconLayoutSidebarRightCollapse,
   IconLayoutSidebarRightExpand,
-  IconUpload,
   IconHistory,
   IconTrash
 } from "@tabler/icons-react";
-import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/shadcn-io/spinner/index";
 import {
   fetchDesignVersions,
@@ -23,7 +20,47 @@ import {
 } from "@/database/actions/versions/versionHistory";
 
 import { toast } from "sonner";
+import {
+  IconSortAscending,
+  IconSortDescending,
+  IconSort09,
+  IconSearch
+} from "@tabler/icons-react";
 
+
+interface FrameEvaluation {
+  id: string;
+  design_id?: string;
+  version_id?: string;
+  file_key: string;
+  node_id: string;
+  thumbnail_url: string;
+  owner_id: string;
+  ai_summary: string;
+  ai_data: {
+    overall_score: number;
+    summary: string;
+    strengths: string[];
+    weaknesses: string[];
+    issues: {
+      id: string;
+      severity: "low" | "medium" | "high";
+      message: string;
+      suggestion: string;
+    }[];
+    category_scores: {
+      color: number;
+      layout: number;
+      hierarchy: number;
+      usability: number;
+      typography: number;
+      accessibility: number;
+    };
+  };
+  created_at: string;
+  updated_at: string;
+  total_score: number;
+}
 
 type Snapshot = {
   age: string;
@@ -54,8 +91,6 @@ type Design = {
   thumbnailPath?: string;
   snapshot: Snapshot;
   current_version_id: string;
-  is_active: boolean;
-  // Add other properties as needed
 };
 
 type EvaluateInput = {
@@ -66,11 +101,6 @@ type EvaluateInput = {
   fallbackImageUrl?: string;
   snapshot: Snapshot;
 }
-
-type ExportedFrame = {
-  nodeId: string;
-  remoteUrl: string;
-};
 
 type EvalResponse = {
   nodeId: string;
@@ -97,27 +127,12 @@ type EvalResponse = {
       id: string;
       severity: string;
       message: string;
-      suggestion: string;
+      suggestions: string;
     }[];
     category_scores?: Record<string, number>;
   } | null;
 };
 
-type PublishedDesign = {
-  id: string;
-  design_id: string;
-  user_id: string;
-  published_version_id: string;
-  published_at: string;
-  title: string;
-  description: string;
-  thumbnail_url: string;
-  ai_summary: string;
-  ai_data: string;
-  is_active: boolean;
-  num_of_hearts: number;
-  num_of_views: number;
-}
 export async function evaluateDesign(input: EvaluateInput): Promise<EvalResponse> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   console.log('Calling evaluate with:', input);
@@ -146,11 +161,10 @@ export default function DesignDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = React.use(params);
-  const router = useRouter();
+  // const router = useRouter();
 
-  const [showEval, setShowEval] = useState(true); // toggle evaluation sidebar
-  const [showVersions, setShowVersions] = useState(false); // toggle version history modal
-  // const [project, setProject] = useState<PublishedDesign | null>(null);
+  const [showEval, setShowEval] = useState(true);
+  const [showVersions, setShowVersions] = useState(false);
   const [selectedVersion, setSelectedVersion] = useState<any>(null);
   const [design, setDesign] = useState<Design | null>(null);
   const [designLoading, setDesignLoading] = useState(true);
@@ -161,21 +175,51 @@ export default function DesignDetailPage({
   const [versions, setVersions] = useState<Versions[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [versionChanged, setVersionChanged] = useState(0);
+  const [frameEvaluations, setFrameEvaluations] = useState<FrameEvaluation[]>([]);
+  const [selectedFrameIndex, setSelectedFrameIndex] = useState(0);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortOrder, setSortOrder] = useState<"default" | "asc" | "desc">("default");
   const [page, setPage] = useState(0);
 
   const pageSize = 6;
 
-  // const [framesLoading, setFramesLoading] = useState(false); // separate from evaluation
-  // const [exportedFrames, setExported] = useState<ExportedFrame[]>([]);
-  // const [loading, setLoading] = useState(false);
-  // async function refreshSignedThumb(path: string) {
-  //   const supabase = createClient();
-  //   const { data: signed, error } = await supabase.storage
-  //     .from("design-thumbnails")
-  //     .createSignedUrl(path, 3600); // 1 hour
-  //   if (!error && signed?.signedUrl) setThumbUrl(signed.signedUrl);
-  // }
 
+  const sortedFrameEvaluations = React.useMemo(() => {
+    if (sortOrder === "default") return frameEvaluations;
+    // Keep "Overall" frame at index 0, sort the rest
+    const [overall, ...frames] = frameEvaluations;
+    const sorted = [...frames].sort((a, b) => {
+      const aScore = a.ai_data.overall_score ?? 0;
+      const bScore = b.ai_data.overall_score ?? 0;
+      return sortOrder === "asc" ? aScore - bScore : bScore - aScore;
+    });
+    return [overall, ...sorted];
+  }, [frameEvaluations, sortOrder]);
+
+  const filteredFrameEvaluations = React.useMemo(() => {
+    if (!searchQuery.trim()) return sortedFrameEvaluations;
+    return sortedFrameEvaluations.filter(frame =>
+      frame.ai_summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      frame.ai_data.summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      frame.node_id?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [sortedFrameEvaluations, searchQuery]);
+
+  const currentFrame = sortedFrameEvaluations[selectedFrameIndex];
+
+  const handleShowVersions = async () => {
+    setShowVersions(true);
+    setLoadingVersions(true);
+    if (design?.id) {
+      fetchDesignVersions(design.id)
+        .then(setVersions)
+        .catch((e: string) => console.error("Failed to fetch versions", e))
+        .finally(() => setLoadingVersions(false));
+    } else {
+      setLoadingVersions(false);
+    }
+  }
   async function handleEvaluate() {
     if (!design?.id || !design?.fileKey) {
       console.error('Missing required design data:', { id: design?.id, fileKey: design?.fileKey });
@@ -187,7 +231,6 @@ export default function DesignDetailPage({
     setEvalError(null);
 
     try {
-      // Get signed URL if thumbnail is a storage path
       let imageUrlForAI = design.thumbnail;
       if (imageUrlForAI && !imageUrlForAI.startsWith('http')) {
         const supabase = createClient();
@@ -217,115 +260,33 @@ export default function DesignDetailPage({
         snapshot: typeof design?.snapshot === "string" ? JSON.parse(design.snapshot) : design?.snapshot,
       });
 
+
       console.log('Evaluation successful:', data);
       setEvalResult(data);
+
+      try {
+        const supabase = createClient();
+        const { data: updatedDesign, error } = await supabase
+          .from("designs")
+          .select("id, current_version_id")
+          .eq("id", design.id)
+          .single();
+        if (!error && updatedDesign) {
+          setDesign((prev) => prev ? { ...prev, current_version_id: updatedDesign.current_version_id } : prev);
+        }
+      } catch (err) {
+        console.error("Failed to refresh current_version_id after evaluation:", err);
+      }
+      setLoadingVersions(true);
     } catch (e: any) {
       console.error('Evaluation failed:', e);
       setEvalError(e.message || "Failed to evaluate");
     } finally {
       setLoadingEval(false);
+      setLoadingVersions(false);
+
     }
   }
-
-  // async function exportFrames() {
-  //   if (!design?.fileKey) return;
-  //   setFramesLoading(true);
-  //   try {
-  //     const res = await fetch("/api/figma/export", {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify({
-  //         fileKey: design?.fileKey,
-  //         mode: "frames",
-  //         scale: 2,
-  //         format: "png",
-  //         upload: false,
-  //       }),
-  //     });
-
-  //     if (!res.ok) {
-  //       throw new Error(`Export failed (${res.status})`);
-  //     }
-  //     const data: { nodes: ExportedFrame[] } = await res.json();
-  //     setExported(data.nodes ?? []);
-  //   } catch (err: any) {
-  //     console.error(err);
-  //   } finally {
-  //     setFramesLoading(false);
-  //   }
-  // }
-
-  // TODO: Handle file reupload → create new version
-
-  // const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-  //   const file = e.target.files?.[0];
-  //   if (!file || !project) return;
-
-  //   const reader = new FileReader();
-  //   reader.onload = () => {
-  //     const currentVersions = project.published_version_id|| [];
-  //     const newVersionNumber = currentVersions.length + 1; // auto increment
-
-  //     const newVersion = {
-  //       version: newVersionNumber,
-  //       timestamp: new Date().toLocaleString(),
-  //       fileName: file.name,
-  //       fileData: reader.result, // base64 for preview
-  //       evaluation: `Evaluation for version ${newVersionNumber}`, // placeholder text
-  //     };
-
-  //     const updatedProject = {
-  //       ...project,
-  //       versions: [...currentVersions, newVersion],
-  //     };
-
-  //     // Save and set as current project + select this version
-  //     setProject(updatedProject);
-  //   };
-  //   reader.readAsDataURL(file);
-  //   router.push("/evaluate");
-  // };
-
-  // Publish project (latest version)
-  // async function syncPublishedState(): Promise<void> {
-  //   const supabase = createClient();
-  //   const { data: userData } = await supabase.auth.getUser();
-  //   const userId = userData?.user?.id;
-
-  //   // Guard clause: don't run if IDs are missing
-  //   if (!design?.id || !userId) return;
-  //   // Fetch the full published design row for this user/design
-  //   const { data: published, error } = await supabase
-  //     .from("published_designs")
-  //     .select("*")
-  //     .eq("design_id", design?.id)
-  //     .eq("user_id", userId)
-  //     .eq("is_active", true)
-  //     .maybeSingle();
-
-  //   if (error) {
-  //     console.error("Failed to sync published state:", error);
-  //     return;
-  //   }
-
-  //   if (published) {
-  //     setProject(published); // <-- Use the published row as the new project state
-  //   } else if (project) {
-  //     setProject({
-  //       ...project,
-  //       is_active: false,
-  //       published_version_id: "",
-  //       published_at: "",
-  //       title: project.title || "",
-  //       description: project.description || "",
-  //       thumbnail_url: project.thumbnail_url || "",
-  //       ai_summary: "",
-  //       ai_data: "",
-  //       num_of_hearts: 0,
-  //       num_of_views: 0,
-  //     });
-  //   }
-  // }
 
   async function syncPublishedState(): Promise<void> {
     const supabase = createClient();
@@ -349,7 +310,6 @@ export default function DesignDetailPage({
       return;
     }
 
-    // Update the design state with the published status
     setDesign((prev) =>
       prev
         ? {
@@ -361,7 +321,6 @@ export default function DesignDetailPage({
         : prev
     );
   }
-
 
   async function publishProject() {
     const supabase = createClient();
@@ -425,10 +384,41 @@ export default function DesignDetailPage({
       .eq("user_id", userId);
 
     if (!error) {
+      // Instantly update local state so UI reflects unpublished status
+      setDesign((prev) =>
+        prev ? { ...prev, is_active: false } : prev
+      );
       toast.success("Design unpublished!");
     } else {
       toast.error(`Failed to unpublish design: ${error.message || "Unknown error"}`);
     }
+  }
+
+  function mapFrameToEvalResponse(frame: FrameEvaluation, frameIdx = 0): EvalResponse {
+    return {
+      nodeId: frame.node_id,
+      imageUrl: frame.thumbnail_url,
+      summary: frame.ai_summary || frame.ai_data.summary,
+      heuristics: null,
+      ai_status: "ok",
+      overall_score: frame.ai_data.overall_score ?? null,
+      strengths: frame.ai_data.strengths,
+      weaknesses: frame.ai_data.weaknesses,
+      issues: (frame.ai_data.issues ?? []).map((issue, issueIdx) => ({
+        ...issue,
+        id: `frame${frameIdx}-issue${issueIdx}`,
+        suggestions: issue.suggestion,
+      })),
+      category_scores: frame.ai_data.category_scores,
+      ai: {
+        ...frame.ai_data,
+        issues: (frame.ai_data.issues ?? []).map((issue, issueIdx) => ({
+          ...issue,
+          id: `frame${frameIdx}-issue${issueIdx}`,
+          suggestions: issue.suggestion,
+        })),
+      },
+    };
   }
 
   useEffect(() => {
@@ -446,22 +436,13 @@ export default function DesignDetailPage({
         const { data, error } = await supabase
           .from("designs")
           .select(`
-            id,
-            title,
-            figma_link,
-            file_key,
-            node_id,
-            thumbnail_url,
+            id, title, figma_link,file_key,
+            node_id, thumbnail_url,
             current_version_id,
+            owner_id,
             design_versions!design_versions_design_id_fkey (
-              id,
-              file_key,
-              node_id,
-              thumbnail_url,
-              ai_summary,
-              ai_data,
-              snapshot,
-              created_at,
+              id, file_key, node_id, thumbnail_url, total_score,
+              ai_summary, ai_data, snapshot,created_at,
               version
             )
           `)
@@ -497,33 +478,43 @@ export default function DesignDetailPage({
             thumbnail: data.thumbnail_url || undefined,
             snapshot: latestVersion?.snapshot || null,
             current_version_id: data.current_version_id,
-
           };
           setDesign(normalized);
 
-          // Set the evaluation result if it exists
           if (latestVersion?.ai_data) {
-            const aiData = latestVersion.ai_data;
-            console.log('Loading saved AI data:', aiData);
+            const overall: FrameEvaluation = {
+              id: "overallFrame",
+              design_id: design?.id,
+              file_key: design?.fileKey || "",
+              node_id: design?.nodeId || "",
+              thumbnail_url: thumbUrl || design?.thumbnail || "",
+              owner_id: data.owner_id || "",
+              total_score: latestVersion?.total_score ?? null,
+              ai_summary: latestVersion.ai_summary || parsedAiData.summary || "",
+              ai_data: {
+                overall_score:
+                  parsedAiData.overall_score ??
+                  latestVersion?.total_score ??
+                  null,
+                summary: parsedAiData.summary ?? "",
+                strengths: parsedAiData.strengths ?? [],
+                weaknesses: parsedAiData.weaknesses ?? [],
+                issues: parsedAiData.issues ?? [],
+                category_scores: parsedAiData.category_scores ?? null,
+              },
+              created_at: latestVersion.created_at,
+              updated_at: latestVersion.created_at,
+            };
 
-            if (parsedAiData) {
-              const evalData: EvalResponse = {
-                nodeId: latestVersion.node_id,
-                imageUrl: latestVersion.thumbnail_url,
-                summary: latestVersion.ai_summary ?? aiData.summary ?? "",
-                heuristics: aiData.heuristics ?? null,
-                ai_status: "ok",
-                overall_score: aiData.overall_score ?? null,
-                strengths: Array.isArray(aiData.strengths) ? aiData.strengths : [],
-                weaknesses: Array.isArray(aiData.weaknesses) ? aiData.weaknesses : [],
-                issues: Array.isArray(aiData.issues) ? aiData.issues : [],
-                category_scores: aiData.category_scores ?? null,
-                ai: aiData
-              }
-              console.log('Setting evaluation result:', evalData);
-              setEvalResult(evalData);
-            }
-            setShowEval(true); // Show evaluation panel automatically
+            const frames = Array.isArray(parsedAiData) ? parsedAiData : [];
+            const normalizedFrames = frames.map((frame) => ({
+              ...frame,
+              ai_data: frame.ai,
+            }));
+            setFrameEvaluations([overall, ...normalizedFrames]);
+            setSelectedFrameIndex(0);
+            setEvalResult(mapFrameToEvalResponse(overall));
+            setShowEval(true);
           }
 
           // Handle thumbnail URL
@@ -548,6 +539,12 @@ export default function DesignDetailPage({
     loadDesign();
   }, [id]);
 
+  useEffect(() => {
+    if (frameEvaluations[selectedFrameIndex]) {
+      setEvalResult(mapFrameToEvalResponse(frameEvaluations[selectedFrameIndex], selectedFrameIndex));
+    }
+  }, [selectedFrameIndex, frameEvaluations]);
+
   // Auto-evaluate (unchanged) but wait until design loaded
   useEffect(() => {
     const auto =
@@ -563,8 +560,6 @@ export default function DesignDetailPage({
       handleEvaluate();
     }
   }, [designLoading, design, loadingEval, evalResult]);
-
-  // Auto-refresh signed Url every 50 min (before expiry)
 
   useEffect(() => {
     if (!design?.thumbnail || design.thumbnail.startsWith("http")) return;
@@ -595,6 +590,7 @@ export default function DesignDetailPage({
             thumbnail_url, 
             ai_summary, 
             ai_data, 
+            total_score,
             snapshot, 
             created_at
           `)
@@ -639,15 +635,25 @@ export default function DesignDetailPage({
           const mapped: EvalResponse = {
             nodeId: data.node_id,
             imageUrl: data.thumbnail_url,
-            summary: data.ai_summary ?? parsedAiData.summary ?? "",
-            heuristics: parsedAiData.heuristics ?? null,
+            summary: data.ai_summary ?? parsedAiData.summary ?? parsedAiData.ai?.summary ?? "",
+            heuristics: parsedAiData.heuristics ?? parsedAiData.ai?.heuristics ?? null,
             ai_status: "ok",
-            overall_score: parsedAiData.overall_score ?? null,
-            strengths: Array.isArray(parsedAiData.strengths) ? parsedAiData.strengths : [],
-            weaknesses: Array.isArray(parsedAiData.weaknesses) ? parsedAiData.weaknesses : [],
-            issues: Array.isArray(parsedAiData.issues) ? parsedAiData.issues : [],
-            category_scores: parsedAiData.category_scores ?? null,
-            ai: parsedAiData
+            strengths: Array.isArray(parsedAiData.strengths)
+              ? parsedAiData.strengths
+              : parsedAiData.ai?.strengths ?? [],
+            weaknesses: Array.isArray(parsedAiData.weaknesses)
+              ? parsedAiData.weaknesses
+              : parsedAiData.ai?.weaknesses ?? [],
+            issues: Array.isArray(parsedAiData.issues)
+              ? parsedAiData.issues
+              : parsedAiData.ai?.issues ?? [],
+            category_scores: parsedAiData.category_scores ?? parsedAiData.ai?.category_scores ?? null,
+            ai: parsedAiData.ai ?? parsedAiData,
+            overall_score:
+              parsedAiData.overall_score ??
+              parsedAiData.ai?.overall_score ??
+              data.total_score ??
+              null,
           };
 
           console.log('Setting saved evaluation:', mapped);
@@ -660,9 +666,8 @@ export default function DesignDetailPage({
     }
 
     loadSavedEvaluation();
-  }, [design?.id]); // Only re-run when design.id changes
+  }, [design?.id]);
 
-  // Design Version scrolling - mess
   useEffect(() => {
     if (showVersions) {
       document.body.style.overflow = "hidden";
@@ -697,6 +702,42 @@ export default function DesignDetailPage({
       .finally(() => setLoadingVersions(false));
   }, [design?.id, versionChanged]);
 
+  useEffect(() => {
+    if (currentFrame) {
+      setEvalResult(mapFrameToEvalResponse(currentFrame, selectedFrameIndex));
+    }
+  }, [currentFrame, selectedFrameIndex]);
+
+  // useEffect(() => {
+  //   setSelectedFrameIndex(0);
+  // }, [searchQuery]);
+
+  useEffect(() => {
+  if (!searchQuery.trim()) {
+    setSelectedFrameIndex(0);
+  } else {
+    // Try to parse the search as a number and jump to that frame
+    const num = parseInt(searchQuery.trim(), 10);
+    if (!isNaN(num) && num > 0 && num < sortedFrameEvaluations.length) {
+      setSelectedFrameIndex(num);
+    } else {
+      // Fallback: find by text match
+      const idx = sortedFrameEvaluations.findIndex(
+        (frame, i) =>
+          i > 0 &&
+          (
+            frame.ai_summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            frame.ai_data.summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            frame.node_id?.toLowerCase().includes(searchQuery.toLowerCase())
+          )
+      );
+      setSelectedFrameIndex(idx === -1 ? 0 : idx);
+    }
+  }
+}, [searchQuery, sortedFrameEvaluations]);
+
+
+  console.log('evalResult', evalResult);
 
   if (designLoading)
     return (
@@ -735,26 +776,13 @@ export default function DesignDetailPage({
           </h1>
         </div>
         <div className="flex gap-3 items-center">
-          {/* <Input
-            type="file"
-            accept=".fig"
-            id="fileUpload"
-            onChange={handleFileUpload}
-            className="hidden"
-          />
-          <label
-            htmlFor="fileUpload"
-            className="cursor-pointer p-2 rounded hover:bg-[#ED5E20]/15"
-          >
-            <IconUpload size={22} />
-          </label> */}
 
 
           {/* Version History */}
           <div className="flex gap-3 items-center">
             <div className="relative group">
               <button
-                onClick={() => setShowVersions(true)}
+                onClick={handleShowVersions}
                 className="cursor-pointer p-2 rounded hover:bg-[#ED5E20]/15 hover:text-[#ED5E20] transition"
                 aria-label="Show Version History"
               >
@@ -768,6 +796,107 @@ export default function DesignDetailPage({
               </div>
             </div>
           </div>
+
+          {/* Sorter and serach experimental */}
+          {/* SEARCH */}
+          <div className="flex gap-2 items-center">
+
+            <div className="relative group">
+              <button
+                className="cursor-pointer p-2 rounded hover:bg-[#ED5E20]/15 hover:text-[#ED5E20] transition"
+                aria-label="Search"
+                title="Search"
+                onClick={() => setShowSearch((prev) => !prev)}
+              >
+                <IconSearch size={20} />
+              </button>
+              {/* Tooltip */}
+              <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
+                <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
+                  Search
+                </div>
+              </div>
+              {/* Popover */}
+              {showSearch && (
+                <div className="absolute left-1/2 top-full mt-3 -translate-x-1/2 z-30 bg-white dark:bg-[#232323] border rounded shadow-lg p-3 w-64">
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 rounded border focus:outline-none"
+                    placeholder="Search frames..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    autoFocus
+                  />
+                  <button
+                    className="mt-2 w-full bg-[#ED5E20] text-white rounded py-1"
+                    onClick={() => setShowSearch(false)}
+                  >
+                    Close
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* SORT  */}
+            <div className="relative group">
+              <button
+                onClick={() => setSortOrder("asc")}
+                className={`cursor-pointer p-2 rounded transition
+                 ${sortOrder === "asc"
+                    ? "bg-[#ED5E20]/15 text-[#ED5E20]"
+                    : "bg-gray-200 text-gray-700 hover:bg-[#ED5E20]/15 hover:text-[#ED5E20]"}`}
+                aria-label="Sort by Lowest Score"
+                title="Sort by Lowest Score"
+              >
+                <IconSortAscending size={20} />
+              </button>
+              {/* Tooltip */}
+              <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
+                <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
+                  Lowest Score
+                </div>
+              </div>
+            </div>
+            <div className="relative group">
+              <button
+                onClick={() => setSortOrder("desc")}
+                className={`cursor-pointer p-2 rounded transition
+                ${sortOrder === "desc"
+                    ? "bg-[#ED5E20]/15 text-[#ED5E20]"
+                    : "bg-gray-200 text-gray-700 hover:bg-[#ED5E20]/15 hover:text-[#ED5E20]"}`}
+                aria-label="Sort by Highest Score"
+                title="Sort by Highest Score"
+              >
+                <IconSortDescending size={20} />
+              </button>
+              {/* Tooltip */}
+              <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
+                <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
+                  Highest Score
+                </div>
+              </div>
+            </div>
+            <div className="relative group">
+              <button
+                onClick={() => setSortOrder("default")}
+                className={`cursor-pointer p-2 rounded transition
+                ${sortOrder === "default"
+                    ? "bg-[#ED5E20]/15 text-[#ED5E20]"
+                    : "bg-gray-200 text-gray-700 hover:bg-[#ED5E20]/15 hover:text-[#ED5E20]"}`}
+                aria-label="Default Order"
+                title="Default Order"
+              >
+                <IconSort09 size={20} />
+              </button>
+              {/* Tooltip */}
+              <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
+                <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
+                  Default Order
+                </div>
+              </div>
+            </div>
+          </div>
+
           {design?.is_active ? (
             <button
               onClick={async () => {
@@ -808,27 +937,35 @@ export default function DesignDetailPage({
       </div>
 
       <div className="flex h-screen">
-        {/* LEFT PANEL */}
-        {/* Design Area */}
+        {/* TODO:  */}
+        {/* Center Design Area */}
         <div className="flex-2 h-full border rounded-md bg-accent overflow-y-auto flex items-center justify-center">
           <Image
             src={
-              thumbUrl
-                ? thumbUrl
-                : design.fileKey
-                  ? `/api/figma/thumbnail?fileKey=${design.fileKey}${design.nodeId
-                    ? `&nodeId=${encodeURIComponent(design.nodeId)}`
-                    : ""
-                  }`
-                  : "/images/design-thumbnail.png"
+              selectedFrameIndex === 0
+                ? (thumbUrl // Use signed Supabase URL for "Overall"
+                  ? thumbUrl
+                  : design.fileKey
+                    ? `/api/figma/thumbnail?fileKey=${design.fileKey}${design.nodeId
+                      ? `&nodeId=${encodeURIComponent(design.nodeId)}`
+                      : ""}`
+                    : "/images/design-thumbnail.png")
+                : (frameEvaluations[selectedFrameIndex]?.thumbnail_url
+                  ? frameEvaluations[selectedFrameIndex].thumbnail_url
+                  : "/images/design-thumbnail.png")
             }
-            alt={design.project_name || "Design"}
+            alt={
+              selectedFrameIndex === 0
+                ? "Overall"
+                : frameEvaluations[selectedFrameIndex]?.node_id
+                  ? `Frame ${selectedFrameIndex}`
+                  : design.project_name || "Design"
+            }
             width={600}
             height={400}
             className="w-full h-full object-contain"
           />
         </div>
-
         {/* Toggle Evaluation Button */}
         <div>
           <button
@@ -850,6 +987,41 @@ export default function DesignDetailPage({
               <h2 className="text-lg font-semibold text-center flex-1">AI Evaluation</h2>
             </div>
 
+            {sortedFrameEvaluations.length > 0 && (
+              <div className="flex items-center gap-4 mb-4 justify-center">
+                <button
+                  className="px-2 py-1 rounded bg-gray-200 text-gray-700 disabled:opacity-50"
+                  onClick={() => setSelectedFrameIndex((prev) => Math.max(0, prev - 1))}
+                  disabled={selectedFrameIndex === 0}
+                  aria-label="Previous Frame"
+                >
+                  &#8592;
+                </button>
+                <span className="text-sm font-medium">
+                  {selectedFrameIndex === 0
+                    ? "Overall"
+                    : sortedFrameEvaluations[selectedFrameIndex]?.ai_summary ||
+                    sortedFrameEvaluations[selectedFrameIndex]?.node_id ||
+                    `Frame ${selectedFrameIndex}`}
+                  {" "}
+                  <span className="text-gray-400">
+                    ({selectedFrameIndex + 1} / {sortedFrameEvaluations.length})
+                  </span>
+                </span>
+                <button
+                  className="px-2 py-1 rounded bg-gray-200 text-gray-700 disabled:opacity-50"
+                  onClick={() =>
+                    setSelectedFrameIndex((prev) =>
+                      Math.min(filteredFrameEvaluations.length - 1, prev + 1)
+                    )
+                  }
+                  disabled={selectedFrameIndex === filteredFrameEvaluations.length - 1}
+                  aria-label="Next Frame"
+                >
+                  &#8594;
+                </button>
+              </div>
+            )}
             <div className="flex-1 overflow-y-auto pr-5 space-y-5">
               {/* Loading State */}
               {loadingEval && (
@@ -868,9 +1040,8 @@ export default function DesignDetailPage({
               {/* Results */}
               {evalResult && !loadingEval && (
                 <>
-
                   {/* Score */}
-                  {evalResult.overall_score && (
+                  {evalResult && typeof evalResult.overall_score === "number" && (
                     <div className="p-3 rounded-lg bg-[#ED5E20]/10 justify-center items-center">
                       <h3 className="font-medium mb-2 text-center">Overall Score</h3>
                       <div className="text-2xl font-bold text-[#ED5E20] text-center">
@@ -878,7 +1049,6 @@ export default function DesignDetailPage({
                       </div>
                     </div>
                   )}
-
                   {/* Summary */}
                   <div className="p-3 rounded-lg bg-[#FFFF00]/10">
                     <h3 className="font-medium mb-2">Summary</h3>
@@ -886,7 +1056,6 @@ export default function DesignDetailPage({
                       {evalResult.summary}
                     </p>
                   </div>
-
                   {/* Strengths */}
                   {evalResult.strengths && evalResult.strengths.length > 0 && (
                     <div className="p-3 rounded-lg bg-[#008000]/10">
@@ -898,25 +1067,77 @@ export default function DesignDetailPage({
                       </ul>
                     </div>
                   )}
+                  {/* Issues */}
+                  {currentFrame?.ai_data.issues?.length > 0 && (
+                    <div className="p-3 rounded-lg bg-[#FFB300]/10 mb-4">
+                      <h3 className="font-medium mb-2">Issues</h3>
+                      <ul className="space-y-3">
 
+                        {(evalResult.issues ?? [])
+                          .sort((a, b) => {
+                            const order: Record<string, number> = { high: 0, medium: 1, low: 2 };
+                            const aKey = (a.severity?.toLowerCase() as string) || "low";
+                            const bKey = (b.severity?.toLowerCase() as string) || "low";
+                            return (order[aKey] ?? 3) - (order[bKey] ?? 3);
+                          })
+                          .map((issue, i) => {
+                            let badgeColor = "bg-gray-300 text-gray-800";
+                            if (issue.severity?.toLowerCase() === "high") badgeColor = "bg-red-500 text-white";
+                            else if (issue.severity?.toLowerCase() === "medium") badgeColor = "bg-yellow-400 text-yellow-900";
+                            else if (issue.severity?.toLowerCase() === "low") badgeColor = "bg-blue-200 text-blue-900";
+
+                            return (
+                              <li
+                                key={issue.id || i}
+                                className="flex items-start gap-3 bg-white/70 dark:bg-[#232323]/70 rounded-lg p-3 border border-[#ED5E20]/20 shadow-sm"
+                              >
+                                <span
+                                  className={`min-w-[60px] text-center px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${badgeColor}`}
+                                  style={{ letterSpacing: "0.05em" }}
+                                >
+                                  {issue.severity}
+                                </span>
+                                <span className="flex-1 text-sm text-neutral-800 dark:text-neutral-200">
+                                  {issue.message}
+                                </span>
+                              </li>
+                            );
+                          })}
+                      </ul>
+                    </div>
+                  )}
+                  {/* Suggestions Section */}
+                  {currentFrame?.ai_data.issues?.some(issue => issue.suggestion) && (
+                    <div className="p-3 rounded-lg bg-[#ED5E20]/10 mb-4">
+                      <h3 className="font-medium mb-2">Suggestions</h3>
+                      <ul className="list-disc list-inside text-sm space-y-2">
+                        {(evalResult.issues ?? [])
+                          .filter(issue => issue.suggestion)
+                          .map((issue, i) => (
+                            <li key={issue.id || i} className="text-neutral-700 dark:text-neutral-200">
+                              {issue.suggestion}
+                            </li>
+                          ))}
+                      </ul>
+                    </div>
+                  )}
                   {/* Weaknesses */}
-                  {evalResult.weaknesses && evalResult.weaknesses.length > 0 && (
+                  {currentFrame?.ai_data.weaknesses?.length > 0 && (
                     <div className="p-3 rounded-lg bg-[#FF0000]/10">
                       <h3 className="font-medium mb-2">Weaknesses</h3>
                       <ul className="list-disc list-inside text-sm space-y-1">
-                        {evalResult.weaknesses.map((w, i) => (
+                        {(evalResult.weaknesses ?? []).map((w, i) => (
                           <li key={i} className="text-neutral-600 dark:text-neutral-300">{w}</li>
                         ))}
                       </ul>
                     </div>
                   )}
-
                   {/* Category Scores */}
-                  {evalResult.category_scores && (
+                  {currentFrame?.ai_data.category_scores && (
                     <div className="p-3 rounded-lg bg-[#ED5E20]/10">
                       <h3 className="font-medium mb-2">Category Scores</h3>
                       <ul className="space-y-2 list-disc list-inside">
-                        {Object.entries(evalResult.category_scores).map(([category, score]) => {
+                        {Object.entries(evalResult.category_scores ?? {}).map(([category, score]) => {
                           // Coloring logic
                           let bg =
                             "bg-gray-100 dark:bg-gray-800 text-neutral-600 dark:text-neutral-300";
@@ -930,7 +1151,6 @@ export default function DesignDetailPage({
                             bg =
                               "bg-[#FFFF00]/20 dark:bg-[#FFFF00]/10 text-neutral-600 dark:text-neutral-300";
                           }
-
                           return (
                             <li
                               key={category}
@@ -946,11 +1166,10 @@ export default function DesignDetailPage({
                       </ul>
                     </div>
                   )}
-
                 </>
               )}
             </div>
-            
+
             <div className="mt-auto pt-4">
               <button
                 onClick={handleEvaluate}
@@ -963,14 +1182,15 @@ export default function DesignDetailPage({
           </div>
         )}
       </div>
-
       {/* VERSION HISTORY MODAL */}
       {showVersions && (
         <div className="fixed inset-0 flex items-center justify-center pl-20 pr-20 cursor-pointer">
           <div
             className="absolute inset-0 bg-black/50 transition-opacity backdrop-blur-md"
-            onClick={() => setShowVersions(false)}
-          ></div>
+            onClick={() =>
+              setShowVersions(false)}
+          >
+          </div>
           <div className="bg-gray-50 border dark:bg-[#1A1A1A] relative rounded-xl p-10 w-[1100px] max-h-[85vh]
                         overflow-y-auto w-full"
           >
@@ -1027,7 +1247,7 @@ export default function DesignDetailPage({
                     {versions
                       .slice(page * pageSize, (page + 1) * pageSize)
                       .map((v) => {
-                        const isCurrent = v.id === design?.current_version_id;
+                        const isCurrent = String(v.id).trim() === String(design?.current_version_id).trim();
                         const isSelected = selectedVersion?.id === v.id;
                         return (
                           <tr
@@ -1040,35 +1260,50 @@ export default function DesignDetailPage({
                                   ? "bg-[#ED5E20]/20 dark:bg-[#ED5E20]/20"
                                   : "hover:bg-[#ED5E20]/10 dark:hover:bg-[#ED5E20]/10")
                             }
-                            onClick={() => {
+                            onClick={async () => {
                               setSelectedVersion(v);
-                              let parsedAiData = null;
                               try {
-                                parsedAiData = typeof v.ai_data === "string" ? JSON.parse(v.ai_data) : v.ai_data;
-                              } catch { }
-                              if (parsedAiData) {
-                                setEvalResult({
-                                  nodeId: v.node_id,
-                                  imageUrl: v.thumbnail_url,
-                                  summary: v.ai_summary ?? parsedAiData.summary ?? "",
-                                  heuristics: parsedAiData.heuristics ?? null,
-                                  ai_status: "ok",
-                                  overall_score: parsedAiData.overall_score ?? null,
-                                  strengths: Array.isArray(parsedAiData.strengths) ? parsedAiData.strengths : [],
-                                  weaknesses: Array.isArray(parsedAiData.weaknesses) ? parsedAiData.weaknesses : [],
-                                  issues: Array.isArray(parsedAiData.issues) ? parsedAiData.issues : [],
-                                  category_scores: parsedAiData.category_scores ?? null,
-                                  ai: parsedAiData,
-                                });
-                                setShowEval(true);
+                                const supabase = createClient();
+                                const { data: latest, error } = await supabase
+                                  .from("design_versions")
+                                  .select(`node_id, thumbnail_url, ai_summary, ai_data, 
+                                    snapshot,  created_at`)
+                                  .eq("id", v.id)
+                                  .single();
+                                if (error) {
+                                  toast.error("Failed to fetch latest version data.");
+                                  return;
+                                }
+                                let parsedAiData = null;
+                                try {
+                                  parsedAiData = typeof latest.ai_data === "string" ? JSON.parse(latest.ai_data) : latest.ai_data;
+                                } catch { }
+
+                                if (parsedAiData) {
+                                  setEvalResult({
+                                    nodeId: latest.node_id,
+                                    imageUrl: latest.thumbnail_url,
+                                    summary: latest.ai_summary ?? parsedAiData.summary ?? "",
+                                    heuristics: parsedAiData.heuristics ?? null,
+                                    ai_status: "ok",
+                                    overall_score: parsedAiData.overall_score ?? null,
+                                    strengths: Array.isArray(parsedAiData.strengths) ? parsedAiData.strengths : [],
+                                    weaknesses: Array.isArray(parsedAiData.weaknesses) ? parsedAiData.weaknesses : [],
+                                    issues: Array.isArray(parsedAiData.issues) ? parsedAiData.issues : [],
+                                    category_scores: parsedAiData.category_scores ?? null,
+                                    ai: parsedAiData,
+                                  });
+                                  setShowEval(true);
+                                }
+                                setShowVersions(false);
+                              } catch (error) {
+                                toast.error(`Error loading version data. ${error}`);
                               }
-                              setShowVersions(false);
                             }}
                           >
                             {/*VERSION*/}
                             <td className="p-2 border text-center text-gray-700 dark:text-gray-200">
-                              {!isCurrent && v.version}
-                              {isCurrent && (
+                              {isCurrent ? (
                                 <span
                                   className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-[#ED5E20] to-orange-400 text-white text-xs font-semibold shadow-md animate-pulse"
                                   style={{
@@ -1094,6 +1329,8 @@ export default function DesignDetailPage({
                                   </svg>
                                   Current
                                 </span>
+                              ) : (
+                                v.version
                               )}
                             </td>
 
@@ -1176,7 +1413,6 @@ export default function DesignDetailPage({
                                   onClick={async (e) => {
                                     e.stopPropagation();
                                     toast(() => {
-                                      // Generate a unique id for this toast to use with dismiss
                                       const toastId = `delete-version-${v.id}`;
                                       return (
                                         <div className="flex flex-col items-center justify-center gap-2 p-4 ml-8">

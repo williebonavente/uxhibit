@@ -6,16 +6,19 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Pointer as PointerIcon } from "lucide-react";
+import { FrameCarousel } from "@/components/carousel/frame-carousel";
 
 type ParsedMeta = {
   fileKey: string;
   nodeId?: string;
   name?: string;
   thumbnail?: string;
+  frameImages?: Record<string, string>;
+  type?: string;
 };
 
 export default function Evaluate() {
+
   const cardCursor: React.CSSProperties = {
     cursor:
       "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='22' stroke='%23ffffff' fill='none' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 3l7 17 2-7 7-2-16-8Z'/></svg>\") 3 3, pointer",
@@ -48,18 +51,12 @@ export default function Evaluate() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   const supabase = createClient();
-  // const [ageChosen, setAgeChosen] = useState(false);
 
-  // Step 1
   const [age, setAge] = useState("");
   const [occupation, setOccupation] = useState("");
-
-  // Step 2
   const [link, setLink] = useState("");
   const [parsing, setParsing] = useState(false);
   const [parsed, setParsed] = useState<ParsedMeta | null>(null);
-
-  // Final submission
   const [submitting, setSubmitting] = useState(false);
 
   const canNextFrom1 = !!age && !!occupation;
@@ -76,12 +73,23 @@ export default function Evaluate() {
     }
     setParsing(true);
     try {
-      const res = await fetch("/api/figma/parse", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/figma/parse`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: link }),
       });
       const data = await res.json();
+
+      if (data) {
+        console.log("Extracted metadata from Figma parse:", data);
+        const frameEntries = Object.entries(data.frameImages || {});
+        frameEntries.forEach(([frameId, imageUrl]) => {
+          console.log("Frame ID:", frameId, "Image URL:", imageUrl);
+        });
+      } else {
+        console.log("No metadata found in Figma parse response.");
+      }
+
       if (!res.ok) {
         toast.error(data?.error || "Parse failed");
         return;
@@ -91,6 +99,8 @@ export default function Evaluate() {
         nodeId: data.nodeId,
         name: data.name || "Untitled",
         thumbnail: data.nodeImageUrl || data.thumbnailUrl || null,
+        frameImages: data.frameImages || {},
+        type: data.type,
       });
       toast.success("Design parsed");
       setStep(3);
@@ -100,7 +110,6 @@ export default function Evaluate() {
       setParsing(false);
     }
   }
-
   async function handleSubmit() {
     if (!parsed) {
       toast.error("No parsed design");
@@ -111,7 +120,6 @@ export default function Evaluate() {
       return;
     }
 
-    // ensure user session
     const {
       data: { session },
     } = await supabase.auth.getSession();
@@ -120,10 +128,16 @@ export default function Evaluate() {
       return;
     }
 
+    const frameEntries = Object.entries(parsed.frameImages || {});
+    if (frameEntries.length === 0) {
+      toast.error("No frames found in parsed design.");
+      return;
+    }
+
     setSubmitting(true);
     const loadingToast = toast.loading("Running AI evaluation...");
     try {
-      // First save the design
+      // Save the design and let the backend handle evaluation
       const saveRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/designs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -139,38 +153,25 @@ export default function Evaluate() {
         }),
       });
       const saved = await saveRes.json();
+      toast.dismiss(loadingToast);
+
       if (!saveRes.ok || !saved?.design?.id) {
         toast.error(saved?.error || "Save failed");
         return;
       }
 
-      // Then trigger AI evaluation
-      const evalRes = await fetch("/api/ai/evaluate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          designId: saved.design.id,
-          fileKey: parsed.fileKey,
-          nodeId: parsed.nodeId,
-          thumbnail_url: parsed.thumbnail,
-          snapshot: { age, occupation }
-        }),
-      });
-
-      if (!evalRes.ok) {
-        console.error("AI evaluation failed:", await evalRes.json());
-        toast.dismiss(loadingToast);
-        toast.error("AI evaluation failed");
-        // Continue anyway since design was saved
+      // Check backend evaluation result
+      if (saved.ai_evaluation && saved.ai_evaluation.frameCount > 0) {
+        toast.success("Design and AI evaluation completed for all frames");
       } else {
-        toast.dismiss(loadingToast);
-        toast.success("Design and AI evaluation completed");
+        toast.warning("Design saved, but AI evaluation did not complete.");
       }
 
       router.push(`/designs/${saved.design.id}`);
     } catch (error) {
       console.error("Submit failed:", error);
       toast.error("Submit failed");
+      toast.dismiss(loadingToast);
     } finally {
       setSubmitting(false);
     }
@@ -209,7 +210,6 @@ export default function Evaluate() {
 
         <div
           className="relative z-10 p-6 md:p-10 flex flex-col gap-8"
-          style={cardCursor}
         >
           {/* Step Indicator */}
           <div className="flex items-center justify-center gap-4 text-xs font-medium tracking-wide">
@@ -369,16 +369,14 @@ export default function Evaluate() {
                 <button
                   disabled={!canNextFrom1}
                   onClick={() => canNextFrom1 && setStep(2)}
-                    className={`px-6 py-2 rounded-lg text-sm font-semibold text-white cursor-pointer
+                  className={`px-6 py-2 rounded-lg text-sm font-semibold text-white cursor-pointer
                       ${canNextFrom1
-                        ? "bg-[#ED5E20] hover:bg-orange-600"
-                        : "bg-gray-400 cursor-not-allowed"
-                      }`}
-                  >
-                    Next
-                  </button>
-
-                
+                      ? "bg-[#ED5E20] hover:bg-orange-600"
+                      : "bg-gray-400 cursor-not-allowed"
+                    }`}
+                >
+                  Next
+                </button>
               </div>
             </div>
           )}
@@ -468,14 +466,19 @@ export default function Evaluate() {
                 </div>
                 <div className="rounded-lg p-4 border bg-white/70 dark:bg-neutral-800/60">
                   <h3 className="font-semibold text-sm mb-2">Design</h3>
-                  {parsed.thumbnail && (
-                    <Image
-                      src={parsed.thumbnail}
-                      alt="thumb"
-                      width={320}
-                      height={200}
-                      className="rounded mb-3 object-cover"
-                    />
+
+                  {parsed.frameImages && Object.keys(parsed.frameImages).length > 0 ? (
+                    <FrameCarousel frameImages={parsed.frameImages} />
+                  ) : (
+                    parsed.thumbnail && (
+                      <Image
+                        src={parsed.thumbnail}
+                        alt="thumb"
+                        width={320}
+                        height={200}
+                        className="rounded mb-3 object-cover"
+                      />
+                    )
                   )}
                   <p className="text-xs md:text-sm font-medium">
                     {parsed.name}
@@ -504,47 +507,46 @@ export default function Evaluate() {
                   >
                     Edit Parameters
                   </button>
-                <button
-                  disabled={submitting}
-                  onClick={handleSubmit}
-                  className="group relative inline-flex items-center justify-center
+                  <button
+                    disabled={submitting}
+                    onClick={handleSubmit}
+                    className="group relative inline-flex items-center justify-center
                     px-9 py-2.5 rounded-xl text-sm font-semibold tracking-wide
                     transition-all duration-300
                     focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40 cursor pointer"
-                >
-                  {/* Glow / gradient base */}
-                  <span
-                    aria-hidden
-                    className= "absolute inset-0 rounded-xl bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b] cursor-pointer"
-                  />
-                  
-                  {/* Inner glass layer */}
-                  <span
-                    aria-hidden
-                    className= "absolute inset-[2px] rounded-[10px] bg-[linear-gradient(145deg,rgba(255,255,255,0.28),rgba(255,255,255,0.07))] backdrop-blur-[2px] cursor-pointer"
-                  />
-                  
-                  {/* Animated sheen */}
-                  {!submitting && (
+                  >
+                    {/* Glow / gradient base */}
                     <span
                       aria-hidden
-                      className="absolute -left-1 -right-1 top-0 h-full overflow-hidden rounded-xl"
-                    >
-                      <span className="absolute inset-y-0 -left-full w-1/2 translate-x-0 bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70" />
+                      className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b] cursor-pointer"
+                    />
+
+                    {/* Inner glass layer */}
+                    <span
+                      aria-hidden
+                      className="absolute inset-[2px] rounded-[10px] bg-[linear-gradient(145deg,rgba(255,255,255,0.28),rgba(255,255,255,0.07))] backdrop-blur-[2px] cursor-pointer"
+                    />
+
+                    {/* Animated sheen */}
+                    {!submitting && (
+                      <span
+                        aria-hidden
+                        className="absolute -left-1 -right-1 top-0 h-full overflow-hidden rounded-xl"
+                      >
+                        <span className="absolute inset-y-0 -left-full w-1/2 translate-x-0 bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70" />
+                      </span>
+                    )}
+
+                    {/* Border ring */}
+                    <span
+                      aria-hidden
+                      className="absolute inset-0 rounded-xl ring-1 ring-white/30 group-hover:ring-white/50 cursor-pointer"
+                    />
+                    {/* Label */}
+                    <span className="relative z-10 flex items-center gap-2 cursor-pointer">
+                      Evaluate
                     </span>
-                  )}
-                  
-                  {/* Border ring */}
-                  <span
-                    aria-hidden
-                    className= "absolute inset-0 rounded-xl ring-1 ring-white/30 group-hover:ring-white/50 cursor-pointer"
-                  />
-                  
-                  {/* Label */}
-                  <span className="relative z-10 flex items-center gap-2 cursor-pointer">
-                    Evaluate
-                  </span>
-                </button>
+                  </button>
                 </div>
               </div>
             </div>

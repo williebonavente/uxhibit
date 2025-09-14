@@ -27,7 +27,7 @@ export default function ForgotPasswordPage() {
   async function onSubmit(values: { email: string }) {
     const supabase = createClient();
     const { error } = await supabase.auth.resetPasswordForEmail(values.email,
-      { redirectTo: "http://localhost:3000/auth/callback" }
+      { redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback` }
     
     );
     // Insert here the redirect: for other page
