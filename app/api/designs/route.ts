@@ -64,6 +64,8 @@ export async function POST(req: Request) {
             body: JSON.stringify({
               url: figma_link,
               designId: existing.id,
+              nodeId: node_id,
+              thumbnail_url: storedThumbnail,
               snapshot
             })
           });
@@ -139,6 +141,8 @@ export async function POST(req: Request) {
           body: JSON.stringify({
             url: figma_link,
             designId: design.id,
+            nodeId: node_id,
+            thumbnailUrl: storedThumbnail,
             snapshot
           })
         });

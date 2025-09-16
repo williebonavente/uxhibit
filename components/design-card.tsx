@@ -6,9 +6,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { IconHeart, IconHeartFilled, IconEye } from "@tabler/icons-react";
 import { SparkleEffect } from "./animation/heart-pop";
+import { MessageSquare } from "lucide-react";
+import { toast } from "sonner";
 
 
-type DesignInfo = {
+export type DesignInfo = {
     design_id: string;
     project_name: string;
     figma_link: string;
@@ -75,7 +77,6 @@ export function DesignCard({
             key={design.design_id}
         >
             <Link
-                // href={design.figma_link}
                 href={`designs/${design.design_id}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -133,8 +134,28 @@ export function DesignCard({
                         </button>
                         <span>{design.likes}</span>
                     </span>
-                    <span className="flex items-center gap-1">
-                        <IconEye size={20} /> {design.views}
+                    <span className="flex items-center gap-2">
+                        <span className="flex items-center gap-1">
+                            <button
+                                className="flex items-center p-2 rounded-full hover:bg-[#ED5E20]/15 hover:text-[#ED5E20] transition cursor-pointer"
+                                title="Comment on this design"
+                                aria-label="Comment"
+                                onClick={() => {
+                                    toast.error("Error");
+                                }}
+                            >
+                                <MessageSquare size={19} />
+                            </button>
+                            <span className="text-xs text-gray-500 font-semibold">
+                                {/* TODO: Comment counter here */}
+                                1
+                                </span>
+                        </span>
+                        {/* Views */}
+                        <span className="flex items-center gap-2 ml-1">
+                            <IconEye size={22} />
+                            <span className="text-xs text-gray-500 font-semibold">{design.views}</span>
+                        </span>
                     </span>
                 </div>
             </div>

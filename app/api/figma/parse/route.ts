@@ -10,6 +10,7 @@ import { normalizeDocument, getFrameTextNodes } from "@/utils/extractor/metadata
 import { evaluateFrameAccessibility } from "@/utils/contrastChecker/frameAccessibility";
 import { evaluateFrameScores } from "@/lib/frameScorer/frameScorer";
 import { getFrameTextMap } from "@/utils/extractor/frameExtractor";
+import { FileKey } from "lucide-react";
 
 export const runtime = "nodejs";
 
@@ -161,6 +162,30 @@ async function handle(url: string) {
     nodes: frameMetadata,
   });
 
+  console.log(
+    "API responses", {
+    fileKey: parsed.fileKey,
+    nodeId: parsed.nodeId ?? null,
+    name: fileJson?.name ?? null,
+    lastModified: fileJson?.lastModified ?? null,
+    thumbnailUrl: fileJson?.thumbnailUrl ?? null,
+    nodeImageUrl,
+    frameImages,
+    themedFrameIds: themedIds,
+    type: parsed.nodeId ? "single-node" : "multi-frame",
+    message: parsed.nodeId
+      ? "Parsed a single node image."
+      : "Parsed all frame images in the file.",
+    extractedFrameId,
+    extractedFrameImageUrl: frameImageUrl,
+    // frameMetadata,
+    // normalizedFrames: normalized.frames ?? [],
+    // textNodes: allTextNodes ?? {},
+    // accessbilityScores: frameAccessibility ?? [],
+    // accessibilityResults: accessibilityResults ?? {},
+  }
+  )
+
   return NextResponse.json({
     fileKey: parsed.fileKey,
     nodeId: parsed.nodeId ?? null,
@@ -177,10 +202,10 @@ async function handle(url: string) {
     extractedFrameId,
     extractedFrameImageUrl: frameImageUrl,
     // frameMetadata,
-    normalizedFrames: normalized.frames,
-    textNodes: allTextNodes,
-    accessbilityScores: frameAccessibility,
-    accessibilityResults,
+    // normalizedFrames: normalized.frames ?? [],
+    // textNodes: allTextNodes ?? {},
+    // accessbilityScores: frameAccessibility ?? [],
+    // accessibilityResults: accessibilityResults ?? {},
   });
 }
 

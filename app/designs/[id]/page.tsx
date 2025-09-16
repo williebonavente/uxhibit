@@ -1,31 +1,24 @@
 "use client";
 
 import React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
-// import { useRouter } from "next/navigation";
+import EvaluationResult from "./dialogs/EvaluationResult";
+import FrameNavigator from "./dialogs/FrameNavigator";
 import {
-  IconArrowLeft,
   IconLayoutSidebarRightCollapse,
   IconLayoutSidebarRightExpand,
-  IconHistory,
-  IconTrash
 } from "@tabler/icons-react";
 import { Spinner } from "@/components/ui/shadcn-io/spinner/index";
-import {
-  fetchDesignVersions,
-  deleteDesignVersion
-} from "@/database/actions/versions/versionHistory";
+import { fetchDesignVersions, deleteDesignVersion } from "@/database/actions/versions/versionHistory";
 
 import { toast } from "sonner";
-import {
-  IconSortAscending,
-  IconSortDescending,
-  IconSort09,
-  IconSearch
-} from "@tabler/icons-react";
+import VersionHistoryModal from "./dialogs/VersionHistoryModal";
+import DesignHeaderActions from "./dialogs/DesignHeader";
+import ZoomControls from "./dialogs/ZoomControls";
+import { CommentsSection } from "./comments/page";
+import { Comment } from "@/components/comments-user";
 
 
 interface FrameEvaluation {
@@ -67,12 +60,13 @@ type Snapshot = {
   occupation: string;
 }
 
-type Versions = {
+export type Versions = {
   id: string;
   design_id: string;
   version: number;
   file_key: string;
   node_id: string;
+  total_score: number;
   thumbnail_url: string;
   ai_summary: string;
   ai_data: string;
@@ -81,7 +75,8 @@ type Versions = {
 };
 
 
-type Design = {
+export type Design = {
+  is_active: boolean;
   id: string;
   project_name: string;
   fileKey?: string;
@@ -91,6 +86,7 @@ type Design = {
   thumbnailPath?: string;
   snapshot: Snapshot;
   current_version_id: string;
+  frames?: { id: string | number; name: string;[key: string]: any }[];
 };
 
 type EvaluateInput = {
@@ -161,7 +157,6 @@ export default function DesignDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = React.use(params);
-  // const router = useRouter();
 
   const [showEval, setShowEval] = useState(true);
   const [showVersions, setShowVersions] = useState(false);
@@ -180,14 +175,80 @@ export default function DesignDetailPage({
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"default" | "asc" | "desc">("default");
+  const [showSortOptions, setShowSortOptions] = useState(false);
+
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [newCommentText, setNewCommentText] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [showComments, setShowComments] = useState(false);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [currentUserProfile, setCurrentUserProfile] = useState<{ fullName: string; avatarUrl: string } | null>(null);
+
   const [page, setPage] = useState(0);
+  const [sidebarWidth, setSidebarWidth] = useState(700);
+  const minSidebarWidth = 0;
+  const maxSidebarWidth = 700;
+  const [isResizing, setIsResizing] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStart = useRef({ x: 0, y: 0 });
+  const mouseStart = useRef({ x: 0, y: 0 });
+  const [sidebarTab, setSidebarTab] = useState<"ai" | "comments">("ai");
 
   const pageSize = 6;
+  const sortRef = useRef<HTMLDivElement>(null);
 
+  function startResizing(e: React.MouseEvent) {
+    setIsResizing(true);
+  }
+
+  React.useEffect(() => {
+    function handleMouseMove(e: MouseEvent) {
+      if (!isResizing) return;
+      const newWidth = window.innerWidth - e.clientX - 8;
+      setSidebarWidth(Math.max(minSidebarWidth, Math.min(maxSidebarWidth, newWidth)));
+      if (newWidth <= 20) setShowEval(false);
+    }
+    function handleMouseUp() {
+      setIsResizing(false);
+    }
+    if (isResizing) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    }
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizing, sidebarWidth, minSidebarWidth, maxSidebarWidth]);
+
+
+  function handlePanStart(e: React.MouseEvent) {
+    if (zoom === 1) return;
+    setIsPanning(true);
+    panStart.current = { ...pan };
+    mouseStart.current = { x: e.clientX, y: e.clientY };
+  }
+
+  function handlePanMove(e: MouseEvent) {
+    if (!isPanning) return;
+    const dx = e.clientX - mouseStart.current.x;
+    const dy = e.clientY - mouseStart.current.y;
+    setPan({
+      x: panStart.current.x + dx,
+      y: panStart.current.y + dy,
+    });
+  }
+
+  function handlePanEnd() {
+    setIsPanning(false);
+  }
 
   const sortedFrameEvaluations = React.useMemo(() => {
     if (sortOrder === "default") return frameEvaluations;
-    // Keep "Overall" frame at index 0, sort the rest
     const [overall, ...frames] = frameEvaluations;
     const sorted = [...frames].sort((a, b) => {
       const aScore = a.ai_data.overall_score ?? 0;
@@ -207,6 +268,91 @@ export default function DesignDetailPage({
   }, [sortedFrameEvaluations, searchQuery]);
 
   const currentFrame = sortedFrameEvaluations[selectedFrameIndex];
+
+  async function handleOpenComments() {
+    setShowComments(true);
+    setLoadingComments(true);
+
+    const supabase = createClient();
+
+    // Mark unread the default notification
+    if (currentUserId && design?.id) {
+      await supabase
+      .from("comments")
+      .update({ is_read: true})
+      .eq("design_id", design.id)
+      .eq("user_id", currentUserId)
+      .eq("is_read", false);
+    }
+    const { data, error } = await supabase
+      .from("comments")
+      .select(`id, text, user_id, created_at, local_time, 
+              is_read,
+              parent_id, 
+              updated_at, 
+              design_id`)
+      .eq("design_id", design?.id)
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      // Map data to your Comment[] shape
+      const mappedComments = await Promise.all(
+        (data || []).map(async (comment) => {
+          const { data: userData } = await supabase
+            .from("profiles")
+            .select("full_name, avatar_url")
+            .eq("id", comment.user_id)
+            .single();
+          return {
+            id: comment.id,
+            text: comment.text,
+            user: {
+              id: comment.user_id,
+              fullName: userData?.full_name || "",
+              avatarUrl: userData?.avatar_url || "",
+            },
+            replies: [],
+            parentId: comment.parent_id,
+            createdAt: new Date(comment.created_at),
+            updatedAt: comment.updated_at ? new Date(comment.updated_at) : undefined,
+            localTime: comment.local_time,
+            design_id: comment.design_id,
+            is_read: comment.is_read,
+          };
+        })
+      );
+
+      const commentMap: { [id: string]: any } = {};
+      mappedComments.forEach(comment => {
+        commentMap[comment.id] = { ...comment, replies: [] };
+      });
+      const rootComments: any[] = [];
+      mappedComments.forEach(comment => {
+        if (comment.parentId) {
+          if (commentMap[comment.parentId]) {
+            commentMap[comment.parentId].replies.push(commentMap[comment.id]);
+          }
+        } else {
+          rootComments.push(commentMap[comment.id]);
+        }
+      });
+
+      setComments(rootComments);
+    }
+    setLoadingComments(false);
+  }
+
+  async function markCommentAsRead(id: string) {
+  const supabase = createClient();
+  await supabase.from("comments").update({ is_read: true }).eq("id", id);
+  // Optionally refresh comments here
+}
+async function markCommentAsUnread(id: string) {
+  const supabase = createClient();
+  await supabase.from("comments").update({ is_read: false }).eq("id", id);
+  // Optionally refresh comments here
+}
+
 
   const handleShowVersions = async () => {
     setShowVersions(true);
@@ -287,7 +433,6 @@ export default function DesignDetailPage({
 
     }
   }
-
   async function syncPublishedState(): Promise<void> {
     const supabase = createClient();
     const { data: userData } = await supabase.auth.getUser();
@@ -321,7 +466,6 @@ export default function DesignDetailPage({
         : prev
     );
   }
-
   async function publishProject() {
     const supabase = createClient();
     const { data: userData } = await supabase.auth.getUser();
@@ -370,7 +514,6 @@ export default function DesignDetailPage({
       toast.error(`Failed to publish design: ${error.message || "Unknown error"}`);
     }
   }
-
   async function unpublishProject() {
     const supabase = createClient();
     const { data: userData } = await supabase.auth.getUser();
@@ -393,7 +536,6 @@ export default function DesignDetailPage({
       toast.error(`Failed to unpublish design: ${error.message || "Unknown error"}`);
     }
   }
-
   function mapFrameToEvalResponse(frame: FrameEvaluation, frameIdx = 0): EvalResponse {
     return {
       nodeId: frame.node_id,
@@ -420,6 +562,74 @@ export default function DesignDetailPage({
       },
     };
   }
+
+
+  const handleAddComment = async () => {
+    const supabase = createClient();
+    if (!newCommentText.trim() || !currentUserId || !currentUserProfile || !design) return;
+
+    const { data, error } = await supabase
+      .from("comments")
+      .insert([
+        {
+          user_id: currentUserId,
+          design_id: design.id,
+          text: newCommentText,
+          parent_id: null,
+          local_time: new Date().toLocaleTimeString(),
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      toast.error("Failed to add comment!");
+      console.error(error.message);
+      return;
+    }
+
+    setNewCommentText("");
+  };
+
+  const handleDeleteComment = (id: string) => {
+    setComments(comments.filter(comment => comment.id !== id));
+  }
+
+  useEffect(() => {
+    const supabase = createClient();
+    async function fetchUserProfile() {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUserId(user?.id ?? null);
+
+      if (user?.id) {
+        // Adjust this query to match your user profile table/fields
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name, avatar_url")
+          .eq("id", user.id)
+          .single();
+        setCurrentUserProfile({
+          fullName: profile?.full_name ?? "Unknown",
+          avatarUrl: profile?.avatar_url ?? "",
+        });
+      }
+    }
+    fetchUserProfile();
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (sortRef.current && !sortRef.current.contains(event.target as Node)) {
+        setShowSortOptions(false);
+      }
+    }
+    if (showSortOptions) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showSortOptions]);
 
   useEffect(() => {
     if (design) {
@@ -517,7 +727,6 @@ export default function DesignDetailPage({
             setShowEval(true);
           }
 
-          // Handle thumbnail URL
           if (data.thumbnail_url && !data.thumbnail_url.startsWith("http")) {
             const { data: signed } = await supabase.storage
               .from("design-thumbnails")
@@ -545,7 +754,6 @@ export default function DesignDetailPage({
     }
   }, [selectedFrameIndex, frameEvaluations]);
 
-  // Auto-evaluate (unchanged) but wait until design loaded
   useEffect(() => {
     const auto =
       typeof window !== "undefined" &&
@@ -581,8 +789,6 @@ export default function DesignDetailPage({
     async function loadSavedEvaluation() {
       try {
         if (!design?.id) return;
-
-        // Get latest evaluation data
         const { data, error } = await supabase
           .from("design_versions")
           .select(`
@@ -597,10 +803,10 @@ export default function DesignDetailPage({
           .eq("design_id", design.id)
           .order("created_at", { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (error) {
-          console.error('Failed to load evaluation:', error);
+          console.error('Failed to load evaluation:', error.message);
           return;
         }
 
@@ -633,9 +839,9 @@ export default function DesignDetailPage({
 
         if (parsedAiData) {
           const mapped: EvalResponse = {
-            nodeId: data.node_id,
-            imageUrl: data.thumbnail_url,
-            summary: data.ai_summary ?? parsedAiData.summary ?? parsedAiData.ai?.summary ?? "",
+            nodeId: data?.node_id,
+            imageUrl: data?.thumbnail_url,
+            summary: data?.ai_summary ?? parsedAiData.summary ?? parsedAiData.ai?.summary ?? "",
             heuristics: parsedAiData.heuristics ?? parsedAiData.ai?.heuristics ?? null,
             ai_status: "ok",
             strengths: Array.isArray(parsedAiData.strengths)
@@ -652,7 +858,7 @@ export default function DesignDetailPage({
             overall_score:
               parsedAiData.overall_score ??
               parsedAiData.ai?.overall_score ??
-              data.total_score ??
+              data?.total_score ??
               null,
           };
 
@@ -708,33 +914,146 @@ export default function DesignDetailPage({
     }
   }, [currentFrame, selectedFrameIndex]);
 
-  // useEffect(() => {
-  //   setSelectedFrameIndex(0);
-  // }, [searchQuery]);
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSelectedFrameIndex(0);
+    } else {
+      // Try to parse the search as a number and jump to that frame
+      const num = parseInt(searchQuery.trim(), 10);
+      if (!isNaN(num) && num > 0 && num < sortedFrameEvaluations.length) {
+        setSelectedFrameIndex(num);
+      } else {
+        // Fallback: find by text match
+        const idx = sortedFrameEvaluations.findIndex(
+          (frame, i) =>
+            i > 0 &&
+            (
+              frame.ai_summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              frame.ai_data.summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              frame.node_id?.toLowerCase().includes(searchQuery.toLowerCase())
+            )
+        );
+        setSelectedFrameIndex(idx === -1 ? 0 : idx);
+      }
+    }
+  }, [searchQuery, sortedFrameEvaluations]);
+
+  React.useEffect(() => {
+    if (isResizing) {
+      document.body.style.userSelect = "col-resize";
+    } else {
+      document.body.style.userSelect = "";
+    }
+    return () => {
+      document.body.style.userSelect = "";
+    };
+  }, [isResizing]);
 
   useEffect(() => {
-  if (!searchQuery.trim()) {
-    setSelectedFrameIndex(0);
-  } else {
-    // Try to parse the search as a number and jump to that frame
-    const num = parseInt(searchQuery.trim(), 10);
-    if (!isNaN(num) && num > 0 && num < sortedFrameEvaluations.length) {
-      setSelectedFrameIndex(num);
+    if (isPanning) {
+      document.body.style.cursor = "grab";
+      document.addEventListener("mousemove", handlePanMove);
+      document.addEventListener("mouseup", handlePanEnd);
     } else {
-      // Fallback: find by text match
-      const idx = sortedFrameEvaluations.findIndex(
-        (frame, i) =>
-          i > 0 &&
-          (
-            frame.ai_summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            frame.ai_data.summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            frame.node_id?.toLowerCase().includes(searchQuery.toLowerCase())
-          )
-      );
-      setSelectedFrameIndex(idx === -1 ? 0 : idx);
+      document.body.style.cursor = "";
+      document.removeEventListener("mousemove", handlePanMove);
+      document.removeEventListener("mouseup", handlePanEnd);
     }
-  }
-}, [searchQuery, sortedFrameEvaluations]);
+    return () => {
+      document.body.style.cursor = "";
+      document.removeEventListener("mousemove", handlePanMove);
+      document.removeEventListener("mouseup", handlePanEnd);
+    };
+  }, [isPanning]);
+
+  useEffect(() => {
+    if (zoom === 1) setPan({ x: 0, y: 0 });
+  }, [zoom]);
+
+  useEffect(() => {
+    const fetchComments = async () => {
+      const supabase = createClient();
+
+      if (!design?.id) {
+        console.log(design?.id);
+        return;
+      }
+      const { data, error } = await supabase
+        .from("comments")
+        .select("id, text, user_id, created_at, local_time, parent_id, updated_at, design_id")
+        .eq("design_id", design?.id)
+        .order("created_at", { ascending: false });
+      if (error) {
+        console.log("Supabase error:", error);
+        toast.error(`Failed to fetch comments! ${error.message}`);
+        return;
+      }
+      const commentsWithUser = await Promise.all(
+        (data || []).map(async (comment) => {
+          const { data: userData } = await supabase
+            .from("profiles")
+            .select("full_name, avatar_url")
+            .eq("id", comment.user_id)
+            .single();
+          return {
+            id: comment.id,
+            text: comment.text,
+            user: {
+              id: comment.user_id,
+              fullName: userData?.full_name || "",
+              avatarUrl: userData?.avatar_url || "",
+            },
+            replies: [],
+            parentId: comment.parent_id,
+            createdAt: new Date(comment.created_at),
+            updatedAt: comment.updated_at ? new Date(comment.updated_at) : undefined,
+            localTime: comment.local_time,
+            design_id: comment.design_id,
+          };
+        })
+      );
+
+      const commentMap: { [id: string]: any } = {};
+      commentsWithUser.forEach(comment => {
+        commentMap[comment.id] = { ...comment, replies: [] };
+      });
+
+      const rootComments: any[] = [];
+      commentsWithUser.forEach(comment => {
+        if (comment.parentId) {
+          if (commentMap[comment.parentId]) {
+            commentMap[comment.parentId].replies.push(commentMap[comment.id]);
+          }
+        } else {
+          rootComments.push(commentMap[comment.id]);
+        }
+      });
+      setComments(rootComments);
+    };
+
+    fetchComments();
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel('comments-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'comments',
+        },
+        (payload) => {
+          fetchComments();
+          console.log("Payload information", payload)
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [design?.id]);
 
 
   console.log('evalResult', evalResult);
@@ -754,196 +1073,51 @@ export default function DesignDetailPage({
       </div>
     );
 
-
   return (
     <div>
-      {/* HEADER BAR */}
-      <div className="flex pt-5 pb-5 items-center justify-between">
-        <div className="flex items-center">
-          {/* Back Button */}
-          <Link href="/dashboard">
-            <IconArrowLeft
-              size={24}
-              className="cursor-pointer hover:text-orange-600 mr-2"
-            />
-          </Link>
-          <h1 className="text-xl font-medium">
-            {design.project_name}
-            {/* Only show version if NOT current */}
-            {selectedVersion && selectedVersion.id !== design.current_version_id
-              ? ` (v${selectedVersion.version})`
-              : ""}
-          </h1>
-        </div>
-        <div className="flex gap-3 items-center">
-
-
-          {/* Version History */}
-          <div className="flex gap-3 items-center">
-            <div className="relative group">
-              <button
-                onClick={handleShowVersions}
-                className="cursor-pointer p-2 rounded hover:bg-[#ED5E20]/15 hover:text-[#ED5E20] transition"
-                aria-label="Show Version History"
-              >
-                <IconHistory size={22} />
-              </button>
-              {/* Tooltip */}
-              <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
-                <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
-                  Version History
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Sorter and serach experimental */}
-          {/* SEARCH */}
-          <div className="flex gap-2 items-center">
-
-            <div className="relative group">
-              <button
-                className="cursor-pointer p-2 rounded hover:bg-[#ED5E20]/15 hover:text-[#ED5E20] transition"
-                aria-label="Search"
-                title="Search"
-                onClick={() => setShowSearch((prev) => !prev)}
-              >
-                <IconSearch size={20} />
-              </button>
-              {/* Tooltip */}
-              <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
-                <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
-                  Search
-                </div>
-              </div>
-              {/* Popover */}
-              {showSearch && (
-                <div className="absolute left-1/2 top-full mt-3 -translate-x-1/2 z-30 bg-white dark:bg-[#232323] border rounded shadow-lg p-3 w-64">
-                  <input
-                    type="text"
-                    className="w-full px-3 py-2 rounded border focus:outline-none"
-                    placeholder="Search frames..."
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    autoFocus
-                  />
-                  <button
-                    className="mt-2 w-full bg-[#ED5E20] text-white rounded py-1"
-                    onClick={() => setShowSearch(false)}
-                  >
-                    Close
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* SORT  */}
-            <div className="relative group">
-              <button
-                onClick={() => setSortOrder("asc")}
-                className={`cursor-pointer p-2 rounded transition
-                 ${sortOrder === "asc"
-                    ? "bg-[#ED5E20]/15 text-[#ED5E20]"
-                    : "bg-gray-200 text-gray-700 hover:bg-[#ED5E20]/15 hover:text-[#ED5E20]"}`}
-                aria-label="Sort by Lowest Score"
-                title="Sort by Lowest Score"
-              >
-                <IconSortAscending size={20} />
-              </button>
-              {/* Tooltip */}
-              <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
-                <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
-                  Lowest Score
-                </div>
-              </div>
-            </div>
-            <div className="relative group">
-              <button
-                onClick={() => setSortOrder("desc")}
-                className={`cursor-pointer p-2 rounded transition
-                ${sortOrder === "desc"
-                    ? "bg-[#ED5E20]/15 text-[#ED5E20]"
-                    : "bg-gray-200 text-gray-700 hover:bg-[#ED5E20]/15 hover:text-[#ED5E20]"}`}
-                aria-label="Sort by Highest Score"
-                title="Sort by Highest Score"
-              >
-                <IconSortDescending size={20} />
-              </button>
-              {/* Tooltip */}
-              <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
-                <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
-                  Highest Score
-                </div>
-              </div>
-            </div>
-            <div className="relative group">
-              <button
-                onClick={() => setSortOrder("default")}
-                className={`cursor-pointer p-2 rounded transition
-                ${sortOrder === "default"
-                    ? "bg-[#ED5E20]/15 text-[#ED5E20]"
-                    : "bg-gray-200 text-gray-700 hover:bg-[#ED5E20]/15 hover:text-[#ED5E20]"}`}
-                aria-label="Default Order"
-                title="Default Order"
-              >
-                <IconSort09 size={20} />
-              </button>
-              {/* Tooltip */}
-              <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
-                <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
-                  Default Order
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {design?.is_active ? (
-            <button
-              onClick={async () => {
-                await unpublishProject();
-                await syncPublishedState();
-              }}
-              className="flex items-center gap-2 bg-gray-300 text-gray-700 
-                      px-8 py-2 rounded-xl font-semibold shadow-md hover:bg-gray-400 
-                      transition-all duration-200 text-sm focus:outline-none 
-                      focus:ring-2 focus:ring-[#ED5E20]/40 cursor-pointer
-                      "
-            >
-              <svg width="18" height="18" fill="none" viewBox="0 0 20 20">
-                <circle cx="10" cy="10" r="9" fill="#6B7280" fillOpacity="0.18" />
-                <path d="M6 6l8 8M14 6l-8 8" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-              Unpublish
-            </button>
-          ) : (
-            <button
-              onClick={async () => {
-                await publishProject();
-                await syncPublishedState();
-              }}
-              className="flex items-center gap-2 bg-gradient-to-r from-[#ED5E20] 
-            to-orange-400 text-white px-8 py-2 rounded-xl font-semibold shadow-md 
-            hover:from-orange-500 hover:to-[#ED5E20] transition-all duration-200 
-            text-sm focus:outline-none focus:ring-2 focus:ring-[#ED5E20]/40 animate-pulse cursor-pointer"
-            >
-              <svg width="18" height="18" fill="none" viewBox="0 0 20 20">
-                <circle cx="10" cy="10" r="9" fill="#fff" fillOpacity="0.18" />
-                <path d="M6 10.5l2.5 2.5L14 8" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-              Publish
-            </button>
-          )}
-        </div>
+      <div className="mb-2">
+        <DesignHeaderActions
+          handleShowVersions={handleShowVersions}
+          handleOpenComments={handleOpenComments}
+          showComments={showComments}
+          setShowComments={setShowComments}
+          comments={comments}
+          loadingComments={loadingComments}
+          showSearch={showSearch}
+          setShowSearch={setShowSearch}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          showSortOptions={showSortOptions}
+          setShowSortOptions={setShowSortOptions}
+          sortOrder={sortOrder}
+          setSortOrder={setSortOrder}
+          sortRef={sortRef}
+          design={design}
+          selectedVersion={selectedVersion}
+          publishProject={publishProject}
+          unpublishProject={unpublishProject}
+          syncPublishedState={syncPublishedState}
+        />
       </div>
-
       <div className="flex h-screen">
-        {/* TODO:  */}
-        {/* Center Design Area */}
-        <div className="flex-2 h-full border rounded-md bg-accent overflow-y-auto flex items-center justify-center">
+        <div className="flex-2 h-full border rounded-md bg-accent overflow-y-auto flex items-center justify-center relative">
+          {designLoading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 dark:bg-[#232323]/80 z-20 rounded-md animate-fade-in-up">
+              <Spinner className="w-12 h-12 text-[#ED5E20] animate-spin mb-4" />
+              <span className="text-lg font-semibold text-[#ED5E20] animate-pulse">
+                Loading your design...
+              </span>
+              <span className="text-sm text-gray-400 mt-2">
+                Please wait while we fetch your frame.
+              </span>
+            </div>
+          )}
+          <ZoomControls zoom={zoom} setZoom={setZoom} setPan={setPan} pan={pan} />
+          {/* Image */}
           <Image
             src={
               selectedFrameIndex === 0
-                ? (thumbUrl // Use signed Supabase URL for "Overall"
+                ? (thumbUrl
                   ? thumbUrl
                   : design.fileKey
                     ? `/api/figma/thumbnail?fileKey=${design.fileKey}${design.nodeId
@@ -964,9 +1138,16 @@ export default function DesignDetailPage({
             width={600}
             height={400}
             className="w-full h-full object-contain"
+            style={{
+              opacity: designLoading ? 0.5 : 1,
+              transition: isPanning ? "none" : "opacity 0.3s, transform 0.2s",
+              transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+              transformOrigin: "center center",
+              cursor: zoom > 1 ? (isPanning ? "grabbing" : "grab") : "default",
+            }}
+            onMouseDown={handlePanStart}
           />
         </div>
-        {/* Toggle Evaluation Button */}
         <div>
           <button
             onClick={() => setShowEval((prev) => !prev)}
@@ -980,588 +1161,136 @@ export default function DesignDetailPage({
           </button>
         </div>
 
+        <div
+          style={{ cursor: "col-resize", width: 8 }}
+          className="flex-shrink-0 bg-transparent hover:bg-orange-200 transition"
+          onMouseDown={startResizing}
+          aria-label="Resize evaluation sidebar"
+          tabIndex={0}
+          role="separator"
+        />
         {/* RIGHT PANEL (Evaluation Sidebar) */}
-        {showEval && (
-          <div className="flex-1 bg-gray-50 border rounded-md dark:bg-[#1A1A1A] p-5 overflow-y-auto flex flex-col h-screen">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold text-center flex-1">AI Evaluation</h2>
-            </div>
-
-            {sortedFrameEvaluations.length > 0 && (
-              <div className="flex items-center gap-4 mb-4 justify-center">
-                <button
-                  className="px-2 py-1 rounded bg-gray-200 text-gray-700 disabled:opacity-50"
-                  onClick={() => setSelectedFrameIndex((prev) => Math.max(0, prev - 1))}
-                  disabled={selectedFrameIndex === 0}
-                  aria-label="Previous Frame"
-                >
-                  &#8592;
-                </button>
-                <span className="text-sm font-medium">
-                  {selectedFrameIndex === 0
-                    ? "Overall"
-                    : sortedFrameEvaluations[selectedFrameIndex]?.ai_summary ||
-                    sortedFrameEvaluations[selectedFrameIndex]?.node_id ||
-                    `Frame ${selectedFrameIndex}`}
-                  {" "}
-                  <span className="text-gray-400">
-                    ({selectedFrameIndex + 1} / {sortedFrameEvaluations.length})
-                  </span>
-                </span>
-                <button
-                  className="px-2 py-1 rounded bg-gray-200 text-gray-700 disabled:opacity-50"
-                  onClick={() =>
-                    setSelectedFrameIndex((prev) =>
-                      Math.min(filteredFrameEvaluations.length - 1, prev + 1)
-                    )
-                  }
-                  disabled={selectedFrameIndex === filteredFrameEvaluations.length - 1}
-                  aria-label="Next Frame"
-                >
-                  &#8594;
-                </button>
-              </div>
-            )}
-            <div className="flex-1 overflow-y-auto pr-5 space-y-5">
-              {/* Loading State */}
-              {loadingEval && (
-                <div className="text-center text-neutral-500">
-                  Running evaluation...
-                </div>
-              )}
-
-              {/* Error State */}
-              {evalError && (
-                <div className="text-red-500 text-sm">
-                  Error: {evalError}
-                </div>
-              )}
-
-              {/* Results */}
-              {evalResult && !loadingEval && (
-                <>
-                  {/* Score */}
-                  {evalResult && typeof evalResult.overall_score === "number" && (
-                    <div className="p-3 rounded-lg bg-[#ED5E20]/10 justify-center items-center">
-                      <h3 className="font-medium mb-2 text-center">Overall Score</h3>
-                      <div className="text-2xl font-bold text-[#ED5E20] text-center">
-                        {Math.round(evalResult.overall_score)}/100
-                      </div>
-                    </div>
-                  )}
-                  {/* Summary */}
-                  <div className="p-3 rounded-lg bg-[#FFFF00]/10">
-                    <h3 className="font-medium mb-2">Summary</h3>
-                    <p className="text-sm text-neutral-600 dark:text-neutral-300">
-                      {evalResult.summary}
-                    </p>
-                  </div>
-                  {/* Strengths */}
-                  {evalResult.strengths && evalResult.strengths.length > 0 && (
-                    <div className="p-3 rounded-lg bg-[#008000]/10">
-                      <h3 className="font-medium mb-2">Strengths</h3>
-                      <ul className="list-disc list-inside text-sm space-y-1">
-                        {evalResult.strengths.map((s, i) => (
-                          <li key={i} className="text-neutral-600 dark:text-neutral-300">{s}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {/* Issues */}
-                  {currentFrame?.ai_data.issues?.length > 0 && (
-                    <div className="p-3 rounded-lg bg-[#FFB300]/10 mb-4">
-                      <h3 className="font-medium mb-2">Issues</h3>
-                      <ul className="space-y-3">
-
-                        {(evalResult.issues ?? [])
-                          .sort((a, b) => {
-                            const order: Record<string, number> = { high: 0, medium: 1, low: 2 };
-                            const aKey = (a.severity?.toLowerCase() as string) || "low";
-                            const bKey = (b.severity?.toLowerCase() as string) || "low";
-                            return (order[aKey] ?? 3) - (order[bKey] ?? 3);
-                          })
-                          .map((issue, i) => {
-                            let badgeColor = "bg-gray-300 text-gray-800";
-                            if (issue.severity?.toLowerCase() === "high") badgeColor = "bg-red-500 text-white";
-                            else if (issue.severity?.toLowerCase() === "medium") badgeColor = "bg-yellow-400 text-yellow-900";
-                            else if (issue.severity?.toLowerCase() === "low") badgeColor = "bg-blue-200 text-blue-900";
-
-                            return (
-                              <li
-                                key={issue.id || i}
-                                className="flex items-start gap-3 bg-white/70 dark:bg-[#232323]/70 rounded-lg p-3 border border-[#ED5E20]/20 shadow-sm"
-                              >
-                                <span
-                                  className={`min-w-[60px] text-center px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${badgeColor}`}
-                                  style={{ letterSpacing: "0.05em" }}
-                                >
-                                  {issue.severity}
-                                </span>
-                                <span className="flex-1 text-sm text-neutral-800 dark:text-neutral-200">
-                                  {issue.message}
-                                </span>
-                              </li>
-                            );
-                          })}
-                      </ul>
-                    </div>
-                  )}
-                  {/* Suggestions Section */}
-                  {currentFrame?.ai_data.issues?.some(issue => issue.suggestion) && (
-                    <div className="p-3 rounded-lg bg-[#ED5E20]/10 mb-4">
-                      <h3 className="font-medium mb-2">Suggestions</h3>
-                      <ul className="list-disc list-inside text-sm space-y-2">
-                        {(evalResult.issues ?? [])
-                          .filter(issue => issue.suggestion)
-                          .map((issue, i) => (
-                            <li key={issue.id || i} className="text-neutral-700 dark:text-neutral-200">
-                              {issue.suggestion}
-                            </li>
-                          ))}
-                      </ul>
-                    </div>
-                  )}
-                  {/* Weaknesses */}
-                  {currentFrame?.ai_data.weaknesses?.length > 0 && (
-                    <div className="p-3 rounded-lg bg-[#FF0000]/10">
-                      <h3 className="font-medium mb-2">Weaknesses</h3>
-                      <ul className="list-disc list-inside text-sm space-y-1">
-                        {(evalResult.weaknesses ?? []).map((w, i) => (
-                          <li key={i} className="text-neutral-600 dark:text-neutral-300">{w}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {/* Category Scores */}
-                  {currentFrame?.ai_data.category_scores && (
-                    <div className="p-3 rounded-lg bg-[#ED5E20]/10">
-                      <h3 className="font-medium mb-2">Category Scores</h3>
-                      <ul className="space-y-2 list-disc list-inside">
-                        {Object.entries(evalResult.category_scores ?? {}).map(([category, score]) => {
-                          // Coloring logic
-                          let bg =
-                            "bg-gray-100 dark:bg-gray-800 text-neutral-600 dark:text-neutral-300";
-                          if (score >= 75) {
-                            bg =
-                              "bg-[#008000]/20 dark:bg-[#008000]/10 text-neutral-600 dark:text-neutral-300";
-                          } else if (score < 50) {
-                            bg =
-                              "bg-[#FF0000]/20 dark:bg-[#FF0000]/10 text-neutral-600 dark:text-neutral-300";
-                          } else {
-                            bg =
-                              "bg-[#FFFF00]/20 dark:bg-[#FFFF00]/10 text-neutral-600 dark:text-neutral-300";
-                          }
-                          return (
-                            <li
-                              key={category}
-                              className={`rounded-md px-3 py-2 flex justify-between items-center font-medium ${bg}`}
-                            >
-                              <span className="capitalize">
-                                {category.replace(/_/g, " ")}
-                              </span>
-                              <span>{Math.round(score)}</span>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            <div className="mt-auto pt-4">
-              <button
-                onClick={handleEvaluate}
-                disabled={loadingEval}
-                className="w-full px-4 py-2 text-sm rounded-md bg-[#ED5E20] text-white hover:bg-orange-600 disabled:opacity-50 cursor-pointer"
-              >
-                {loadingEval ? "Evaluating..." : "Re-Evaluate"}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-      {/* VERSION HISTORY MODAL */}
-      {showVersions && (
-        <div className="fixed inset-0 flex items-center justify-center pl-20 pr-20 cursor-pointer">
+        {showEval && sidebarWidth > 20 && <div style={{ width: sidebarWidth }}>
           <div
-            className="absolute inset-0 bg-black/50 transition-opacity backdrop-blur-md"
-            onClick={() =>
-              setShowVersions(false)}
+            className="flex-1 bg-gray-50 border rounded-md dark:bg-[#1A1A1A] p-5 overflow-y-auto flex flex-col h-screen"
+            style={{ width: sidebarWidth, minWidth: minSidebarWidth, maxWidth: maxSidebarWidth }}
           >
-          </div>
-          <div className="bg-gray-50 border dark:bg-[#1A1A1A] relative rounded-xl p-10 w-[1100px] max-h-[85vh]
-                        overflow-y-auto w-full"
-          >
-            <h2 className="text-lg font-semibold mb-3 relative flex items-center justify-center">
-              <span className="mx-auto">Version History</span>
+            {/* Tabs */}
+            <div className="flex items-center justify-between mb-3 border-b pb-2">
               <button
-                onClick={() => setShowVersions(false)}
-                aria-label="Close"
-                className="cursor-pointer p-2 rounded hover:bg-[#ED5E20]/15 hover:text-[#ED5E20] transition"
+                className={`text-lg font-semibold flex-1 text-center cursor-pointer
+                          ${sidebarTab === "ai" ? "text-[#ED5E20] border-b-2 border-[#ED5E20]" : "text-gray-500"}`}
+                onClick={() => setSidebarTab("ai")}
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+                AI Evaluation
               </button>
-            </h2>
-            {loadingVersions ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <Spinner className="w-10 h-10 text-[#ED5E20] animate-spin mb-4" />
-                <span className="text-lg font-semibold text-[#ED5E20] animate-pulse">
-                  Loading Version History...
-                </span>
-                <span className="text-sm text-gray-400 mt-2">
-                  Please wait while we fetch your design versions.
-                </span>
-              </div>
-            ) : (
+              <button
+                className={`text-lg font-semibold flex-1 text-center cursor-pointer
+                  ${sidebarTab === "comments" ? "text-[#ED5E20] border-b-2 border-[#ED5E20]" : "text-gray-500"}`}
+                onClick={() => setSidebarTab("comments")}
+              >
+                Comments
+              </button>
+            </div>
+            {sidebarTab === "ai" && (
+              <>
+                <FrameNavigator
+                  selectedFrameIndex={selectedFrameIndex}
+                  setSelectedFrameIndex={setSelectedFrameIndex}
+                  sortedFrameEvaluations={sortedFrameEvaluations}
+                  filteredFrameEvaluations={filteredFrameEvaluations}
+                />
 
-              <div className="border rounded-lg overflow-hidden">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="bg-[#ED5E20] dark:bg-[#ED5E20] text-white dark:text-white">
-                      <th className="p-2 border">Version</th>
-                      <th className="p-2 border">Score</th>
-                      <th className="p-2 border">AI Summary</th>
-                      <th className="p-2 border">Parameter</th>
-                      <th className="p-2 border">Thumbnail</th>
-                      <th className="p-2 border">Node ID</th>
-                      <th className="p-2 border">Evaluated at</th>
-                      <th className="p-2 border text-center">Delete</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {versions
-                      .slice(page * pageSize, (page + 1) * pageSize)
-                      .map((v) => {
-                        const isCurrent = String(v.id).trim() === String(design?.current_version_id).trim();
-                        const isSelected = selectedVersion?.id === v.id;
-                        return (
-                          <tr
-                            key={v.id}
-                            className={
-                              "cursor-pointer transition " +
-                              (isCurrent
-                                ? "hover:bg-[#ED5E20]/10 dark:hover:bg-[#ED5E20]/10"
-                                : isSelected
-                                  ? "bg-[#ED5E20]/20 dark:bg-[#ED5E20]/20"
-                                  : "hover:bg-[#ED5E20]/10 dark:hover:bg-[#ED5E20]/10")
-                            }
-                            onClick={async () => {
-                              setSelectedVersion(v);
-                              try {
-                                const supabase = createClient();
-                                const { data: latest, error } = await supabase
-                                  .from("design_versions")
-                                  .select(`node_id, thumbnail_url, ai_summary, ai_data, 
-                                    snapshot,  created_at`)
-                                  .eq("id", v.id)
-                                  .single();
-                                if (error) {
-                                  toast.error("Failed to fetch latest version data.");
-                                  return;
-                                }
-                                let parsedAiData = null;
-                                try {
-                                  parsedAiData = typeof latest.ai_data === "string" ? JSON.parse(latest.ai_data) : latest.ai_data;
-                                } catch { }
+                <div className="flex-1 overflow-y-auto pr-5 space-y-5">
+                  {/* Loading State */}
+                  {loadingEval && (
+                    <div className="text-center text-neutral-500">
+                      Running evaluation...
+                    </div>
+                  )}
 
-                                if (parsedAiData) {
-                                  setEvalResult({
-                                    nodeId: latest.node_id,
-                                    imageUrl: latest.thumbnail_url,
-                                    summary: latest.ai_summary ?? parsedAiData.summary ?? "",
-                                    heuristics: parsedAiData.heuristics ?? null,
-                                    ai_status: "ok",
-                                    overall_score: parsedAiData.overall_score ?? null,
-                                    strengths: Array.isArray(parsedAiData.strengths) ? parsedAiData.strengths : [],
-                                    weaknesses: Array.isArray(parsedAiData.weaknesses) ? parsedAiData.weaknesses : [],
-                                    issues: Array.isArray(parsedAiData.issues) ? parsedAiData.issues : [],
-                                    category_scores: parsedAiData.category_scores ?? null,
-                                    ai: parsedAiData,
-                                  });
-                                  setShowEval(true);
-                                }
-                                setShowVersions(false);
-                              } catch (error) {
-                                toast.error(`Error loading version data. ${error}`);
-                              }
-                            }}
-                          >
-                            {/*VERSION*/}
-                            <td className="p-2 border text-center text-gray-700 dark:text-gray-200">
-                              {isCurrent ? (
-                                <span
-                                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-[#ED5E20] to-orange-400 text-white text-xs font-semibold shadow-md animate-pulse"
-                                  style={{
-                                    boxShadow: "0 2px 8px 0 rgba(237,94,32,0.18)",
-                                    letterSpacing: "0.03em",
-                                  }}
-                                >
-                                  <svg
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 20 20"
-                                    fill="none"
-                                    className="mr-1"
-                                  >
-                                    <circle cx="10" cy="10" r="10" fill="#fff" fillOpacity="0.18" />
-                                    <path
-                                      d="M6 10.5l2.5 2.5L14 8"
-                                      stroke="#fff"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    />
-                                  </svg>
-                                  Current
-                                </span>
-                              ) : (
-                                v.version
-                              )}
-                            </td>
+                  {/* Error State */}
+                  {evalError && (
+                    <div className="text-red-500 text-sm">
+                      Error: {evalError}
+                    </div>
+                  )}
 
-                            {/*SCORE*/}
-                            <td className="p-2 border text-gray-700 dark:text-gray-200 text-center">
-                              {(() => {
-                                if (!v.ai_data) return "-";
-                                try {
-                                  const ai = typeof v.ai_data === "string" ? JSON.parse(v.ai_data) : v.ai_data;
-                                  return ai.overall_score !== undefined ? Math.round(ai.overall_score) : "-";
-                                } catch {
-                                  return "-";
-                                }
-                              })()}
-                            </td>
+                  {/* Results */}
+                  {evalResult && !loadingEval && (
+                    <EvaluationResult
+                      evalResult={evalResult}
+                      loadingEval={loadingEval}
+                      currentFrame={currentFrame}
+                      frameEvaluations={frameEvaluations}
+                      selectedFrameIndex={selectedFrameIndex}
+                    />
+                  )}
+                </div>
 
-                            {/*AI SUMMARY*/}
-                            <td className="p-2 border text-gray-700 dark:text-gray-200">{v.ai_summary || "-"}</td>
-
-                            {/*PARAMETERS*/}
-                            <td className="p-5 border align-middle text-gray-700 dark:text-gray-200">
-                              {(() => {
-                                let age = "-";
-                                let occupation = "-";
-                                try {
-                                  const snap = typeof v.snapshot === "string" ? JSON.parse(v.snapshot) : v.snapshot;
-                                  age = snap?.age ?? "-";
-                                  occupation = snap?.occupation ?? "-";
-                                } catch { }
-                                // Use stronger contrast for current version
-                                const badgeAgeClass = isCurrent
-                                  ? "bg-[#ED5E20] text-white border border-[#ED5E20]"
-                                  : "bg-[#ED5E20]/10 text-[#ED5E20] border border-[#ED5E20]/30";
-                                const badgeOccClass = isCurrent
-                                  ? "bg-orange-700 text-white border border-orange-700"
-                                  : "bg-orange-400/10 text-orange-700 border border-orange-400/30";
-                                return (
-                                  <div className="items-center space-y-1">
-                                    <span className={`w-full inline-flex items-center px-4 py-0.5 min-w-[90px] justify-center rounded-full text-xs font-semibold ${badgeAgeClass}`}>
-                                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 16 16">
-                                        <path d="M7 2l-4 7h4v5l4-7H7V2z" />
-                                      </svg>
-                                      {typeof age === "string"
-                                        ? age.replace(/\s+/g, " ").trim()
-                                        : age}
-                                    </span>
-                                    <span className={`w-full inline-flex items-center px-4 py-0.5 min-w-[90px] justify-center rounded-full text-xs font-semibold ${badgeOccClass}`}>
-                                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 16 16">
-                                        <path d="M8 2a3 3 0 0 1 3 3c0 1.657-1.343 3-3 3S5 6.657 5 5a3 3 0 0 1 3-3zm0 7c2.21 0 4 1.343 4 3v2H4v-2c0-1.657 1.79-3 4-3z" />
-                                      </svg>
-                                      {occupation}
-                                    </span>
-                                  </div>
-                                );
-                              })()}
-                            </td>
-
-                            {/*THUMBNAIL*/}
-                            <td className="p-2 border text-gray-700 dark:text-gray-200">
-                              {v.thumbnail_url && v.thumbnail_url.startsWith("http") ? (
-                                <Image src={v.thumbnail_url} alt="thumb"
-                                  width={70}
-                                  height={50}
-                                  className="object-cover" />
-                              ) : (
-                                "-"
-                              )}
-                            </td>
-
-                            {/*NODE ID*/}
-                            <td className="p-2 border text-gray-700 dark:text-gray-200 text-center">{v.node_id}</td>
-
-                            {/*EVALUATION TIME*/}
-                            <td className="p-2 border text-gray-700 dark:text-gray-200 text-center">{v.created_at ? new Date(v.created_at).toLocaleString() : "-"}</td>
-
-                            {/*DELETE*/}
-                            <td className="p-2 border text-center text-gray-700 dark:text-gray-200">
-                              {!isCurrent && (
-                                <button
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    toast(() => {
-                                      const toastId = `delete-version-${v.id}`;
-                                      return (
-                                        <div className="flex flex-col items-center justify-center gap-2 p-4 ml-8">
-                                          <span className="text-base font-semibold text-[#ED5E20] text-center">
-                                            Delete version <span className="font-bold">v{v.version}</span>?
-                                          </span>
-                                          <span className="mt-1 text-xs text-gray-500 text-center">
-                                            This action cannot be undone.
-                                          </span>
-                                          <div className="flex gap-6 mt-4 justify-center w-full">
-                                            <button
-                                              onClick={async () => {
-                                                toast.dismiss(toastId);
-                                                try {
-                                                  await deleteDesignVersion(v.id);
-                                                  setVersions(versions.filter(ver => ver.id !== v.id));
-                                                  setVersionChanged((v) => v + 1);
-                                                  toast.success(
-                                                    <span>
-                                                      <span className="font-bold text-[#ED5E20]">v{v.version}</span> deleted successfully!
-                                                    </span>
-                                                  );
-                                                } catch (err: unknown) {
-                                                  const errorMsg =
-                                                    err instanceof Error
-                                                      ? err.message
-                                                      : typeof err === "string"
-                                                        ? err
-                                                        : JSON.stringify(err);
-
-                                                  // Check for foreign key violation (published version)
-                                                  let isPublishedConstraint = false;
-                                                  try {
-                                                    const parsed = typeof err === "string" ? JSON.parse(err) : err;
-                                                    if (parsed && parsed.code === "23503") {
-                                                      isPublishedConstraint = true;
-                                                    }
-                                                  } catch { }
-
-                                                  toast.error(
-                                                    <span>
-                                                      <span className="font-bold text-[#ED5E20]">v{v.version}</span> could not be deleted.<br />
-                                                      {isPublishedConstraint ? (
-                                                        <span>
-                                                          This version is currently published.<br />
-                                                          Please unpublish the design before deleting this version.
-                                                        </span>
-                                                      ) : (
-                                                        <>
-                                                          {errorMsg && (
-                                                            <span className="text-xs text-red-400">{errorMsg}<br /></span>
-                                                          )}
-                                                          Please try again.
-                                                        </>
-                                                      )}
-                                                    </span>
-                                                  );
-                                                }
-                                              }}
-                                              className="px-6 py-2 rounded-full bg-gradient-to-r from-[#ED5E20] to-orange-400 text-white font-bold shadow-lg hover:scale-105 hover:from-orange-500 hover:to-[#ED5E20] transition-all duration-200 cursor-pointer"
-                                            >
-                                              Yes, Delete
-                                            </button>
-                                            <button
-                                              onClick={() => toast.dismiss(toastId)}
-                                              className="px-6 py-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-semibold shadow hover:bg-gray-200 dark:hover:bg-gray-700 hover:scale-105 transition-all duration-200 cursor-pointer"
-                                            >
-                                              Cancel
-                                            </button>
-                                          </div>
-                                        </div>
-                                      );
-                                    }, { duration: 10000, id: `delete-version-${v.id}` });
-                                  }}
-                                  className="text-red-500 hover:text-white hover:bg-red-500 rounded-full p-1 cursor-pointer transition-all duration-200"
-                                  title="Delete version"
-                                >
-                                  <IconTrash size={18} />
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-                </table>
-              </div>
+                <div className="mt-auto pt-4">
+                  <button
+                    onClick={handleEvaluate}
+                    disabled={loadingEval}
+                    className="w-full px-4 py-2 text-sm rounded-md bg-[#ED5E20] text-white hover:bg-orange-600 disabled:opacity-50 cursor-pointer"
+                  >
+                    {loadingEval ? "Evaluating..." : "Re-Evaluate"}
+                  </button>
+                </div>
+              </>
             )}
-            {versions.length > pageSize && (
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 px-2">
-                {/* Progress Bar */}
-                <div className="w-full sm:w-1/2 h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden shadow-inner">
-                  <div
-                    className="h-full bg-gradient-to-r from-[#ED5E20] to-orange-400 transition-all duration-500"
-                    style={{
-                      width: `${((page + 1) / Math.ceil(versions.length / pageSize)) * 100}%`,
-                    }}
-                  />
-                </div>
-                {/* Pagination Controls */}
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setPage((p) => Math.max(0, p - 1))}
-                    disabled={page === 0}
-                    className={`group relative flex items-center justify-center px-4 py-2 rounded-full
-                      bg-white/80 dark:bg-[#232323]/80 shadow-lg border border-[#ED5E20]/30
-                      text-[#ED5E20] dark:text-[#ED5E20] font-bold text-base
-                      transition-all duration-300
-                      hover:bg-[#ED5E20] hover:text-white hover:scale-110 active:scale-95
-                      disabled:opacity-40 disabled:cursor-not-allowed
-                      outline-none focus:ring-2 focus:ring-[#ED5E20]/40
-                      cursor-pointer
-                      `}
-                    aria-label="Previous Page"
-                  >
-                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" className="mr-1">
-                      <path d="M15 19l-7-7 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    Back
-                    <span className="absolute -inset-1 rounded-full pointer-events-none group-hover:animate-pulse" />
-                  </button>
-                  <span className="mx-2 text-sm font-semibold tracking-wide bg-gradient-to-r from-[#ED5E20]/80 to-orange-400/80 text-white px-4 py-1 rounded-full shadow">
-                    Page {page + 1} of {Math.ceil(versions.length / pageSize)}
-                  </span>
-                  <button
-                    onClick={() => setPage((p) => Math.min(Math.ceil(versions.length / pageSize) - 1, p + 1))}
-                    disabled={(page + 1) * pageSize >= versions.length}
-                    className={`
-                      group relative flex items-center justify-center px-4 py-2 rounded-full
-                      bg-white/80 dark:bg-[#232323]/80 shadow-lg border border-[#ED5E20]/30
-                      text-[#ED5E20] dark:text-[#ED5E20] font-bold text-base
-                      transition-all duration-300
-                      hover:bg-[#ED5E20] hover:text-white hover:scale-110 active:scale-95
-                      disabled:opacity-40 disabled:cursor-not-allowed
-                      outline-none focus:ring-2 focus:ring-[#ED5E20]/40
-                      cursor-pointer`}
-                    aria-label="Next Page"
-                  >
-                    Next
-                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" className="ml-1">
-                      <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    <span className="absolute -inset-1 rounded-full pointer-events-none group-hover:animate-pulse" />
-                  </button>
-                </div>
+            {sidebarTab === "comments" && (
+              <div className="flex-1 flex flex-col">
+                <CommentsSection
+                  comments={comments}
+                  newCommentText={newCommentText}
+                  setNewCommentText={setNewCommentText}
+                  currentUserId={currentUserId}
+                  handleAddComment={handleAddComment}
+                  editingId={editingId}
+                  setEditingId={setEditingId}
+                  replyingToId={replyingToId}
+                  setReplyingToId={setReplyingToId}
+                  handleDeleteComment={handleDeleteComment}
+                />
               </div>
             )}
           </div>
         </div>
+        }
+        {sidebarWidth <= 20 && (
+          <button
+            onClick={() => {
+              setSidebarWidth(700);
+              setShowEval(true);
+            }}
+            className="absolute top-1/2 right-0 z-50 bg-[#ED5E20] text-white rounded-l px-2 py-1 shadow -translate-y-1/2"
+            aria-label="Show Evaluation Sidebar"
+          >
+            <IconLayoutSidebarRightExpand size={22} />
+          </button>
+        )}
+
+      </div>
+      {showVersions && (
+        <VersionHistoryModal
+          open={showVersions}
+          onClose={() => setShowVersions(false)}
+          loadingVersions={loadingVersions}
+          versions={versions}
+          page={page}
+          pageSize={pageSize}
+          setPage={setPage}
+          design={design}
+          selectedVersion={selectedVersion}
+          setSelectedVersion={setSelectedVersion}
+          fetchDesignVersions={fetchDesignVersions}
+          deleteDesignVersion={deleteDesignVersion}
+          setVersions={setVersions}
+          setVersionChanged={setVersionChanged}
+          setEvalResult={setEvalResult}
+          setShowEval={setShowEval}
+        />
       )}
     </div>
   );

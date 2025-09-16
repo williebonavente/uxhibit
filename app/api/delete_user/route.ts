@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     const { error } = await supabase.auth.admin.deleteUser(userId);
 
     if (error) {
-      console.error("Supabase deleteUser error:", error);
+      console.error("Supabase deleteUser error:", error.message);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 

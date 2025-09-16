@@ -81,10 +81,11 @@ export default function Evaluate() {
       const data = await res.json();
 
       if (data) {
-        console.log("Extracted metadata from Figma parse:", data.normalizedFrames);
-        console.log("Extracted text nodes from Figma parse", data.textNodes);
-        console.log("Extracted contrast evaluation score parse: ", data.accessbilityScores)
-        console.log("Extracted random sheesh", data.accessibilityResults);
+        // console.log("Extracted metadata from Figma parse:", data.normalizedFrames);
+        console.log("There is data", { data });
+        // console.log("Extracted text nodes from Figma parse", data.textNodes);
+        // console.log("Extracted contrast evaluation score parse: ", data.accessbilityScores)
+        // console.log("Extracted random sheesh", data.accessibilityResults);
       } else {
         console.log("No metadata found in Figma parse response.");
       }
@@ -139,7 +140,8 @@ export default function Evaluate() {
       // Save the design and let the backend handle evaluation
       const saveRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/designs`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           title: parsed.name,
           figma_link: link,
@@ -152,13 +154,13 @@ export default function Evaluate() {
         }),
       });
       const saved = await saveRes.json();
+      console.log(saved);
       toast.dismiss(loadingToast);
 
       if (!saveRes.ok || !saved?.design?.id) {
         toast.error(saved?.error || "Save failed");
         return;
       }
-
       // Check backend evaluation result
       if (saved.ai_evaluation && saved.ai_evaluation.frameCount > 0) {
         toast.success("Design and AI evaluation completed for all frames");

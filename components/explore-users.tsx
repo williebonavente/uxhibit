@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { LoadingInspiration } from "./animation/loading-fetching";
 import { DesignCard } from "./design-card";
 import { CommentItem } from "./comments-user";
+import { MessageSquare } from "lucide-react";
 import { Comment } from "./comments-user";
 // import { useRef } from "react";
 
@@ -32,18 +33,34 @@ type UserInfo = {
   designs: DesignInfo[];
 };
 
-export function UserAvatar({ avatarPath, alt }: { avatarPath: string | null, alt: string }) {
-  const avatarUrl = useSignedAvatarUrl(avatarPath);
-  return (
-    <Image
-      src={avatarUrl ?? "/images/default_avatar.png"}
-      alt={alt}
-      className="w-10 h-10 rounded-full"
-      width={400}
-      height={400}
-    />
-  );
+type UserAvatarProps = {
+  avatarPath: string | null;
+  alt: string;
+  className?: string;
 }
+
+// export function UserAvatar({ avatarPath, alt }: { avatarPath: string | null, alt: string }) {
+//   const avatarUrl = useSignedAvatarUrl(avatarPath);
+//   return (
+//     <Image
+//       src={avatarUrl ?? "/images/default_avatar.png"}
+//       alt={alt}
+//       className="w-10 h-10 rounded-full"
+//       width={400}
+//       height={400}
+//     />
+//   );
+// }
+
+export const UserAvatar: React.FC<UserAvatarProps> = ({ avatarPath, alt, className }) => (
+    <Image
+        src={avatarPath || "/iamges/default_avatar.png"}
+        alt={alt}
+        className={className} 
+        width={40}
+        height={40}
+    />
+);
 
 export function useSignedAvatarUrl(avatarPath: string | null) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
@@ -85,8 +102,6 @@ export default function ExplorePage() {
   const [users, setUsers] = useState<UserInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [animatingHeart, setAnimatingHeart] = useState<string | null>(null);
-  const [replyingToId, setReplyingToId] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [comments, setComments] = useState<Comment[]>(initialComments);
   const [newCommentText, setNewCommentText] = useState("");
   const [currentUserProfile, setCurrentUserProfile] = useState<{ fullName: string; avatarUrl: string } | null>(null);
@@ -256,51 +271,8 @@ export default function ExplorePage() {
     }
   };
 
-  const handleAddComment = async () => {
-    const supabase = createClient();
-    if (!newCommentText.trim() || !currentUserId || !currentUserProfile) return;
-
-    const { data, error } = await supabase
-      .from("comments")
-
-      .insert([
-        {
-          user_id: currentUserId,
-          text: newCommentText,
-          parent_id: null,
-          local_time: new Date().toLocaleTimeString(),
-        },
-      ])
-      .select()
-      .single();
 
 
-    if (error) {
-      toast.error("Failed to add comment!");
-      return;
-    }
-
-    setComments([
-      {
-        id: data.id,
-        text: data.text,
-        user: {
-          id: currentUserId,
-          fullName: currentUserProfile.fullName,
-          avatarUrl: currentUserProfile.avatarUrl,
-        },
-        replies: [],
-        createdAt: new Date(data.created_at),
-        localTime: data.local_time,
-      },
-      ...comments,
-    ]);
-    setNewCommentText("");
-  };
-
-  const handleDeleteComment = (id: string) => {
-    setComments(comments.filter(comment => comment.id !== id));
-  }
   useEffect(() => {
     if (!currentUserId) return;
     fetchUsersWithDesigns();
@@ -396,8 +368,6 @@ export default function ExplorePage() {
 
     fetchComments();
 
-    // Subscribe to realtime changes
-
     const supabase = createClient()
     const channel = supabase
       .channel('comments-realtime')
@@ -447,37 +417,6 @@ export default function ExplorePage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-      </div>
-
-      {/* Replace this with your actual comment data */}
-      <div className="mb-4">
-        <div className="flex gap-2 mb-2">
-          <input
-            type="text"
-            value={newCommentText}
-            onChange={e => setNewCommentText(e.target.value)}
-            placeholder="Write a comment..."
-            className="border rounded px-2 py-1 flex-1"
-          />
-          <button
-            className="bg-blue-500 text-white px-3 py-1 rounded"
-            onClick={handleAddComment}
-            disabled={!newCommentText.trim() || !currentUserId}
-          >
-            Add Comment
-          </button>
-        </div>
-        {comments.map(comment => (
-          <CommentItem
-            key={comment.id}
-            comment={comment}
-            editingId={editingId}
-            setEditingId={setEditingId}
-            replyingToId={replyingToId}
-            setReplyingToId={setReplyingToId}
-            onDelete={handleDeleteComment}
-          />
-        ))}
       </div>
 
       {/* User Cards */}

@@ -18,23 +18,21 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { registerFormSchema } from "@/lib/validation-schemas";
 import MiddleHeaderIcon from "./middle-header-icon";
-import Image from "next/image";
 import { type User } from "@supabase/supabase-js";
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import { avatarStyles  } from "@/constants/randomAvatars"
 // import { Avatar } from '@radix-ui/react-avatar'
 
 export default function RegistrationForm({ user }: { user: User | null }) {
-  const router = useRouter();
 
-  // const [loading, setLoading] = useState(true);
-  // const [fullname, setFullName] = useState<string | null>(null);
-  // const [username, setUsername] = useState<string | null>(null);
-  // const [website, setWebsite] = useState<string | null>(null);
-  // const [age, setAge] = useState<string | null>(null);
-  // const [avatar_url, setAvatarUrl] = useState<string | null>(null);
-  // const [isCheck, setCheck] = useState<string | null>(null);
+  const router = useRouter();
+  function getRandomAvatar(userId: string) {
+    const randomStyle =
+      avatarStyles[Math.floor(Math.random() * avatarStyles.length)];
+    return `${randomStyle}${userId}`;
+  }
+
 
   const form = useForm<z.infer<typeof registerFormSchema>>({
     defaultValues: {
@@ -49,40 +47,6 @@ export default function RegistrationForm({ user }: { user: User | null }) {
     resolver: zodResolver(registerFormSchema),
   });
 
-  // async function updateProfile({
-  //   username,
-  //   website,
-  //   age,
-  //   avatar_url,
-  // }: {
-  //   username: string | null
-  //   fullname: string | null
-  //   age: number
-  //   website: string | null
-  //   avatar_url: string | null
-  // }) {
-  //   try {
-  //     setLoading(true)
-
-  //     const { error } = await supabase
-  //       .from('profiles')
-  //       .upsert({
-  //         id: user?.id as string,
-  //         username,
-  //         full_name: fullname,
-  //         age,
-  //         website,
-  //         avatar_url,
-  //         updated_at: new Date().toISOString(),
-  //       })
-  //     if (error) throw error
-  //     alert('Profile updated!')
-  //   } catch (error) {
-  //     alert('Error updating the data!')
-  //   } finally {
-  //     setLoading(false)
-  //   }
-  // }
   const origin =
     typeof window !== "undefined"
       ? window.location.origin
@@ -116,6 +80,9 @@ export default function RegistrationForm({ user }: { user: User | null }) {
             full_name: values.full_name,
             age: values.age,
             gender: values.gender,
+            // default avatar here
+            // if it's does not have profile existing where avatar_url is null in db
+
           },
         },
       });
@@ -127,6 +94,21 @@ export default function RegistrationForm({ user }: { user: User | null }) {
         return;
       }
 
+      // Insert profile with avatar if user was created
+      const userId = signUpData?.user?.id;
+      if (userId) {
+        const avatarUrl = getRandomAvatar(userId);
+        await supabase.from("profiles").upsert({
+          id: userId,
+          full_name: values.full_name,
+          username: values.username,
+          age: values.age,
+          gender: values.gender,
+          avatar_url: avatarUrl,
+          updated_at: new Date().toISOString(),
+        });
+      }
+
       toast.success('Check your email to confirm your account');
       router.push('/auth/login');
     } catch (e) {
@@ -134,7 +116,6 @@ export default function RegistrationForm({ user }: { user: User | null }) {
       toast.error(`Failed to submit the form. Please try again.${e}`);
     }
   }
-
 
   return (
     <>

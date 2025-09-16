@@ -126,7 +126,7 @@ async function critiqueWithMistral(
 }
 
 export async function POST(req: Request) {
-    const { url, designId, snapshot } = await req.json();
+    const { url, designId, nodeId, thumbnailUrl, snapshot } = await req.json();
 
     if (!url) {
         return NextResponse.json({ error: "Missing Figma URL" }, { status: 400 });
@@ -135,7 +135,10 @@ export async function POST(req: Request) {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
     const parseRes = await fetch(`${baseUrl}/api/figma/parse`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+            "Content-Type": "application/json",
+            cookie: req.headers.get('cookie') || '',
+        },
         body: JSON.stringify({ url }),
     });
 
@@ -230,13 +233,12 @@ export async function POST(req: Request) {
         // Delayed per API response
         await sleep(2000);
     }
-
     // After the for-loop
     console.log(`All ${frameIds.length} frames evaluated. Aggregating results and saving design version...`);
 
     // 2. Aggregate results for design_versions
     const validResults = frameResults.filter(r => r.ai);
-    const overall_score = validResults.length
+    const total_score = validResults.length
         ? Math.round(validResults.reduce((sum, r) => sum + (r.ai?.overall_score ?? 0), 0) / validResults.length)
         : 0;
     const summary = `Aggregate summary: ${validResults.map(r => r.ai?.summary).join(" | ")}`;
@@ -244,12 +246,14 @@ export async function POST(req: Request) {
     // 3. Save aggregate to design_versions (single row)
     try {
         const nextVersion = await getNextVersion(supabase, designId);
-        await supabase.from("design_versions").upsert({
+        const { error, data } = await supabase.from("design_versions").upsert({
             design_id: designId,
             file_key: fileKey,
+            node_id: nodeId,
+            thumbnail_url: thumbnailUrl,
             ai_summary: summary,
-            ai_data: frameResults, 
-            overall_score,
+            ai_data: frameResults,
+            total_score,
             snapshot: (() => {
                 if (!snapshot) return null;
                 if (typeof snapshot === "string") {
@@ -261,6 +265,11 @@ export async function POST(req: Request) {
             version: nextVersion,
             created_by: user.id
         });
+        if (error) {
+            console.error("Supabase upsert error (design_versions):", error);
+        } else {
+            console.log("Supabase upsert success (design_versions):", data);
+        }
     } catch (err) {
         console.error("Error in Supabase save (aggregate):", err);
     }
@@ -268,6 +277,10 @@ export async function POST(req: Request) {
     return NextResponse.json({
         results: frameResults,
         frameCount: frameIds.length,
-        message: "AI evaluation completed for all frames and aggregate saved."
+        message: "AI evaluation completed for all frames and aggregate saved.",
+        // // Watchout about this error ones
+        // accessibilityResults: parseData.accessibilityResults,
+        // accessbilityScores: parseData.accessbilityScores,
+        // normalizedFrames: parseData.normalizedFrames,
     });
 }

@@ -25,15 +25,26 @@ export async function fetchDesignVersions(designId: string): Promise<Versions[]>
   const { data, error } = await supabase
     .from("design_versions")
     .select(`
-      id, design_id, version,snapshot,file_key,node_id,
-      thumbnail_url,ai_summary,ai_data,created_at`)
+      id, design_id, 
+      version,
+      snapshot,
+      file_key,node_id,
+      thumbnail_url,
+      ai_summary,
+      ai_data,
+      total_score,
+      created_at`
+    )
     .eq("design_id", designId)
     .order("version", { ascending: true });
-  if (error) throw error;
+  if (error) {
+    console.error(error.message);
+    throw error;
+  }
   return data || [];
 }
 
-export async function deleteDesignVersion(versionId: string): Promise<boolean> {
+export async function deleteDesignVersion(versionId: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
     .from("design_versions")
@@ -41,7 +52,6 @@ export async function deleteDesignVersion(versionId: string): Promise<boolean> {
     .eq("id", versionId);
 
   if (error) throw error;
-  return true;
 }
 export async function getNextVersion(supabase: SupabaseClient, designId: string): Promise<number> {
   const { data: versions, error } = await supabase
