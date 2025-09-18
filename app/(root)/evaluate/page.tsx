@@ -48,7 +48,7 @@ export default function Evaluate() {
       "backdrop-blur-sm",
     ].join(" ");
   const router = useRouter();
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
   const supabase = createClient();
 
@@ -135,7 +135,7 @@ export default function Evaluate() {
     }
 
     setSubmitting(true);
-    const loadingToast = toast.loading("Running AI evaluation...");
+    // const loadingToast = toast.loading("Running AI evaluation...");
     try {
       // Save the design and let the backend handle evaluation
       const saveRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/designs`, {
@@ -155,7 +155,7 @@ export default function Evaluate() {
       });
       const saved = await saveRes.json();
       console.log(saved);
-      toast.dismiss(loadingToast);
+      // toast.dismiss(loadingToast);
 
       if (!saveRes.ok || !saved?.design?.id) {
         toast.error(saved?.error || "Save failed");
@@ -172,7 +172,7 @@ export default function Evaluate() {
     } catch (error) {
       console.error("Submit failed:", error);
       toast.error("Submit failed");
-      toast.dismiss(loadingToast);
+      // toast.dismiss(loadingToast);
     } finally {
       setSubmitting(false);
     }
@@ -189,32 +189,44 @@ export default function Evaluate() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-80px)] flex flex-col items-center justify-center px-4 py-8 z-0">
-      <div className="w-full max-w-3xl relative overflow-hidden rounded-xl shadow-xl z-0">
-        <Image
-          src="/images/gradient-evaluate.png"
-          alt="Background"
-          fill
-          priority
-          className="object-cover"
-          sizes="(min-width:1280px) 1024px, 100vw"
-        />
-        {/* CHANGED: layered glass overlays for readability (lighter in light mode, subtle in dark) */}
-        <div className="absolute inset-0">
-          {/* base blur + tint */}
-          <div className="absolute inset-0 backdrop-blur-md bg-white/35 dark:bg-black/40" />
-          {/* gradient to increase contrast behind center content */}
-          <div className="absolute inset-0 bg-gradient-to-b from-white/70 via-white/40 to-white/20 dark:from-black/60 dark:via-black/50 dark:to-black/40" />
-          {/* slight inner ring for glass edge definition */}
-          <div className="absolute inset-0 ring-1 ring-white/40 dark:ring-white/10 rounded-2xl pointer-events-none" />
-        </div>
+    <div className="relative min-h-screen flex items-center justify-center rounded-2xl overflow-hidden mt-5">
+      {/* Orange gradient background */}
+      <div
+        className="absolute inset-0 w-full h-full orange-gradient-bg opacity-45"
+        style={{
+          zIndex: 0,
+          background:
+            "linear-gradient(135deg, #ffb347 0%, #ed5e20 60%, #f97316 100%)",
+        }}
+      >
+        <style>
+          {`
+            @media (prefers-color-scheme: dark) {
+              .orange-gradient-bg {
+                background: linear-gradient(135deg, #ed5e20 0%, #f59e0b 60%, #ffb347 100%);
+              }
+            }
+          `}
+        </style>
+      </div>
+
+      {/* CHANGED: layered glass overlays for readability (lighter in light mode, subtle in dark) */}
+      <div className="absolute inset-0">
+        {/* base blur + tint */}
+        <div className="absolute inset-0 backdrop-blur-md bg-white/35 dark:bg-black/40 " />
+        {/* gradient to increase contrast behind center content */}
+        <div className="absolute inset-0 bg-gradient-to-b from-white/70 via-white/40 to-white/20 dark:from-black/60 dark:via-black/50 dark:to-black/40 rounded-2xl" />
+        {/* slight inner ring for glass edge definition */}
+        <div className="absolute inset-0 ring-1 ring-white/40 dark:ring-white/10 pointer-events-none" />
+      </div>
 
         <div
           className="relative z-10 p-6 md:p-10 flex flex-col gap-8"
+          style={cardCursor}
         >
           {/* Step Indicator */}
           <div className="flex items-center justify-center gap-4 text-xs font-medium tracking-wide">
-            {[1, 2, 3].map((n) => (
+            {[1, 2, 3, 4].map((n) => (
               <div key={n} className={`flex items-center gap-2`}>
                 <span
                   className={`h-7 w-7 rounded-full flex items-center justify-center text-[11px]
@@ -234,8 +246,9 @@ export default function Evaluate() {
                   {n === 1 && "Parameters"}
                   {n === 2 && "Upload"}
                   {n === 3 && "Review"}
+                  {n === 4 && "AI Evaluation"}
                 </span>
-                {n < 3 && (
+                {n < 4 && (
                   <div className="h-px w-10 bg-gradient-to-r from-transparent via-neutral-300/60 dark:via-neutral-600/50 to-transparent" />
                 )}
               </div>
@@ -343,7 +356,7 @@ export default function Evaluate() {
               <div className="flex flex-col sm:flex-row justify-between gap-4 pt-2">
                 <Button
                   onClick={resetAll}
-                  className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-lg text-sm font-medium
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-sm font-medium
                     border border-neutral-300/70 dark:border-neutral-600/60 
                     bg-white/60 dark:bg-neutral-800/50
                     text-neutral-700 dark:text-neutral-200
@@ -352,7 +365,7 @@ export default function Evaluate() {
                     hover:border-neutral-400 dark:hover:border-neutral-500
                     transition-colors
                     focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ED5E20]/60
-                    focus:ring-offset-white dark:focus:ring-"
+                    focus:ring-offset-white dark:focus:ring- cursor-pointer"
                   type="button"
                 >
                   <svg
@@ -415,8 +428,29 @@ export default function Evaluate() {
               <div className="flex justify-between gap-4">
                 <button
                   onClick={() => setStep(1)}
-                  className="px-5 py-2 rounded-lg border text-sm text-neutral-600 dark:text-neutral-300 hover:bg-white/70 dark:hover:bg-neutral-800/60 cursor-pointer"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-sm font-medium
+                    border border-neutral-300/70 dark:border-neutral-600/60 
+                    bg-white/60 dark:bg-neutral-800/50
+                    text-neutral-700 dark:text-neutral-200
+                    shadow-sm backdrop-blur
+                    hover:bg-white/80 dark:hover:bg-neutral-800/70
+                    hover:border-neutral-400 dark:hover:border-neutral-500
+                    transition-colors
+                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ED5E20]/60
+                    focus:ring-offset-white dark:focus:ring- cursor-pointer"
+                  type="button"
                 >
+                  <svg
+                    className="h-4 w-4 opacity-80"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M13 17l-5-5 5-5" />
+                  </svg>
                   Back
                 </button>
                 <div className="flex gap-3">
@@ -432,6 +466,7 @@ export default function Evaluate() {
                   >
                     {parsing ? "Parsing..." : parsed ? "Re-Parse" : "Parse"}
                   </button>
+                  {/*
                   <button
                     disabled={!parsed}
                     onClick={() => parsed && setStep(3)}
@@ -443,6 +478,7 @@ export default function Evaluate() {
                   >
                     Review
                   </button>
+                  */}
                 </div>
               </div>
             </div>
@@ -497,20 +533,66 @@ export default function Evaluate() {
               <div className="flex justify-between gap-4">
                 <button
                   onClick={() => setStep(2)}
-                  className="px-5 py-2 rounded-lg border text-sm text-neutral-600 dark:text-neutral-300 hover:bg-white/70 dark:hover:bg-neutral-800/60 cursor-pointer"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-sm font-medium
+                    border border-neutral-300/70 dark:border-neutral-600/60 
+                    bg-white/60 dark:bg-neutral-800/50
+                    text-neutral-700 dark:text-neutral-200
+                    shadow-sm backdrop-blur
+                    hover:bg-white/80 dark:hover:bg-neutral-800/70
+                    hover:border-neutral-400 dark:hover:border-neutral-500
+                    transition-colors
+                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ED5E20]/60
+                    focus:ring-offset-white dark:focus:ring- cursor-pointer"
                 >
+                  <svg
+                    className="h-4 w-4 opacity-80"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M13 17l-5-5 5-5" />
+                  </svg>
                   Back
                 </button>
                 <div className="flex gap-3">
                   <button
                     onClick={() => setStep(1)}
-                    className="px-5 py-2 rounded-lg border text-sm text-neutral-600 dark:text-neutral-300 hover:bg-white/70 dark:hover:bg-neutral-800/60 cursor-pointer"
+                    className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-sm font-medium
+                      border border-neutral-300/70 dark:border-neutral-600/60 
+                      bg-white/60 dark:bg-neutral-800/50
+                      text-neutral-700 dark:text-neutral-200
+                      shadow-sm backdrop-blur
+                      hover:bg-white/80 dark:hover:bg-neutral-800/70
+                      hover:border-neutral-400 dark:hover:border-neutral-500
+                      transition-colors
+                      focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ED5E20]/60
+                      focus:ring-offset-white dark:focus:ring- cursor-pointer"
+                    type="button"
                   >
+                    <svg
+                      className="h-4 w-4 opacity-80"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      {/* Pencil (edit) icon */}
+                      <path d="M15.232 5.232l-10 10V17h1.768l10-10a2 2 0 0 0-2.828-2.828z" />
+                      <path d="M17.414 2.586a2 2 0 0 1 0 2.828l-1.172 1.172-2.828-2.828 1.172-1.172a2 2 0 0 1 2.828 0z" />
+                    </svg>
                     Edit Parameters
                   </button>
                   <button
                     disabled={submitting}
-                    onClick={handleSubmit}
+                    onClick={() => {
+                      handleSubmit();
+                      setStep(4);
+                    }}
                     className="group relative inline-flex items-center justify-center
                     px-9 py-2.5 rounded-xl text-sm font-semibold tracking-wide
                     transition-all duration-300
@@ -552,8 +634,29 @@ export default function Evaluate() {
               </div>
             </div>
           )}
+
+          {/* STEP 4: Running AI Evaluation */}
+          {step === 4 && (
+            <div className="space-y-6">
+              <div className="flex flex-col items-center justify-center text-center py-24 animate-pulse">
+                <Image
+                  src="/images/smart-evaluation-underway.svg"
+                  alt="Running evaluation illustration"
+                  height={150}
+                  width={150}
+                  className="object-contain mb-6"
+                  priority
+                />
+                <h2 className="text-lg font-semibold text-[#ED5E20] mb-2">
+                  Smart Evaluation Underway!
+                </h2>
+                <p className="text-gray-500 text-sm mb-4">
+                  This may take a few minutes...
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
-    </div>
   );
 }

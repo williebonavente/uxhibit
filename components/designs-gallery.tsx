@@ -14,7 +14,6 @@ type DesignRow = {
   title: string;
   thumbnail_url: string | null;
   thumbnail_storage_path: string | null; // This is the original storage path
-
   file_key: string | null;
   node_id: string | null;
   current_version_id: string | null;
@@ -158,21 +157,33 @@ export default function DesignsGallery() {
 
     if (isPublished) {
       toast(
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            <IconTrash size={40} className="text-yellow-500 animate-bounce" />
-            <div>
-              <div className="font-semibold text-base text-yellow-700">Warning: Published Design</div>
-              <div className="text-sm text-yellow-800">
-                <span className="font-bold">This design is currently published.</span><br />
-                Unpublish it before deleting.<br />
-                <span className="italic text-yellow-600">Published designs are visible to others and cannot be deleted directly for safety.</span>
-              </div>
-            </div>
+        <div  className="items-center justify-center text-center text-black dark:text-white">
+          <div className="flex flex-col items-center justify-center text-center">
+            <Image
+              src="/images/let-go-of-this-design.svg"
+              alt="Delete design illustration"
+              height={150}
+              width={150}
+              className="object-contain mt-3 mb-3"
+              priority
+            />
+            <h2 className="text-lg font-semibold text-yellow-700 mb-2">
+              Warning: Published Design
+            </h2>
+            <p className="text-sm text-yellow-800 mb-1">
+              <span className="font-bold">This design is currently published.</span>
+            </p>
+            <p className="text-sm text-yellow-800 mb-1">
+              Unpublish it before deleting.
+            </p>
+            <p className="text-xs italic text-yellow-600">
+              Published designs are visible to others and cannot be deleted directly
+              for safety.
+            </p>
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-center items-center gap-2 mt-2 mb-3">
             <button
-              className="px-4 py-2 rounded bg-yellow-200 text-yellow-900 font-semibold hover:bg-yellow-300"
+              className="px-6 py-2 rounded-lg bg-[#ED5E20] hover:bg-[#d44e0f] text-sm font-semibold text-white cursor-pointer"
               onClick={() => {
                 setShowOverlay(false);
                 toast.dismiss();
@@ -185,7 +196,7 @@ export default function DesignsGallery() {
         {
           position: "top-center",
           duration: 999999,
-          className: "rounded-xl border border-yellow-400",
+          className: "bg-white dark:bg-[#120F12] text-black dark:text-white rounded-2xl items-center justify-center text-center",
           onAutoClose: () => setShowOverlay(false),
         }
       );
@@ -193,19 +204,26 @@ export default function DesignsGallery() {
     }
 
     toast(
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-3">
-          <IconTrash size={40} className="text-red-500" />
-          <div>
-            <div className="font-semibold text-base">Delete Design?</div>
-            <div className="text-sm text-gray-700">
-              This action cannot be undone.
-            </div>
-          </div>
+      <div className="items-center justify-center text-center text-black dark:text-white">
+        <div className="flex flex-col items-center justify-center text-center">
+          <Image
+            src="/images/let-go-of-this-design.svg"
+            alt="Delete design illustration"
+            height={150}
+            width={150}
+            className="object-contain mt-3 mb-3"
+            priority
+          />
+          <h2 className="text-lg font-semibold text-[#ED5E20] mb-2">
+            Let go of this design?
+          </h2>
+          <p className="text-gray-500 text-sm mb-4">
+            This action cannot be undone.
+          </p>
         </div>
-        <div className="flex flex-col sm:flex-row justify-end gap-2 mt-2">
+        <div className="flex justify-center items-center gap-2 mt-2 mb-3">
           <button
-            className="px-4 py-2 rounded bg-gray-200 text-gray-800 hover:bg-gray-300 font-semibold w-full sm:w-auto"
+            className="px-6 py-2 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300 text-sm font-semibold cursor-pointer"
             onClick={() => {
               setShowOverlay(false);
               toast.dismiss();
@@ -214,7 +232,7 @@ export default function DesignsGallery() {
             Cancel
           </button>
           <button
-            className="px-4 py-2 rounded bg-red-500 text-white hover:bg-red-600 font-semibold w-full sm:w-auto"
+            className="px-6 py-2 rounded-lg bg-[#ED5E20] hover:bg-[#d44e0f] text-sm font-semibold text-white cursor-pointer"
             onClick={async () => {
               try {
                 // First get design info for logging and storage cleanup
@@ -327,29 +345,47 @@ export default function DesignsGallery() {
       </div>,
       {
         position: "top-center",
-        duration: 999999,
-        className: "rounded-xl",
-        onAutoClose: () => setShowOverlay(false),
+          duration: 999999,
+          className: "bg-white dark:bg-[#120F12] text-black dark:text-white rounded-2xl items-center justify-center text-center",
+          onAutoClose: () => setShowOverlay(false),
       }
     );
   };
 
   if (loading) {
-    return <LoadingInspiration
-      text={"Getting your creative designs..."}
-    />;
+    return (
+      <div className="flex flex-col items-center justify-center text-center py-24 animate-pulse">
+        <Image
+          src="/images/loading-your-designs.svg"
+          alt="Loading designs illustration"
+          height={150}
+          width={150}
+          className="object-contain mb-6"
+          priority
+        />
+        <p className="text-gray-500 text-sm mb-4">
+          Loading your desings...
+        </p>
+      </div>
+    );
   }
   if (designs.length === 0) {
-    return (
-      <div className="mt-15 flex flex-col items-center justify-center text-center">
+     return (
+      <div className="flex flex-col items-center justify-center text-center py-24">
         <Image
-          src="/images/empty-design.svg"
+          src="/images/your-gallery-is-waiting-for-its-first-design.svg"
           alt="No designs illustration"
-          height={180}
-          width={180}
-          className="object-contain mx-auto opacity-25"
+          height={150}
+          width={150}
+          className="object-contain mb-6"
+          priority
         />
-        <p className="text-[#6A6F6F]/50 text-md">No designs uploaded yet.</p>
+        <h2 className="text-lg font-semibold text-[#ED5E20] mb-2">
+          No Designs Yet
+        </h2>
+        <p className="text-gray-500 text-sm mb-4">
+          Your gallery is waiting for its first design!
+        </p>
       </div>
     );
   }
@@ -361,31 +397,48 @@ export default function DesignsGallery() {
           key={design.id}
           className="bg-accent dark:bg-[#1A1A1A] rounded-xl shadow-md space-y-0 flex flex-col h-full p-2"
         >
-          <Link
-            href={`/designs/${design.id}`}
-            rel="noopener noreferrer"
-          >
-            <div className="relative w-full aspect-video rounded-lg border overflow-hidden">
-              <Image
-                src={design.thumbnail_url ? design.thumbnail_url : "/images/placeholder.png"}
-                alt={design.title || "Design Preview"}
-                fill
-                className="object-cover"
-                sizes="(min-width:1280px) 1280px, 100vw"
-                onError={async () => {
-                  if (design.thumbnail_storage_path && !design.thumbnail_storage_path.startsWith("http")) {
-                    const newUrl = await resolveThumbnail(design.thumbnail_storage_path);
-                    setDesigns((ds) =>
-                      ds.map((d) =>
-                        d.id === design.id ? { ...d, thumbnail_url: newUrl } : d
-                      )
-                    );
-                  }
-                }}
-              />
-            </div>
-          </Link>
-          <div className="p-3 space-y-2 group relative">
+          <div className="p-1 space-y-2 group relative">
+            <Link
+              href={`/designs/${design.id}`}
+              rel="noopener noreferrer"
+            >
+              <div className="relative w-full aspect-video rounded-lg border overflow-hidden mb-3">
+                <Image
+                  src={design.thumbnail_url ? design.thumbnail_url : "/images/placeholder.png"}
+                  alt={design.title || "Design Preview"}
+                  fill
+                  className="object-cover"
+                  sizes="(min-width:1280px) 1280px, 100vw"
+                  onError={async () => {
+                    if (design.thumbnail_storage_path && !design.thumbnail_storage_path.startsWith("http")) {
+                      const newUrl = await resolveThumbnail(design.thumbnail_storage_path);
+                      setDesigns((ds) =>
+                        ds.map((d) =>
+                          d.id === design.id ? { ...d, thumbnail_url: newUrl } : d
+                        )
+                      );
+                    }
+                  }}
+                />
+              </div>
+            </Link>
+            {design.is_published && (
+              <div className="flex justify-start items-center gap-2 text-green-600 text-xs animate-pulse">
+                <svg
+                  width="12"
+                  height="12"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                  className="inline-block drop-shadow-[0_0_1px_#22c55e]"
+                  style={{ filter: "drop-shadow(0 0 6px #22c55e)" }}
+                >
+                  <circle cx="12" cy="12" r="8" fill="currentColor" />
+                  <circle cx="12" cy="12" r="11" stroke="currentColor" strokeWidth="2" fill="none" />
+                </svg>
+                <span className="drop-shadow-[0_0_1px_#22c55e]">Now Live</span>
+              </div>
+            )}
+          
             <div className="flex items-center justify-between gap-2">
               <input
                 type="text"
@@ -407,20 +460,7 @@ export default function DesignsGallery() {
                 <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm" />
               )}
             </div>
-            {design.is_published && (
-              <div className="flex items-center gap-1 text-green-600 text-xs mb-1 animate-pulse">
-                <svg
-                  width="16"
-                  height="16"
-                  fill="currentColor"
-                  className="inline-block drop-shadow-[0_0_4px_#22c55e]"
-                  style={{ filter: "drop-shadow(0 0 6px #22c55e)" }}
-                >
-                  <path d="M8 1.333a6.667 6.667 0 1 0 0 13.334A6.667 6.667 0 0 0 8 1.333zm0 12A5.333 5.333 0 1 1 8 2.667a5.333 5.333 0 0 1 0 10.666zm-.667-8h1.334v4H7.333zm0 5.333h1.334v1.334H7.333z" />
-                </svg>
-                <span>Currently published</span>
-              </div>
-            )}
+         
             <div className="text-sm text-gray-500 flex items-center justify-between">
               <span className="flex items-center gap-1">
                 <IconHeart size={18} /> {design.likes ?? 0}

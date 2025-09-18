@@ -145,54 +145,46 @@ export default function LoginForm() {
 
   return (
     <>
-      {/* Top Middle Icon */}
-      <MiddleHeaderIcon href="/" />
+      {/* Page Container with background video */}
+      <div className="relative min-h-screen flex items-center justify-center w-full overflow-hidden p-5">
+        {/* Fullscreen Video Background */}
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover"
+        >
+          <source src="/images/uxhibit-gif-3(webm).webm" type="video/webm" />
+          Your browser does not support the video tag.
+        </video>
 
-      {/* Container uniform with registration */}
-      <div className="flex flex-col lg:flex-row min-h-screen w-full justify-center items-center px-4 py-8 lg:px-20 lg:py-12">
-        {/* Left Side → Video Background */}
-        <div className="hidden 2xl:block relative mr-[116px] w-full 2xl:w-[640px] 2xl:h-[857px] flex-shrink-0 rounded-xl overflow-hidden">
-          {/* Video */}
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="object-cover w-full h-full rounded-4xl"
-          >
-            <source src="/images/uxhibit-gif-3(webm).webm" type="video/webm" />
-            Your browser does not support the video tag.
-          </video>
+        {/* Overlay for darkening background */}
+        <div className="absolute inset-0 bg-black/40" />
 
-          {/* Overlay Text on Video */}
-          <span
-            className="absolute inset-0 flex items-center justify-center 
-                      text-white z-10 mb-150 leading-tight 
-                      text-2xl sm:text-3xl lg:text-3xl xl:text-5xl font-medium"
-          >
-            Welcome back! <br /> Xhibit your greatness.
-          </span>
-        </div>
-        {/* End of Left Side */}
+        {/* Centered Login Card */}
+        <div className="relative z-10 flex flex-col w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-md xl:max-w-lg p-6 sm:p-8 md:p-10 lg:p-12 
+                        bg-white/40 dark:bg-[#1E1E1E]/40 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20">
 
-        {/* Right Side → Login Form */}
-        <div className="flex flex-col w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-lg self-center">
-          {/* Title */}
-          <h2
-            className="title-regsiter-login text-4xl sm:text-5xl lg:text-[60px] 
-                         text-center lg:text-left mb-4"
-          >
-            Log In
-          </h2>
+          {/* Centered Logo */}
+          <div className="flex justify-center">
+            <Image
+              src="/images/dark-header-icon.png"
+              alt="Uxhibit Logo"
+              width={2280}   // original width
+              height={899}   // original height
+              className="w-auto h-16 sm:h-20 md:h-24 mb-5"
+            />
+          </div>
 
           {/* Subtitle */}
-          <p className="text-base sm:text-lg lg:text-[24px] mb-4 text-[#1E1E1E]/50 dark:text-[#F5F5F5]/60 text-center lg:text-left lg:pb-6">
-            Welcome back — Xhibit your edge!
+          <p className="text-sm sm:text-base md:text-lg text-center mb-10 text-[#1E1E1E]/70 dark:text-[#F5F5F5]/70">
+            Welcome Back, Please Log In to Continue
           </p>
 
           {/* Login Form */}
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
               {/* Email Field */}
               <FormField
                 control={form.control}
@@ -205,10 +197,7 @@ export default function LoginForm() {
                         placeholder="Email"
                         type="email"
                         autoComplete="email"
-                        className="w-full h-12 
-                                  sm:h-[45px] sm:text-sm 
-                                  lg:h-[55px] lg:text-md 
-                                  xl:h-[55px] xl:text-lg"
+                        className="w-full h-11 sm:h-12 text-sm sm:text-base"
                         {...field}
                       />
                     </FormControl>
@@ -228,10 +217,7 @@ export default function LoginForm() {
                         id="password"
                         placeholder="Password"
                         autoComplete="current-password"
-                        className="w-full h-12 
-                                  sm:h-[45px] sm:text-sm 
-                                  lg:h-[55px] lg:text-md 
-                                  xl:h-[55px] xl:text-lg"
+                        className="w-full h-11 sm:h-12 text-sm sm:text-base"
                         {...field}
                       />
                     </FormControl>
@@ -242,16 +228,14 @@ export default function LoginForm() {
               {/* Login Button */}
               <Button
                 type="submit"
-                className={`
-                  group relative inline-flex items-center justify-center
-                  w-full h-12 lg:w-[513px] lg:h-[62px]
-                  rounded-xl text-lg font-semibold tracking-wide
+                className={`group relative inline-flex items-center justify-center
+                  w-full h-11 sm:h-12
+                  rounded-xl text-base tracking-wide
                   transition-all duration-300 cursor-pointer
                   text-white shadow-[0_4px_18px_-4px_rgba(237,94,32,0.55)]
                   hover:shadow-[0_6px_26px_-6px_rgba(237,94,32,0.65)]
                   active:scale-[.97]
-                  focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40
-                `}
+                  focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40`}
               >
                 {/* Glow / gradient base */}
                 <span
@@ -294,18 +278,21 @@ export default function LoginForm() {
             </form>
           </Form>
           {/* End of Login Form submission */}
+
+          {/* Figma Login */}
           <Button
-            type='button'
+            type="button"
             onClick={handleFigmaLogin}
-            className={` group relative inline-flex items-center justify-center
-                        w-full h-12 lg:w-[513px] lg:h-[62px] mt-5
-                        rounded-xl text-lg font-semibold tracking-wide
+            className={`group relative inline-flex items-center justify-center
+                        w-full h-11 sm:h-12 mt-5
+                        rounded-xl text-base tracking-wide
                         transition-all duration-300 cursor-pointer
                         text-white shadow-md
                         hover:shadow-lg
                         active:scale-[.97]
                         focus:outline-none focus-visible:ring-4 focus-visible:ring-[#1E1E1E]/20
-                        bg-[#1E1E1E] dark:bg-[#2C2C2C]`}>
+                        bg-[#1E1E1E] dark:bg-[#2C2C2C]`}
+          >
             <span
               aria-hidden
               className="absolute inset-[2px] rounded-[10px] 
@@ -322,15 +309,15 @@ export default function LoginForm() {
               <Image
                 src="/images/figma-logo.png"
                 alt="Figma Logo"
-                width={40}
-                height={20}
+                width={20}
+                height={10}
               />
               Continue with Figma
             </span>
           </Button>
 
           {/* Links: Sign Up + Forgot Password */}
-          <div className="mt-8 text-center text-sm sm:text-base text-[#1E1E1E]/60 dark:text-[#F5F5F5]/40">
+          <div className="mt-8 text-center text-xs sm:text-sm text-[#1E1E1E]/60 dark:text-[#F5F5F5]/40">
             Don&apos;t have an account?{" "}
             <Link
               href="/auth/signup"
@@ -338,7 +325,7 @@ export default function LoginForm() {
             >
               Sign Up
             </Link>
-            <div className="mt-4">
+            <div className="mt-2">
               <Link
                 href="/auth/forgot-password"
                 className="text-[#1E1E1E]/60 dark:text-[#F5F5F5]/40 hover:text-[#ED5E20] transition-colors duration-200 hover:underline"
@@ -348,7 +335,7 @@ export default function LoginForm() {
             </div>
           </div>
         </div>
-        {/* End of Right Side */}
+        {/* End of Login Card */}
       </div>
       {/* End of Container */}
     </>

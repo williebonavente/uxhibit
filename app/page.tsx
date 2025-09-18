@@ -48,7 +48,7 @@ export default function Home() {
           playsInline
           className="w-full h-full object-cover"
         >
-          <source src="/images/landing-page-bg(webm).webm" type="video/webm" />
+          <source src="/images/uxhibit-gif-3(webm).webm" type="video/webm" />
           Your browser does not support the video tag.
         </video>
         {/* gradient overlay for readability */}
