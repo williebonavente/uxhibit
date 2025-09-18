@@ -50,8 +50,7 @@ export default function ResetPasswordPage() {
     const supabase = createClient();
     const { error } = await supabase.auth.updateUser({ password: values.password });
     if (!error) {
-      toast.success("Password updated successfully!");
-      window.location.href = "/auth/login";
+      window.location.href = "/auth/reset-password-success";
     } else {
       toast.error("There was an error updating your password.");
     }
@@ -108,14 +107,14 @@ export default function ResetPasswordPage() {
               control={form.control}
               name="password"
               render={({ field }) => (
-                <FormItem className="grid gap-2 mb-6">
+                <FormItem className="grid gap-2 mb-2">
                   <FormControl>
                     <PasswordInput
                       id="password"
                       placeholder="Enter new password"
                       type="password"
                       autoComplete="new-password"
-                      className="w-full h-12 input-placeholder-lg input-lg input-colored"
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base"
                       {...field}
                     />
                   </FormControl>
@@ -134,7 +133,7 @@ export default function ResetPasswordPage() {
                       placeholder="Re-enter new password"
                       type="password"
                       autoComplete="new-password"
-                      className="w-full h-12 input-placeholder-lg input-lg input-colored"
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base"
                       {...field}
                     />
                   </FormControl>
