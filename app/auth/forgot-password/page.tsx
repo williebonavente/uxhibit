@@ -27,10 +27,9 @@ export default function ForgotPasswordPage() {
   async function onSubmit(values: { email: string }) {
     const supabase = createClient();
     const { error } = await supabase.auth.resetPasswordForEmail(values.email,
-      { redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback` }
+      { redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback` }
     
     );
-    // Insert here the redirect: for other page
     if (error) {
       toast.error(error.message || "Failed to send reset email.");
     } else {

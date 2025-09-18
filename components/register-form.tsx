@@ -21,18 +21,11 @@ import MiddleHeaderIcon from "./middle-header-icon";
 import { type User } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import { avatarStyles  } from "@/constants/randomAvatars"
 // import { Avatar } from '@radix-ui/react-avatar'
 
 export default function RegistrationForm({ user }: { user: User | null }) {
 
   const router = useRouter();
-  function getRandomAvatar(userId: string) {
-    const randomStyle =
-      avatarStyles[Math.floor(Math.random() * avatarStyles.length)];
-    return `${randomStyle}${userId}`;
-  }
-
 
   const form = useForm<z.infer<typeof registerFormSchema>>({
     defaultValues: {
@@ -80,8 +73,6 @@ export default function RegistrationForm({ user }: { user: User | null }) {
             full_name: values.full_name,
             age: values.age,
             gender: values.gender,
-            // default avatar here
-            // if it's does not have profile existing where avatar_url is null in db
 
           },
         },
@@ -92,21 +83,6 @@ export default function RegistrationForm({ user }: { user: User | null }) {
         toast.error(error.message ?? "Registration failed");
         console.log("Sign-up error details:", error);
         return;
-      }
-
-      // Insert profile with avatar if user was created
-      const userId = signUpData?.user?.id;
-      if (userId) {
-        const avatarUrl = getRandomAvatar(userId);
-        await supabase.from("profiles").upsert({
-          id: userId,
-          full_name: values.full_name,
-          username: values.username,
-          age: values.age,
-          gender: values.gender,
-          avatar_url: avatarUrl,
-          updated_at: new Date().toISOString(),
-        });
       }
 
       toast.success('Check your email to confirm your account');

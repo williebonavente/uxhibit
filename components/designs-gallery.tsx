@@ -73,7 +73,7 @@ export default function DesignsGallery() {
   };
 
   const loadDesigns = useCallback(async () => {
-    if (!currentUserId) return; // Wait for user ID
+    if (!currentUserId) return;
     setLoading(true);
     const { data, error } = await supabase
       .from("designs")
@@ -148,7 +148,7 @@ export default function DesignsGallery() {
   useEffect(() => {
     const interval = setInterval(() => {
       loadDesigns();
-    }, 55 * 60 * 1000); // 55 minutes
+    }, 55 * 60 * 1000);
     return () => clearInterval(interval);
   }, [loadDesigns]);
 
@@ -226,9 +226,7 @@ export default function DesignsGallery() {
                   published_designs(id), 
                   design_versions!design_versions_design_id_fkey (
                     id,
-                    thumbnail_url
-                  )
-                `)
+                    thumbnail_url)`)
                   .eq("id", id)
                   .single();
 
@@ -283,6 +281,16 @@ export default function DesignsGallery() {
                   throw versionsError;
                 }
 
+                const { error: commentsError } = await supabase 
+                .from("comments")
+                .delete()
+                .eq("design_id", id);
+
+                if (commentsError) {
+                  console.error(`Failed to delete coments: " ${commentsError.message}`);
+                  throw commentsError;
+                }
+
                 const { error: deleteError } = await supabase
                   .from("designs")
                   .delete()
@@ -293,7 +301,7 @@ export default function DesignsGallery() {
                     error: deleteError,
                     designId: id,
                     designTitle: design?.title
-                  });
+                  }, deleteError.message);
                   toast.error(`Delete failed: ${deleteError.message}`);
                 } else {
                   console.log('Design, versions, and files deleted successfully:', {

@@ -13,6 +13,8 @@ interface CommentsSectionProps {
     replyingToId: string | null;
     setReplyingToId: (id: string | null) => void;
     handleDeleteComment: (id: string) => void;
+    postingComment: boolean;
+    // handleAddReply: (parentId: string, replyText: string) => Promise<void>
 }
 
 export const CommentsSection: React.FC<CommentsSectionProps> = ({
@@ -23,9 +25,11 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
     handleAddComment,
     editingId,
     setEditingId,
-    replyingToId,
-    setReplyingToId,
+    // replyingToId,
+    // setReplyingToId,
     handleDeleteComment,
+    // handleAddReply,
+    postingComment
 }) => (
     <div className="mb-6">
         {/* Input Area */}
@@ -40,13 +44,23 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
                             focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
                 disabled={!currentUserId}
             />
-
+           
             <button
                 onClick={handleAddComment}
                 disabled={!newCommentText.trim() || !currentUserId}
                 className="cursor-pointer flex items-center gap-1 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm px-3 py-1.5 rounded-lg shadow transition"
             >
-                <span>Post</span>
+                {postingComment ? (
+                    <>
+                        <svg className="animate-spin h-4 w-4 mr-1" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                        </svg>
+                        Posting...
+                    </>
+                ) : (
+                    <span>Post</span>
+                )}
             </button>
         </div>
 
@@ -67,8 +81,9 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
                         comment={comment}
                         editingId={editingId}
                         setEditingId={setEditingId}
-                        replyingToId={replyingToId}
-                        setReplyingToId={setReplyingToId}
+                        // replyingToId={replyingToId}
+                        // setReplyingToId={setReplyingToId}
+                        // onReply={handleAddReply}
                         onDelete={handleDeleteComment}
                     />
                 ))

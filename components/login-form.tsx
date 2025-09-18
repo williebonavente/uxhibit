@@ -24,8 +24,18 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { getFigmaAuthUrl } from "@/lib/figma-auth";
 import { useEffect } from "react";
+import { avatarStyles } from "@/constants/randomAvatars";
+import { createClient } from "@/utils/supabase/client";
+
 
 const formSchema = loginFormSchema;
+
+function getRandomAvatar(userId: string) {
+  const randomStyle =
+    avatarStyles[Math.floor(Math.random() * avatarStyles.length)];
+  return `${randomStyle}${userId}`;
+}
+
 
 export default function LoginForm() {
   const router = useRouter();
@@ -91,6 +101,39 @@ export default function LoginForm() {
                 : result.error
         );
         return;
+      }
+
+      // After successful login, ensure profile exists
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (user) {
+        // Fetch the user's profile
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("id, avatar_url, full_name, username, age, gender")
+          .eq("id", user.id)
+          .single();
+
+        if (profileError) {
+          console.error(`Profile Error: ${profileError}`);
+        } else if (profile && (!profile.avatar_url || profile.avatar_url.trim() === "")) {
+          // If avatar_url is missing or empty, generate and set a default avatar
+          const avatarUrl = getRandomAvatar(user.id);
+          const { error: upsertError } = await supabase.from("profiles").upsert({
+            id: user.id,
+            full_name: profile.full_name ?? user.user_metadata?.full_name ?? "",
+            username: profile.username ?? user.user_metadata?.username ?? "",
+            age: profile.age ?? user.user_metadata?.age ?? "",
+            gender: profile.gender ?? user.user_metadata?.gender ?? "",
+            avatar_url: avatarUrl,
+            updated_at: new Date().toISOString(),
+          });
+          if (upsertError) {
+            console.error("Profile upsert error: ", upsertError.message);
+            toast.error(`Failed to save profile avatar. ${upsertError.message}`);
+          }
+        }
       }
       toast.success("Logged in successfully!");
       router.push("/dashboard");

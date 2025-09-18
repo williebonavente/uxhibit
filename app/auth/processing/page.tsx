@@ -16,7 +16,7 @@ export default function Processing() {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 const elapsed = Date.now() - startTime;
-                const minDelay = 3000; // 8 seconds
+                const minDelay = 1000; // 8 seconds
                 if (elapsed < minDelay) {
                     setTimeout(() => router.replace("/dashboard"), minDelay - elapsed);
                 } else {
@@ -29,7 +29,6 @@ export default function Processing() {
         checkSession();
     }, [router]);
 
-    // Generate floating particles only once per mount
     const particles = useMemo(() =>
         [...Array(12)].map((_, i) => ({
             width: 16 + Math.random() * 32,

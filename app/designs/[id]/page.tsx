@@ -1,7 +1,12 @@
 "use client";
 
 import React from "react";
-import { useEffect, useState, useRef } from "react";
+import {
+  useEffect,
+  useState,
+  useRef,
+  useCallback
+} from "react";
 import Image from "next/image";
 import { createClient } from "@/utils/supabase/client";
 import EvaluationResult from "./dialogs/EvaluationResult";
@@ -23,6 +28,7 @@ import { Comment } from "@/components/comments-user";
 
 interface FrameEvaluation {
   id: string;
+  snapshot: string;
   design_id?: string;
   version_id?: string;
   file_key: string;
@@ -87,6 +93,8 @@ export type Design = {
   snapshot: Snapshot;
   current_version_id: string;
   frames?: { id: string | number; name: string;[key: string]: any }[];
+  published_version_id?: string;
+  published_at?: string;
 };
 
 type EvaluateInput = {
@@ -182,6 +190,7 @@ export default function DesignDetailPage({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [postingComment, setPostingComment] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [loadingComments, setLoadingComments] = useState(false);
   const [currentUserProfile, setCurrentUserProfile] = useState<{ fullName: string; avatarUrl: string } | null>(null);
@@ -275,52 +284,44 @@ export default function DesignDetailPage({
 
     const supabase = createClient();
 
-    // Mark unread the default notification
     if (currentUserId && design?.id) {
       await supabase
-      .from("comments")
-      .update({ is_read: true})
-      .eq("design_id", design.id)
-      .eq("user_id", currentUserId)
-      .eq("is_read", false);
+        .from("comments")
+        .update({ is_read: true })
+        .eq("design_id", design.id)
+        .eq("user_id", currentUserId)
+        .eq("is_read", false);
     }
+
     const { data, error } = await supabase
       .from("comments")
-      .select(`id, text, user_id, created_at, local_time, 
-              is_read,
-              parent_id, 
-              updated_at, 
-              design_id`)
+      .select(`
+      id, text, user_id, created_at, local_time, 
+      is_read, parent_id, updated_at, design_id,
+      profiles:profiles!comments_user_id_fkey (
+        full_name, avatar_url
+      )
+    `)
       .eq("design_id", design?.id)
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      // Map data to your Comment[] shape
-      const mappedComments = await Promise.all(
-        (data || []).map(async (comment) => {
-          const { data: userData } = await supabase
-            .from("profiles")
-            .select("full_name, avatar_url")
-            .eq("id", comment.user_id)
-            .single();
-          return {
-            id: comment.id,
-            text: comment.text,
-            user: {
-              id: comment.user_id,
-              fullName: userData?.full_name || "",
-              avatarUrl: userData?.avatar_url || "",
-            },
-            replies: [],
-            parentId: comment.parent_id,
-            createdAt: new Date(comment.created_at),
-            updatedAt: comment.updated_at ? new Date(comment.updated_at) : undefined,
-            localTime: comment.local_time,
-            design_id: comment.design_id,
-            is_read: comment.is_read,
-          };
-        })
-      );
+      const mappedComments = (data || []).map((comment: any) => ({
+        id: comment.id,
+        text: comment.text,
+        user: {
+          id: comment.user_id,
+          fullName: comment.profiles?.full_name || "",
+          avatarUrl: comment.profiles?.avatar_url || "",
+        },
+        replies: [],
+        parentId: comment.parent_id,
+        createdAt: new Date(comment.created_at),
+        updatedAt: comment.updated_at ? new Date(comment.updated_at) : undefined,
+        localTime: comment.local_time,
+        design_id: comment.design_id,
+        is_read: comment.is_read,
+      }));
 
       const commentMap: { [id: string]: any } = {};
       mappedComments.forEach(comment => {
@@ -342,31 +343,24 @@ export default function DesignDetailPage({
     setLoadingComments(false);
   }
 
-  async function markCommentAsRead(id: string) {
-  const supabase = createClient();
-  await supabase.from("comments").update({ is_read: true }).eq("id", id);
-  // Optionally refresh comments here
-}
-async function markCommentAsUnread(id: string) {
-  const supabase = createClient();
-  await supabase.from("comments").update({ is_read: false }).eq("id", id);
-  // Optionally refresh comments here
-}
-
-
   const handleShowVersions = async () => {
     setShowVersions(true);
     setLoadingVersions(true);
     if (design?.id) {
       fetchDesignVersions(design.id)
-        .then(setVersions)
+        .then((versions) => setVersions(
+          versions.map((v: any) => ({
+            ...v,
+            total_score: v.total_score ?? 0, // Ensure total_score exists
+          }))
+        ))
         .catch((e: string) => console.error("Failed to fetch versions", e))
         .finally(() => setLoadingVersions(false));
     } else {
       setLoadingVersions(false);
     }
   }
-  async function handleEvaluate() {
+  const handleEvaluate = React.useCallback(async () => {
     if (!design?.id || !design?.fileKey) {
       console.error('Missing required design data:', { id: design?.id, fileKey: design?.fileKey });
       setEvalError("Missing required design data");
@@ -432,8 +426,8 @@ async function markCommentAsUnread(id: string) {
       setLoadingVersions(false);
 
     }
-  }
-  async function syncPublishedState(): Promise<void> {
+  }, [design, setEvalError, setLoadingEval, setEvalResult, setDesign, setLoadingVersions]);
+  const syncPublishedState = React.useCallback(async (): Promise<void> => {
     const supabase = createClient();
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData?.user?.id;
@@ -465,7 +459,7 @@ async function markCommentAsUnread(id: string) {
         }
         : prev
     );
-  }
+  }, [design?.id]);
   async function publishProject() {
     const supabase = createClient();
     const { data: userData } = await supabase.auth.getUser();
@@ -536,6 +530,41 @@ async function markCommentAsUnread(id: string) {
       toast.error(`Failed to unpublish design: ${error.message || "Unknown error"}`);
     }
   }
+
+  async function fetchCommentWithProfile(commentId: string) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("comments")
+      .select(`
+      id, text, user_id, created_at, local_time, parent_id, updated_at, design_id, is_read,
+      profiles:profiles!comments_user_id_fkey (
+        full_name, avatar_url
+      )
+    `)
+      .eq("id", commentId)
+      .single();
+    if (error) {
+      console.error("Failed to fetch comment with profile:", error);
+      return null;
+    }
+    return {
+      id: data.id,
+      text: data.text,
+      user: {
+        id: data.user_id,
+        fullName: data.profiles?.full_name || "",
+        avatarUrl: data.profiles?.avatar_url || "",
+      },
+      replies: [],
+      parentId: data.parent_id,
+      createdAt: new Date(data.created_at),
+      updatedAt: data.updated_at ? new Date(data.updated_at) : undefined,
+      localTime: data.local_time,
+      design_id: data.design_id,
+      is_read: data.is_read,
+    };
+  }
+
   function mapFrameToEvalResponse(frame: FrameEvaluation, frameIdx = 0): EvalResponse {
     return {
       nodeId: frame.node_id,
@@ -563,37 +592,233 @@ async function markCommentAsUnread(id: string) {
     };
   }
 
-
   const handleAddComment = async () => {
+  const supabase = createClient();
+  if (!newCommentText.trim() || !currentUserId || !currentUserProfile || !design) return;
+
+  setPostingComment(true);
+
+  // Optimistically add the comment to UI
+  const tempId = "temp-" + Date.now();
+  const optimisticComment = {
+    id: tempId,
+    text: newCommentText,
+    user: {
+      id: currentUserId,
+      fullName: currentUserProfile.fullName,
+      avatarUrl: currentUserProfile.avatarUrl,
+    },
+    replies: [],
+    parentId: null,
+    createdAt: new Date(),
+    updatedAt: undefined,
+    localTime: new Date().toLocaleTimeString(),
+    design_id: design.id,
+    is_read: false,
+  };
+  setComments(prev => [optimisticComment, ...prev]);
+
+  const { data, error } = await supabase
+    .from("comments")
+    .insert([
+      {
+        user_id: currentUserId,
+        design_id: design.id,
+        text: newCommentText,
+        parent_id: null,
+        local_time: new Date().toLocaleTimeString(),
+      },
+    ])
+    .select()
+    .single();
+
+  if (error) {
+    toast.error("Failed to add comment!");
+    console.error(error.message);
+    // Remove the optimistic comment if insert fails
+    setComments(prev => prev.filter(c => c.id !== tempId));
+    setPostingComment(false);
+    return;
+  }
+
+  // Optionally: Replace the optimistic comment with the real one (if needed)
+  // But the realtime handler will fetch and render the new comment anyway
+  setNewCommentText("");
+  setPostingComment(false);
+  console.log("[AddComment] Comment successfully added:", data);
+};
+
+// const handleAddReply = async (parentId: string, replyText: string) => {
+//   const supabase = createClient();
+//   if (!replyText.trim() || !currentUserId || !currentUserProfile || !design) return;
+
+//   setPostingComment(true);
+
+//   // Create a temporary optimistic reply
+//   const tempId = "temp-reply-" + Date.now();
+//   const optimisticReply = {
+//     id: tempId,
+//     text: replyText,
+//     user: {
+//       id: currentUserId,
+//       fullName: currentUserProfile.fullName,
+//       avatarUrl: currentUserProfile.avatarUrl,
+//     },
+//     replies: [],
+//     parentId: parentId,
+//     createdAt: new Date(),
+//     updatedAt: undefined,
+//     localTime: new Date().toLocaleTimeString(),
+//     design_id: design.id,
+//     is_read: false,
+//   };
+
+//   // Optimistically add the reply to the parent comment
+//   setComments(prev => {
+//     function addReply(comments) {
+//       return comments.map(comment => {
+//         if (comment.id === parentId) {
+//           return {
+//             ...comment,
+//             replies: [optimisticReply, ...(comment.replies || [])],
+//           };
+//         }
+//         return {
+//           ...comment,
+//           replies: comment.replies ? addReply(comment.replies) : [],
+//         };
+//       });
+//     }
+//     return addReply(prev);
+//   });
+
+//   // Insert reply in the database
+//   const { data, error } = await supabase
+//     .from("comments")
+//     .insert([
+//       {
+//         user_id: currentUserId,
+//         design_id: design.id,
+//         text: replyText,
+//         parent_id: parentId,
+//         local_time: new Date().toLocaleTimeString(),
+//       },
+//     ])
+//     .select()
+//     .single();
+
+//   if (error) {
+//     toast.error("Failed to add reply!");
+//     console.error(error.message);
+//     // Remove the optimistic reply if insert fails
+//     setComments(prev => {
+//       function removeTemp(comments) {
+//         return comments.map(comment => ({
+//           ...comment,
+//           replies: comment.replies
+//             ? comment.replies.filter(r => r.id !== tempId)
+//             : [],
+//         }));
+//       }
+//       return removeTemp(prev);
+//     });
+//     setPostingComment(false);
+//     return;
+//   }
+
+//   // The realtime handler will fetch and render the real reply
+//   setPostingComment(false);
+//   console.log("[AddReply] Reply successfully added:", data);
+// };
+
+
+  const fetchComments = useCallback(async () => {
+
     const supabase = createClient();
-    if (!newCommentText.trim() || !currentUserId || !currentUserProfile || !design) return;
 
-    const { data, error } = await supabase
-      .from("comments")
-      .insert([
-        {
-          user_id: currentUserId,
-          design_id: design.id,
-          text: newCommentText,
-          parent_id: null,
-          local_time: new Date().toLocaleTimeString(),
-        },
-      ])
-      .select()
-      .single();
-
-    if (error) {
-      toast.error("Failed to add comment!");
-      console.error(error.message);
+    if (!design?.id) {
       return;
     }
+    setLoadingComments(true);
+    const { data, error } = await supabase
+      .from("comments")
+      .select(`
+        id, text, user_id, created_at, local_time, parent_id, updated_at, design_id,
+        profiles:profiles!comments_user_id_fkey (
+          full_name, avatar_url
+        )
+      `)
+      .eq("design_id", design?.id)
+      .order("created_at", { ascending: false })
+      .range(0, 19);
 
-    setNewCommentText("");
-  };
+    if (error) {
+      console.log("Supabase error:", error);
+      toast.error(`Failed to fetch comments! ${error.message}`);
+      setLoadingComments(false);
+      return;
+    }
+    const commentsWithUser = (data || []).map((comment: any) => ({
+      id: comment.id,
+      text: comment.text,
+      user: {
+        id: comment.user_id,
+        fullName: comment.profiles?.full_name || "",
+        avatarUrl: comment.profiles?.avatar_url || "",
+      },
+      replies: [],
+      parentId: comment.parent_id,
+      createdAt: new Date(comment.created_at),
+      updatedAt: comment.updated_at ? new Date(comment.updated_at) : undefined,
+      localTime: comment.local_time,
+      design_id: comment.design_id,
+    }));
+
+    const commentMap: { [id: string]: any } = {};
+    commentsWithUser.forEach(comment => {
+      commentMap[comment.id] = { ...comment, replies: [] };
+    });
+
+    const rootComments: any[] = [];
+    commentsWithUser.forEach(comment => {
+      if (comment.parentId) {
+        if (commentMap[comment.parentId]) {
+          commentMap[comment.parentId].replies.push(commentMap[comment.id]);
+        }
+      } else {
+        rootComments.push(commentMap[comment.id]);
+      }
+    });
+    setComments(rootComments);
+    // setLoadingComments(false);
+  }, [design?.id]);
 
   const handleDeleteComment = (id: string) => {
     setComments(comments.filter(comment => comment.id !== id));
   }
+
+  // Helper to update a comment in the tree
+  const updateCommentTree = React.useCallback((comments, updated) => {
+    return comments.map(comment => {
+      if (comment.id === updated.id) {
+        return { ...comment, ...updated };
+      }
+      return {
+        ...comment,
+        replies: comment.replies ? updateCommentTree(comment.replies, updated) : [],
+      };
+    });
+  }, []);
+
+  // Helper to delete a comment from the tree
+  const deleteCommentTree = React.useCallback((comments, idToDelete) => {
+    return comments
+      .filter(comment => comment.id !== idToDelete)
+      .map(comment => ({
+        ...comment,
+        replies: comment.replies ? deleteCommentTree(comment.replies, idToDelete) : [],
+      }));
+  }, []);
 
   useEffect(() => {
     const supabase = createClient();
@@ -602,7 +827,6 @@ async function markCommentAsUnread(id: string) {
       setCurrentUserId(user?.id ?? null);
 
       if (user?.id) {
-        // Adjust this query to match your user profile table/fields
         const { data: profile } = await supabase
           .from("profiles")
           .select("full_name, avatar_url")
@@ -635,107 +859,110 @@ async function markCommentAsUnread(id: string) {
     if (design) {
       syncPublishedState();
     }
-  }, [design?.id]);
+  }, [design?.id, syncPublishedState, design]);
 
   useEffect(() => {
     async function loadDesign() {
       setDesignLoading(true);
       try {
         const supabase = createClient();
-        // Modify the query to include AI evaluation data
-        const { data, error } = await supabase
+
+        // 1. Always fetch the design and its versions
+        const { data: designData, error: designError } = await supabase
           .from("designs")
           .select(`
-            id, title, figma_link,file_key,
-            node_id, thumbnail_url,
-            current_version_id,
-            owner_id,
-            design_versions!design_versions_design_id_fkey (
-              id, file_key, node_id, thumbnail_url, total_score,
-              ai_summary, ai_data, snapshot,created_at,
-              version
-            )
-          `)
+          id, title, figma_link, file_key,
+          node_id, thumbnail_url,
+          current_version_id, owner_id,
+          design_versions (
+            id, file_key, node_id, thumbnail_url, total_score,
+            ai_summary, ai_data, snapshot, created_at, version
+          )
+        `)
           .eq("id", id)
-          .order('created_at', { foreignTable: 'design_versions', ascending: false })
-          .limit(1, { foreignTable: 'design_versions' })
-          .single();
+          .maybeSingle();
 
-        if (!error && data) {
-          const latestVersion = data.design_versions?.[0];
-          // Parse the JSONB data
-          let parsedAiData = null;
-          if (latestVersion?.ai_data) {
-            try {
-              // Handle both string and object formats
-              parsedAiData = typeof latestVersion.ai_data === 'string'
-                ? JSON.parse(latestVersion.ai_data)
-                : latestVersion.ai_data;
 
-              console.log('Parsed AI data:', parsedAiData);
-            } catch (e) {
-              console.error('Error parsing AI data:', e);
-            }
+        if (designError || !designData) {
+          console.error('Failed to load design:', designError, designData);
+          setDesign(null);
+          setDesignLoading(false);
+          return;
+        }
+
+        const { data: publishedData } = await supabase
+          .from("published_designs")
+          .select(`is_active, published_version_id, published_at`)
+          .eq("design_id", id)
+          .eq("is_active", true)
+          .maybeSingle();
+
+
+        // 3. Normalize design object
+        const latestVersion = designData.design_versions?.[0];
+        let parsedAiData = null;
+        if (latestVersion?.ai_data) {
+          try {
+            parsedAiData = typeof latestVersion.ai_data === 'string'
+              ? JSON.parse(latestVersion.ai_data)
+              : latestVersion.ai_data;
+          } catch (e) {
+            console.error('Error parsing AI data:', e, latestVersion.ai_data);
           }
+        }
 
-          // Set the design data
-          const normalized: Design = {
-            id: data.id,
-            project_name: data.title,
-            fileKey: latestVersion?.file_key || data.file_key || undefined,
-            nodeId: latestVersion?.node_id || data.node_id || undefined,
-            imageUrl: data.thumbnail_url || "/images/design-thumbnail.png",
-            thumbnail: data.thumbnail_url || undefined,
-            snapshot: latestVersion?.snapshot || null,
-            current_version_id: data.current_version_id,
+        const normalized: Design = {
+          id: designData.id,
+          project_name: designData.title,
+          fileKey: latestVersion?.file_key || designData.file_key || undefined,
+          nodeId: latestVersion?.node_id || designData.node_id || undefined,
+          imageUrl: designData.thumbnail_url || "/images/design-thumbnail.png",
+          thumbnail: designData.thumbnail_url || undefined,
+          snapshot: latestVersion?.snapshot || null,
+          current_version_id: designData.current_version_id,
+          is_active: publishedData?.is_active ?? false,
+          published_version_id: publishedData?.published_version_id ?? "",
+          published_at: publishedData?.published_at ?? "",
+        };
+        setDesign(normalized);
+
+        if (latestVersion?.ai_data) {
+          const overall: FrameEvaluation = {
+            id: "overallFrame",
+            design_id: normalized.id,
+            file_key: normalized.fileKey || "",
+            node_id: normalized.nodeId || "",
+            thumbnail_url: normalized.thumbnail || "",
+            owner_id: designData.owner_id || "",
+            total_score: latestVersion?.total_score ?? null,
+            ai_summary: latestVersion.ai_summary || parsedAiData.summary || "",
+            ai_data: {
+              overall_score: parsedAiData.overall_score ?? latestVersion?.total_score ?? null,
+              summary: parsedAiData.summary ?? "",
+              strengths: parsedAiData.strengths ?? [],
+              weaknesses: parsedAiData.weaknesses ?? [],
+              issues: parsedAiData.issues ?? [],
+              category_scores: parsedAiData.category_scores ?? null,
+            },
+            snapshot: latestVersion?.snapshot ?? null,
+            created_at: latestVersion.created_at,
+            updated_at: latestVersion.created_at,
           };
-          setDesign(normalized);
+          setFrameEvaluations([overall]);
+          setSelectedFrameIndex(0);
+          setEvalResult(mapFrameToEvalResponse(overall));
+          setShowEval(true);
+        }
 
-          if (latestVersion?.ai_data) {
-            const overall: FrameEvaluation = {
-              id: "overallFrame",
-              design_id: design?.id,
-              file_key: design?.fileKey || "",
-              node_id: design?.nodeId || "",
-              thumbnail_url: thumbUrl || design?.thumbnail || "",
-              owner_id: data.owner_id || "",
-              total_score: latestVersion?.total_score ?? null,
-              ai_summary: latestVersion.ai_summary || parsedAiData.summary || "",
-              ai_data: {
-                overall_score:
-                  parsedAiData.overall_score ??
-                  latestVersion?.total_score ??
-                  null,
-                summary: parsedAiData.summary ?? "",
-                strengths: parsedAiData.strengths ?? [],
-                weaknesses: parsedAiData.weaknesses ?? [],
-                issues: parsedAiData.issues ?? [],
-                category_scores: parsedAiData.category_scores ?? null,
-              },
-              created_at: latestVersion.created_at,
-              updated_at: latestVersion.created_at,
-            };
-
-            const frames = Array.isArray(parsedAiData) ? parsedAiData : [];
-            const normalizedFrames = frames.map((frame) => ({
-              ...frame,
-              ai_data: frame.ai,
-            }));
-            setFrameEvaluations([overall, ...normalizedFrames]);
-            setSelectedFrameIndex(0);
-            setEvalResult(mapFrameToEvalResponse(overall));
-            setShowEval(true);
-          }
-
-          if (data.thumbnail_url && !data.thumbnail_url.startsWith("http")) {
+        if (designData.thumbnail_url) {
+          if (designData.thumbnail_url.startsWith("http")) {
+            setThumbUrl(designData.thumbnail_url);
+          } else {
             const { data: signed } = await supabase.storage
               .from("design-thumbnails")
-              .createSignedUrl(data.thumbnail_url, 3600);
+              .createSignedUrl(designData.thumbnail_url, 3600);
             if (signed?.signedUrl) setThumbUrl(signed.signedUrl);
           }
-        } else {
-          console.error('Failed to load design:', error);
-          setDesign(null);
         }
       } catch (err) {
         console.error('Error loading design:', err);
@@ -747,6 +974,81 @@ async function markCommentAsUnread(id: string) {
 
     loadDesign();
   }, [id]);
+
+  useEffect(() => {
+    if (!design?.id) return;
+    const supabase = createClient();
+
+    async function fetchEvaluations() {
+      // 1. Fetch overall evaluation from design_versions (latest)
+      const { data: versionData, error: versionError } = await supabase
+        .from("design_versions")
+        .select(`
+        id, design_id, version, file_key, node_id, thumbnail_url, created_by,
+        ai_summary, ai_data, snapshot, created_at, updated_at, total_score
+      `)
+        .eq("design_id", design?.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (versionError) {
+        console.error("Failed to fetch overall evaluation:", versionError.message);
+        return;
+      }
+
+      let overall: FrameEvaluation | null = null;
+      if (versionData) {
+        let aiData = versionData.ai_data;
+        if (typeof aiData === "string") {
+          try {
+            aiData = JSON.parse(aiData);
+          } catch (e) {
+            aiData = {};
+          }
+        }
+        overall = {
+          id: "overallFrame",
+          design_id: versionData.design_id,
+          version_id: versionData.id,
+          file_key: versionData.file_key,
+          node_id: versionData.node_id,
+          thumbnail_url: versionData.thumbnail_url,
+          owner_id: versionData.created_by,
+          ai_summary: versionData.ai_summary,
+          ai_data: aiData,
+          snapshot: versionData.snapshot,
+          created_at: versionData.created_at,
+          updated_at: versionData.updated_at,
+          total_score: versionData.total_score,
+        };
+      }
+
+      const { data: frameData, error: frameError } = await supabase
+        .from("design_frame_evaluations")
+        .select(`
+        id, design_id, version_id, file_key, node_id, thumbnail_url, owner_id,
+        ai_summary, ai_data, snapshot, created_at, updated_at
+      `)
+        .eq("design_id", design?.id)
+        .order("created_at", { ascending: false });
+
+      if (frameError) {
+        console.error("Failed to fetch frame evaluations:", frameError.message);
+        return;
+      }
+
+      const frames = (frameData || []).map((frame: any) => ({
+        ...frame,
+        ai_data: typeof frame.ai_data === "string" ? JSON.parse(frame.ai_data) : frame.ai_data,
+      }));
+
+      const combined = overall ? [overall, ...frames] : frames;
+      setFrameEvaluations(combined);
+    }
+
+    fetchEvaluations();
+  }, [design?.id]);
 
   useEffect(() => {
     if (frameEvaluations[selectedFrameIndex]) {
@@ -767,7 +1069,7 @@ async function markCommentAsUnread(id: string) {
     ) {
       handleEvaluate();
     }
-  }, [designLoading, design, loadingEval, evalResult]);
+  }, [designLoading, design, loadingEval, evalResult, handleEvaluate]);
 
   useEffect(() => {
     if (!design?.thumbnail || design.thumbnail.startsWith("http")) return;
@@ -778,7 +1080,6 @@ async function markCommentAsUnread(id: string) {
         .createSignedUrl(design.thumbnail as string, 3600);
       if (signed?.signedUrl) setThumbUrl(signed.signedUrl);
     };
-    // run once immediately
     refresh();
     const idRef = setInterval(refresh, 55 * 60 * 1000);
     return () => clearInterval(idRef);
@@ -887,15 +1188,6 @@ async function markCommentAsUnread(id: string) {
   }, [showVersions]);
 
   useEffect(() => {
-    if (!design?.id) return;
-    setLoadingVersions(true);
-    fetchDesignVersions(design.id)
-      .then(setVersions)
-      .catch((e: string) => console.error("Failed to fetch versions", e))
-      .finally(() => setLoadingVersions(false))
-  }, [design?.id])
-
-  useEffect(() => {
     if (showVersions) setPage(0);
   }, [showVersions, versions.length])
 
@@ -903,7 +1195,14 @@ async function markCommentAsUnread(id: string) {
     if (!design?.id) return;
     setLoadingVersions(true);
     fetchDesignVersions(design.id)
-      .then(setVersions)
+      .then((versions) =>
+        setVersions(
+          versions.map((v: any) => ({
+            ...v,
+            total_score: v.total_score ?? 0,
+          }))
+        )
+      )
       .catch((e: string) => console.error("Failed to fetch versions", e))
       .finally(() => setLoadingVersions(false));
   }, [design?.id, versionChanged]);
@@ -918,7 +1217,6 @@ async function markCommentAsUnread(id: string) {
     if (!searchQuery.trim()) {
       setSelectedFrameIndex(0);
     } else {
-      // Try to parse the search as a number and jump to that frame
       const num = parseInt(searchQuery.trim(), 10);
       if (!isNaN(num) && num > 0 && num < sortedFrameEvaluations.length) {
         setSelectedFrameIndex(num);
@@ -971,69 +1269,25 @@ async function markCommentAsUnread(id: string) {
   }, [zoom]);
 
   useEffect(() => {
-    const fetchComments = async () => {
-      const supabase = createClient();
+    if (design?.id) {
+      fetchComments();
+    }
+  }, [design?.id, fetchComments]);
+  
+  useEffect(() => {
+    if (sidebarTab === "comments" && design?.id) {
+      fetchComments();
+    }
+  }, [sidebarTab, design?.id, fetchComments]);
 
-      if (!design?.id) {
-        console.log(design?.id);
-        return;
-      }
-      const { data, error } = await supabase
-        .from("comments")
-        .select("id, text, user_id, created_at, local_time, parent_id, updated_at, design_id")
-        .eq("design_id", design?.id)
-        .order("created_at", { ascending: false });
-      if (error) {
-        console.log("Supabase error:", error);
-        toast.error(`Failed to fetch comments! ${error.message}`);
-        return;
-      }
-      const commentsWithUser = await Promise.all(
-        (data || []).map(async (comment) => {
-          const { data: userData } = await supabase
-            .from("profiles")
-            .select("full_name, avatar_url")
-            .eq("id", comment.user_id)
-            .single();
-          return {
-            id: comment.id,
-            text: comment.text,
-            user: {
-              id: comment.user_id,
-              fullName: userData?.full_name || "",
-              avatarUrl: userData?.avatar_url || "",
-            },
-            replies: [],
-            parentId: comment.parent_id,
-            createdAt: new Date(comment.created_at),
-            updatedAt: comment.updated_at ? new Date(comment.updated_at) : undefined,
-            localTime: comment.local_time,
-            design_id: comment.design_id,
-          };
-        })
-      );
-
-      const commentMap: { [id: string]: any } = {};
-      commentsWithUser.forEach(comment => {
-        commentMap[comment.id] = { ...comment, replies: [] };
-      });
-
-      const rootComments: any[] = [];
-      commentsWithUser.forEach(comment => {
-        if (comment.parentId) {
-          if (commentMap[comment.parentId]) {
-            commentMap[comment.parentId].replies.push(commentMap[comment.id]);
-          }
-        } else {
-          rootComments.push(commentMap[comment.id]);
-        }
-      });
-      setComments(rootComments);
-    };
-
-    fetchComments();
-
+  useEffect(() => {
+    if (!design?.id) {
+      console.log("[Realtime] No design id, skipping subscription setup.");
+      return;
+    }
+    console.log("[Realtime] Setting up subscription for design:", design.id);
     const supabase = createClient();
+
     const channel = supabase
       .channel('comments-realtime')
       .on(
@@ -1042,21 +1296,108 @@ async function markCommentAsUnread(id: string) {
           event: '*',
           schema: 'public',
           table: 'comments',
+          filter: `design_id=eq.${design.id}`,
         },
-        (payload) => {
-          fetchComments();
-          console.log("Payload information", payload)
+        async (payload) => {
+          console.log("[Realtime] Payload received:", payload);
+
+          if (payload.eventType === 'INSERT') {
+            console.log("[Realtime] INSERT event for comment id:", payload.new.id);
+            const newComment = await fetchCommentWithProfile(payload.new.id);
+            console.log("[Realtime] Fetched new comment with profile:", newComment);
+            if (!newComment) {
+              console.warn("[Realtime] New comment fetch failed or returned null.");
+              return;
+            }
+
+            setComments(prev => {
+              console.log("[Realtime] Previous comments before INSERT:", prev);
+              if (!newComment.parentId) {
+                const result = [newComment, ...prev];
+                console.log("[Realtime] New root comment array after INSERT:", result);
+                return result;
+              }
+              function addReply(comments) {
+                return comments.map(comment => {
+                  if (comment.id === newComment.parentId) {
+                    const updated = {
+                      ...comment,
+                      replies: [newComment, ...(comment.replies || [])],
+                    };
+                    console.log("[Realtime] Added reply to comment id:", comment.id, updated);
+                    return updated;
+                  }
+                  return {
+                    ...comment,
+                    replies: comment.replies ? addReply(comment.replies) : [],
+                  };
+                });
+              }
+              const result = addReply(prev);
+              console.log("[Realtime] Comments after adding reply:", result);
+              return result;
+            });
+          }
+
+          else if (payload.eventType === 'UPDATE') {
+            console.log("[Realtime] UPDATE event for comment id:", payload.new.id);
+            setComments(prev => {
+              const updated = updateCommentTree(prev, {
+                id: payload.new.id,
+                text: payload.new.text,
+                user: {
+                  id: payload.new.user_id,
+                  fullName: "",
+                  avatarUrl: "",
+                },
+                replies: [],
+                parentId: payload.new.parent_id,
+                createdAt: new Date(payload.new.created_at),
+                updatedAt: payload.new.updated_at ? new Date(payload.new.updated_at) : undefined,
+                localTime: payload.new.local_time,
+                design_id: payload.new.design_id,
+                is_read: payload.new.is_read,
+              });
+              console.log("[Realtime] Comments after UPDATE:", updated);
+              return updated;
+            });
+          }
+
+          else if (payload.eventType === 'DELETE') {
+            console.log("[Realtime] DELETE event for comment id:", payload.old.id);
+            setComments(prev => {
+              const updated = deleteCommentTree(prev, payload.old.id);
+              console.log("[Realtime] Comments after DELETE:", updated);
+              return updated;
+            });
+          }
         }
       )
       .subscribe();
 
     return () => {
+      console.log("[Realtime] Cleaning up subscription for design:", design.id);
       supabase.removeChannel(channel);
     };
-  }, [design?.id]);
+  }, [design?.id, deleteCommentTree, updateCommentTree]);
+
+  useEffect(() => {
+    // If the comment being edited or replied to is no longer present, reset state
+    if (editingId && !comments.some(c => c.id === editingId)) {
+      setEditingId(null);
+    }
+    if (replyingToId && !comments.some(c => c.id === replyingToId)) {
+      setReplyingToId(null);
+    }
+  }, [replyingToId, editingId, comments]);
 
 
-  console.log('evalResult', evalResult);
+  useEffect(() => {
+    if (sidebarTab !== "comments") {
+      setEditingId(null);
+      setReplyingToId(null);
+    }
+  }, [sidebarTab]);
 
   if (designLoading)
     return (
@@ -1072,7 +1413,6 @@ async function markCommentAsUnread(id: string) {
         <p>Design not found.</p>
       </div>
     );
-
   return (
     <div>
       <div className="mb-2">
@@ -1113,7 +1453,8 @@ async function markCommentAsUnread(id: string) {
             </div>
           )}
           <ZoomControls zoom={zoom} setZoom={setZoom} setPan={setPan} pan={pan} />
-          {/* Image */}
+
+          {/* Center of the image here */}
           <Image
             src={
               selectedFrameIndex === 0
@@ -1247,11 +1588,13 @@ async function markCommentAsUnread(id: string) {
                   setNewCommentText={setNewCommentText}
                   currentUserId={currentUserId}
                   handleAddComment={handleAddComment}
+                  // handleAddReply={handleAddReply}
                   editingId={editingId}
                   setEditingId={setEditingId}
                   replyingToId={replyingToId}
                   setReplyingToId={setReplyingToId}
                   handleDeleteComment={handleDeleteComment}
+                  postingComment={postingComment}
                 />
               </div>
             )}

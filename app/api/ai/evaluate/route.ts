@@ -233,20 +233,27 @@ export async function POST(req: Request) {
         // Delayed per API response
         await sleep(2000);
     }
-    // After the for-loop
     console.log(`All ${frameIds.length} frames evaluated. Aggregating results and saving design version...`);
 
     // 2. Aggregate results for design_versions
+    console.error("Aggregating frameResults:", frameResults);
+
     const validResults = frameResults.filter(r => r.ai);
+    console.error("Valid results for aggregation:", validResults);
+
     const total_score = validResults.length
         ? Math.round(validResults.reduce((sum, r) => sum + (r.ai?.overall_score ?? 0), 0) / validResults.length)
         : 0;
-    const summary = `Aggregate summary: ${validResults.map(r => r.ai?.summary).join(" | ")}`;
+    console.error("Calculated total_score:", total_score);
 
-    // 3. Save aggregate to design_versions (single row)
+    const summary = `Aggregate summary: ${validResults.map(r => r.ai?.summary).join(" | ")}`;
+    console.error("Aggregate summary string:", summary);
+
     try {
         const nextVersion = await getNextVersion(supabase, designId);
-        const { error, data } = await supabase.from("design_versions").upsert({
+        console.error("Next version for design_versions:", nextVersion);
+
+        const upsertPayload = {
             design_id: designId,
             file_key: fileKey,
             node_id: nodeId,
@@ -264,11 +271,18 @@ export async function POST(req: Request) {
             created_at: new Date().toISOString(),
             version: nextVersion,
             created_by: user.id
-        });
+        };
+        console.error("Upsert payload for design_versions:", upsertPayload);
+
+        const { error, data } = await supabase.from("design_versions")
+        .upsert(upsertPayload)
+        .select();
+        console.error("Upsert response - error:", error, "data:", data);
+
         if (error) {
             console.error("Supabase upsert error (design_versions):", error);
         } else {
-            console.log("Supabase upsert success (design_versions):", data);
+            console.error("Supabase upsert success (design_versions):", data);
         }
     } catch (err) {
         console.error("Error in Supabase save (aggregate):", err);

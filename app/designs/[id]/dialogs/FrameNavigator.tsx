@@ -1,5 +1,7 @@
 import React from "react";
 
+import Image from 'next/image';
+
 interface FrameNavigatorProps {
   selectedFrameIndex: number;
   setSelectedFrameIndex: React.Dispatch<React.SetStateAction<number>>;
@@ -13,9 +15,13 @@ const FrameNavigator: React.FC<FrameNavigatorProps> = ({
   sortedFrameEvaluations,
   filteredFrameEvaluations,
 }) => {
+
+
+
   if (sortedFrameEvaluations.length === 0) return null;
 
   return (
+
     <div className="flex items-center gap-6 mb-6 justify-center">
       {/* Previous Button */}
       <button
@@ -24,7 +30,7 @@ const FrameNavigator: React.FC<FrameNavigatorProps> = ({
           hover:from-[#ED5E20]/80 hover:to-orange-400/80 hover:text-white hover:shadow-lg hover:scale-110
           focus:outline-none focus:ring-2 focus:ring-[#ED5E20]/40
           ${selectedFrameIndex === 0 ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-        `}
+          `}
         onClick={() => setSelectedFrameIndex((prev) => Math.max(0, prev - 1))}
         disabled={selectedFrameIndex === 0}
         aria-label="Previous Frame"
@@ -39,9 +45,8 @@ const FrameNavigator: React.FC<FrameNavigatorProps> = ({
       <span className="text-base font-semibold px-4 py-2 rounded-full bg-white/70 dark:bg-[#232323]/70 shadow border border-[#ED5E20]/10">
         {selectedFrameIndex === 0
           ? "Overall"
-          : sortedFrameEvaluations[selectedFrameIndex]?.ai_summary ||
-            sortedFrameEvaluations[selectedFrameIndex]?.node_id ||
-            `Frame ${selectedFrameIndex}`}
+          : sortedFrameEvaluations[selectedFrameIndex]?.node_id ||
+          `Frame ${selectedFrameIndex}`}
         <span className="text-gray-400 ml-2 font-normal">
           ({selectedFrameIndex + 1} / {sortedFrameEvaluations.length})
         </span>
@@ -54,7 +59,7 @@ const FrameNavigator: React.FC<FrameNavigatorProps> = ({
           hover:from-[#ED5E20]/80 hover:to-orange-400/80 hover:text-white hover:shadow-lg hover:scale-110
           focus:outline-none focus:ring-2 focus:ring-[#ED5E20]/40
           ${selectedFrameIndex === filteredFrameEvaluations.length - 1 ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-        `}
+          `}
         onClick={() =>
           setSelectedFrameIndex((prev) =>
             Math.min(filteredFrameEvaluations.length - 1, prev + 1)

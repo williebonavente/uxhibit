@@ -20,24 +20,30 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
   return (
     <>
       {/* Score */}
-      {typeof evalResult.overall_score === "number" && (
-        <div className="p-3 rounded-lg bg-[#ED5E20]/10 justify-center items-center">
-          <h3 className="font-medium mb-2 text-center">
-            {selectedFrameIndex === 0
-              ? "Overall Score"
-              : (
-                frameEvaluations[selectedFrameIndex]?.ai_summary ||
-                  frameEvaluations[selectedFrameIndex]?.node_id
-                  ? `Frame ${selectedFrameIndex} Score`
-                  : "Frame Score"
-              )
-            }
-          </h3>
-          <div className="text-2xl font-bold text-[#ED5E20] text-center">
-            {Math.round(evalResult.overall_score)}/100
+      {typeof (selectedFrameIndex === 0
+        ? currentFrame?.total_score
+        : evalResult.overall_score) === "number" && (
+          <div className="p-3 rounded-lg bg-[#ED5E20]/10 justify-center items-center">
+            <h3 className="font-medium mb-2 text-center">
+              {selectedFrameIndex === 0
+                ? "Overall Score"
+                : (
+                  frameEvaluations[selectedFrameIndex]?.ai_summary ||
+                    frameEvaluations[selectedFrameIndex]?.node_id
+                    ? `Frame ${selectedFrameIndex} Score`
+                    : "Frame Score"
+                )
+              }
+            </h3>
+            <div className="text-2xl font-bold text-[#ED5E20] text-center">
+              {Math.round(
+                selectedFrameIndex === 0
+                  ? currentFrame?.total_score
+                  : evalResult.overall_score
+              )}/100
+            </div>
           </div>
-        </div>
-      )}
+        )}
       {/* Summary */}
       <div className="p-3 rounded-lg bg-[#FFFF00]/10">
         <h3 className="font-medium mb-2">Summary</h3>

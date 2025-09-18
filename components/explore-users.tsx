@@ -1,6 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback
+} from "react";
 import {
   IconSearch,
 } from "@tabler/icons-react";
@@ -10,10 +14,7 @@ import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import { LoadingInspiration } from "./animation/loading-fetching";
 import { DesignCard } from "./design-card";
-import { CommentItem } from "./comments-user";
-import { MessageSquare } from "lucide-react";
 import { Comment } from "./comments-user";
-// import { useRef } from "react";
 
 
 type DesignInfo = {
@@ -39,27 +40,15 @@ type UserAvatarProps = {
   className?: string;
 }
 
-// export function UserAvatar({ avatarPath, alt }: { avatarPath: string | null, alt: string }) {
-//   const avatarUrl = useSignedAvatarUrl(avatarPath);
-//   return (
-//     <Image
-//       src={avatarUrl ?? "/images/default_avatar.png"}
-//       alt={alt}
-//       className="w-10 h-10 rounded-full"
-//       width={400}
-//       height={400}
-//     />
-//   );
-// }
 
 export const UserAvatar: React.FC<UserAvatarProps> = ({ avatarPath, alt, className }) => (
-    <Image
-        src={avatarPath || "/iamges/default_avatar.png"}
-        alt={alt}
-        className={className} 
-        width={40}
-        height={40}
-    />
+  <Image
+    src={avatarPath || "/iamges/default_avatar.png"}
+    alt={alt}
+    className={`rounded-full ${className ?? ""}`}
+    width={40}
+    height={40}
+  />
 );
 
 export function useSignedAvatarUrl(avatarPath: string | null) {
@@ -97,15 +86,16 @@ export function useSignedAvatarUrl(avatarPath: string | null) {
 export default function ExplorePage() {
 
   const initialComments: Comment[] = [];
-  const [search, setSearch] = useState("");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [users, setUsers] = useState<UserInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [animatingHeart, setAnimatingHeart] = useState<string | null>(null);
+  // debounce state
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [comments, setComments] = useState<Comment[]>(initialComments);
   const [newCommentText, setNewCommentText] = useState("");
   const [currentUserProfile, setCurrentUserProfile] = useState<{ fullName: string; avatarUrl: string } | null>(null);
-  // const fetchTimeout = useRef<NodeJS.Timeout | null>(null);
 
 
   const fetchUsersWithDesigns = useCallback(async () => {
@@ -123,7 +113,6 @@ export default function ExplorePage() {
         setLoading(false);
         return;
       }
-
       // Fetch designs
       const { data: designsData, error: designsError } = await supabase
         .from("designs")
@@ -136,18 +125,17 @@ export default function ExplorePage() {
         return;
       }
 
-      // Fetch published designs (get design_id and owner_id)
       const { data: publishedData, error: publishedError } = await supabase
         .from("published_designs")
-        .select("design_id, user_id, num_of_hearts, num_of_views")
+        .select(` design_id, user_id, num_of_hearts, num_of_views,
+                designs (id, owner_id, title, figma_link, thumbnail_url),
+                profiles (id, full_name, avatar_url)`)
         .eq("is_active", true);
 
       if (publishedError) {
         setLoading(false);
         return;
       }
-
-      // Only include published designs
       const publishedDesignIds = publishedData?.map((p) => p.design_id) || [];
 
       const publishedLookup = Object.fromEntries(
@@ -164,7 +152,6 @@ export default function ExplorePage() {
         likedDesignIds = (likesData || []).map(like => like.design_id);
       }
 
-      // Group designs by user
       const usersWithDesigns = usersData.map((user) => ({
         user_id: user.id,
         name: user.full_name,
@@ -271,7 +258,13 @@ export default function ExplorePage() {
     }
   };
 
-
+  // Debounce state
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300); 
+    return () => clearTimeout(handler);
+  }, [search]);
 
   useEffect(() => {
     if (!currentUserId) return;
@@ -396,8 +389,8 @@ export default function ExplorePage() {
       ...user,
       designs: user.designs.filter(
         (design) =>
-          user.name.toLowerCase().includes(search.toLowerCase()) ||
-          design.project_name.toLowerCase().includes(search.toLowerCase())
+          user.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+          design.project_name.toLowerCase().includes(debouncedSearch.toLowerCase())
       ),
     }))
     .filter((user) => user.designs.length > 0);
@@ -408,7 +401,7 @@ export default function ExplorePage() {
   return (
     <div className="p-t-10 space-y-5">
       {/* Search */}
-      <div className="flex items-center border rounded-lg px-4 py-2 w-full max-w-md mx-auto">
+     <div className="flex items-center border rounded-lg px-4 py-2 w-full max-w-md mx-auto">
         <IconSearch size={20} className="text-gray-500" />
         <input
           type="text"

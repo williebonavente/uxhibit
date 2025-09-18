@@ -7,7 +7,6 @@ import Link from "next/link";
 import { IconHeart, IconHeartFilled, IconEye } from "@tabler/icons-react";
 import { SparkleEffect } from "./animation/heart-pop";
 import { MessageSquare } from "lucide-react";
-import { toast } from "sonner";
 
 
 export type DesignInfo = {
@@ -136,16 +135,16 @@ export function DesignCard({
                     </span>
                     <span className="flex items-center gap-2">
                         <span className="flex items-center gap-1">
-                            <button
-                                className="flex items-center p-2 rounded-full hover:bg-[#ED5E20]/15 hover:text-[#ED5E20] transition cursor-pointer"
+                            <span
+                                className="flex items-center p-2 rounded-full transition"
                                 title="Comment on this design"
                                 aria-label="Comment"
-                                onClick={() => {
-                                    toast.error("Error");
-                                }}
+                                // onClick={() => {
+                                //     toast.error("Error");
+                                // }}
                             >
                                 <MessageSquare size={19} />
-                            </button>
+                            </span>
                             <span className="text-xs text-gray-500 font-semibold">
                                 {/* TODO: Comment counter here */}
                                 1

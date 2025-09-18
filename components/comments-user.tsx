@@ -32,19 +32,21 @@ interface CommentItemProps {
     comment: Comment;
     editingId: string | null;
     setEditingId: (id: string | null) => void;
-    replyingToId: string | null;
-    setReplyingToId: (id: string | null) => void;
+    // replyingToId: string | null;
+    // setReplyingToId: (id: string | null) => void;
     onDelete: (id: string) => void;
     depth?: number;
+    //  onReply: (parentId: string, replyText: string) => Promise<void>;
 }
 
 export const CommentItem: React.FC<CommentItemProps> = ({
     comment,
     editingId,
     setEditingId,
-    replyingToId,
-    setReplyingToId,
+    // replyingToId,
+    // setReplyingToId,
     onDelete,
+    // onReply,
     depth = 0,
 }) => {
 
@@ -56,18 +58,28 @@ export const CommentItem: React.FC<CommentItemProps> = ({
     const [editText, setEditText] = useState(comment.text);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [collapsed, setCollapsed] = useState(false);
+    const [postingReply, setPostingReply] = useState(false);
+    const [savingEdit, setSavingEdit] = useState(false);
 
-    const isReplying = replyingToId === comment.id;
-    const isEditing = editingId === comment.id;
+    // replying state
+    const [isEditing, setIsEditing] = useState(false);
+    const [isReplying, setIsReplying] = useState(false);
+
+    // const isReplying = replyingToId === comment.id;
+    // const isEditing = editingId === comment.id;
 
     const handleEdit = () => {
-        setReplyingToId(null);
-        setEditingId(comment.id);
+        // setReplyingToId(null);
+        setIsReplying(false);
+        // setEditingId(comment.id);
+        setIsEditing(true);
     }
 
     const handleReply = () => {
-        setEditingId(null);
-        setReplyingToId(comment.id)
+        // setEditingId(null);
+        setIsEditing(false);
+        setIsReplying(true);
+        // setReplyingToId(comment.id)
     }
 
     const handleSaveEdit = async () => {
@@ -75,7 +87,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
             toast.error("Comment cannot be empty.");
             return;
         }
-        // Update in Supabase
+        setSavingEdit(true);
         const { error } = await supabase
             .from("comments")
             .update({
@@ -83,6 +95,8 @@ export const CommentItem: React.FC<CommentItemProps> = ({
                 updated_at: new Date().toISOString(),
             })
             .eq("id", comment.id);
+
+        setSavingEdit(false);
 
         if (error) {
             toast.error(`Failed to update comment! ${error.message}`);
@@ -92,11 +106,13 @@ export const CommentItem: React.FC<CommentItemProps> = ({
         comment.text = editText;
         comment.updatedAt = new Date();
         setEditingId(null);
+        setIsEditing(false);
         toast.success("Comment updated!");
     }
 
     const handleCancelEdit = () => {
-        setEditingId(null);
+        // setEditingId(null);
+        setIsEditing(false);
     }
 
     const handleDelete = async () => {
@@ -154,7 +170,8 @@ export const CommentItem: React.FC<CommentItemProps> = ({
 
     const handleAddReply = async () => {
         if (!replyText.trim() || !currentUserId) return;
-
+        setPostingReply(true);
+        // await onReply(comment.id, replyText);
         const designId = comment.design_id;
         const { error } = await supabase
             .from("comments")
@@ -166,14 +183,16 @@ export const CommentItem: React.FC<CommentItemProps> = ({
                     parent_id: comment.id,
                     local_time: new Date().toLocaleTimeString(),
                 },
-            ])
+            ]);
+        setPostingReply(false);
         if (error) {
             toast.error("Failed to add reply!");
             console.error(error.message);
             return;
         }
         setReplyText("");
-        setReplyingToId(null);
+        // setReplyingToId(null);
+        setIsReplying(false);
     };
 
     useEffect(() => {
@@ -237,19 +256,21 @@ export const CommentItem: React.FC<CommentItemProps> = ({
                             type="text"
                             value={editText}
                             onChange={(e) => setEditText(e.target.value)}
-                            className="border rounded px-3 py-2 flex-1 text-sm focus:ring-2 focus:ring-orange-400 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+                            className={`border rounded px-3 py-2 flex-1 text-sm focus:ring-2 focus:ring-orange-400 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 ${savingEdit ? "cursor-not-allowed" : ""}`}
+                            disabled={savingEdit}
                         />
                         <div className="flex gap-2">
                             <button
-                                className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm transition-colors disabled:opacity-50 cursor-pointer"
+                                className={`bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm transition-colors disabled:opacity-50 ${savingEdit ? "cursor-not-allowed" : "cursor-pointer"}`}
                                 onClick={handleSaveEdit}
-                                disabled={!editText.trim()}
+                                disabled={!editText.trim() || savingEdit}
                             >
-                                Save
+                                {savingEdit ? "Saving..." : "Save"}
                             </button>
                             <button
-                                className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 cursor-pointer dark:hover:bg-gray-600 text-black dark:text-white px-3 py-1 rounded text-sm transition-colors"
+                                className={`bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-black dark:text-white px-3 py-1 rounded text-sm transition-colors cursor-pointer`}
                                 onClick={handleCancelEdit}
+                                disabled={savingEdit}
                             >
                                 Cancel
                             </button>
@@ -292,18 +313,22 @@ export const CommentItem: React.FC<CommentItemProps> = ({
                         onChange={(e) => setReplyText(e.target.value)}
                         placeholder="Write a reply..."
                         className="border rounded px-3 py-2 flex-1 text-sm focus:ring-2 focus:ring-orange-400 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 dark:placeholder-gray-400"
+                        disabled={postingReply}
                     />
                     <div className="flex gap-2">
                         <button
                             onClick={handleAddReply}
-                            className="bg-blue-500 hover:bg-blue-600 cursor-pointer text-white px-3 py-1 rounded text-sm transition-colors disabled:opacity-50"
-                            disabled={!replyText.trim()}
+                            className="bg-blue-500  
+                            hover:bg-blue-600 cursor-pointer text-white px-3 py-1 rounded text-sm transition-colors disabled:opacity-50"
+                            disabled={!replyText.trim() || postingReply}
                         >
-                            Reply
+                            {postingReply ? "Posting..." : "Reply"}
                         </button>
                         <button
-                            onClick={() => setReplyingToId(null)}
+                            onClick={() => setIsReplying(false)}
+                            // onClick={() => setReplyingToId(null)}
                             className="bg-gray-200 hover:bg-gray-300 cursor-pointer dark:bg-gray-700 dark:hover:bg-gray-600 text-black dark:text-white px-3 py-1 rounded text-sm transition-colors"
+                            disabled={postingReply}
                         >
                             Cancel
                         </button>
@@ -357,8 +382,8 @@ export const CommentItem: React.FC<CommentItemProps> = ({
                                             comment={reply}
                                             editingId={editingId}
                                             setEditingId={setEditingId}
-                                            replyingToId={replyingToId}
-                                            setReplyingToId={setReplyingToId}
+                                            // replyingToId={replyingToId}
+                                            // setReplyingToId={setReplyingToId}
                                             onDelete={onDelete}
                                             depth={depth + 1}
                                         />
