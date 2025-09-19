@@ -33,7 +33,7 @@ import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { type User } from "@supabase/supabase-js";
 import { Skeleton } from "./ui/skeleton";
-import { Bug, Settings, UserRound } from "lucide-react";
+import { Bug, Settings, UserRound, Trash } from "lucide-react";
 import { useDesignNotifications } from "../lib/notification"
 import { IconBell, IconX } from "@tabler/icons-react";
 
@@ -378,8 +378,8 @@ export function NavUser({ user }: { user: User | null }) {
                   Account
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setShowDeleteDialog(true)}>
-                  <Settings />
-                  Settings
+                  <Trash />
+                  Delete Account
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setShowNotifModal(true)}>
                   <IconNotification />
