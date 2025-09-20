@@ -8,11 +8,6 @@ Unlike traditional evaluation tools, UXhibit also considers **demographic factor
 - [About the Project](#-about-the-project)  
 - [Features](#-features)  
 - [Tech Stack](#-tech-stack)  
-- [Installation](#-installation)  
-- [Usage](#-usage)  
-- [Project Structure](#-project-structure)  
-- [Contributors](#-contributors)  
-- [License](#-license)  
 
 ---
 
@@ -39,3 +34,10 @@ Our vision is to make **UX learning more interactive, insightful, and data-drive
 ---
 
 ## 🛠 Tech Stack  
+- **Frontend:** TypeScript, CSS, HTML
+- **Frameworks & Libraries:** React.js, Tailwind CSS
+- **Backend:** Node.js, Express.js
+- **Database:** Supabase (PostgreSQL, Auth, Storage)  
+- **AI Integration:** Large Language Models (LLMs)  
+- **Development & Testing Tools:** Postman
+- **Version Control:** Git & GitHub  
