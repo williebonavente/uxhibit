@@ -36,8 +36,9 @@ Our vision is to make **UX learning more interactive, insightful, and data-drive
 ## 🛠 Tech Stack  
 - **Frontend:** TypeScript, CSS, HTML
 - **Frameworks & Libraries:** React.js, Tailwind CSS
-- **Backend:** Node.js, Express.js
+- **Backend:** Node.js, Express.jsm Javascript
 - **Database:** Supabase (PostgreSQL, Auth, Storage)  
 - **AI Integration:** Large Language Models (LLMs)  
 - **Development & Testing Tools:** Postman
 - **Version Control:** Git & GitHub  
+
