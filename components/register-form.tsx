@@ -112,13 +112,12 @@ export default function RegistrationForm() {
     <div className="relative min-h-screen flex items-center justify-center w-full overflow-hidden p-5">
       <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover">
         <source src="/images/uxhibit-gif-3(webm).webm" type="video/webm" />
-        Your browser does not support the video tag.
       </video>
 
       <div className="absolute inset-0 bg-black/40" />
 
       <div className="relative z-10 flex flex-col w-full max-w-sm sm:max-w-md md:max-w-lg xl:max-w-xl p-6 sm:p-8 md:p-10 lg:p-12
-                       bg-white/40 dark:bg-[#1E1E1E]/40 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20">
+                      bg-white/40 dark:bg-[#1E1E1E]/40 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20">
 
         <div className="flex justify-center mb-5">
           <Image
@@ -131,87 +130,164 @@ export default function RegistrationForm() {
         </div>
 
         <p className="text-sm sm:text-base md:text-lg text-center mb-8 text-[#1E1E1E]/70 dark:text-[#F5F5F5]/70">
-          Create your account and start designing with Uxhibit
+          Create your account and start designing with UXhibit
         </p>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {[
-              { name: "username", placeholder: "Username" },
-              { name: "full_name", placeholder: "Full Name" },
-              { name: "email", placeholder: "Email", type: "email" },
-              { name: "age", placeholder: "Age", type: "number" },
-              { name: "gender", placeholder: "Gender" },
-              { name: "password", placeholder: "Password", password: true },
-              { name: "confirmPassword", placeholder: "Confirm Password", password: true },
-            ].map((fieldConfig, idx) => (
-              <FormField
-                key={idx}
-                control={form.control}
-                name={fieldConfig.name as any}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      {fieldConfig.password ? (
-                        <PasswordInput
-                          id={fieldConfig.name}
-                          placeholder={fieldConfig.placeholder}
-                          type="password"
-                          className="w-full h-11 sm:h-12 text-sm sm:text-base"
-                          {...field}
-                        />
-                      ) : (
-                        <Input
-                          id={fieldConfig.name}
-                          placeholder={fieldConfig.placeholder}
-                          type={fieldConfig.type || "text"}
-                          className="w-full h-11 sm:h-12 text-sm sm:text-base"
-                          {...field}
-                        />
-                      )}
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            ))}
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
+            {/* Username */}
+            <FormField
+              control={form.control}
+              name="username"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <Input
+                      id="username"
+                      placeholder="Username"
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            {/* Terms and Conditions Checkbox */}
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="terms"
-                checked={termsAccepted}
-                onCheckedChange={handleCheckboxChange}
-                className="cursor-pointer"
-              />
-              <label
-                htmlFor="terms"
-                className="text-sm text-[#1E1E1E]/70 dark:text-[#F5F5F5]/70" 
-              >
-                I accept the{" "} 
-                  <Link 
-                    href="/auth/terms"
-                    onClick={() => {
-                      const values = form.getValues();
-                      localStorage.setItem("registrationDraft", JSON.stringify(values));
-                      router.push("/terms");
-                    }}
-                    className="text-[#ff7f3f] hover:text-[#ED5E20] transition-colors duration-200 hover:underline font-medium"
-                  >
-                    Terms and Conditions</Link>
-              </label>
+            {/* Full Name */}
+            <FormField
+              control={form.control}
+              name="full_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <Input
+                      id="full_name"
+                      placeholder="Full Name"
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Email */}
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <Input
+                      id="email"
+                      placeholder="Email"
+                      type="email"
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Age and Gender in one row */}
+            <div className="flex gap-x-2">
+              <div className="flex-1">
+                <FormField
+                  control={form.control}
+                  name="age"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input
+                          id="age"
+                          placeholder="Age"
+                          type="number"
+                          className="w-full h-11 sm:h-12 text-sm sm:text-base"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="flex-1">
+                <FormField
+                  control={form.control}
+                  name="gender"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input
+                          id="gender"
+                          placeholder="Gender"
+                          className="w-full h-11 sm:h-12 text-sm sm:text-base"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
+
+            {/* Password */}
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <PasswordInput
+                      id="password"
+                      placeholder="Password"
+                      type="password"
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Confirm Password */}
+            <FormField
+              control={form.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <PasswordInput
+                      id="confirmPassword"
+                      placeholder="Confirm Password"
+                      type="password"
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Terms and Conditions Checkbox */} <div className="flex items-center space-x-2 mb-5"> <Checkbox id="terms" checked={termsAccepted} onCheckedChange={handleCheckboxChange} className="cursor-pointer" /> <label htmlFor="terms" className="text-sm text-[#1E1E1E]/70 dark:text-[#F5F5F5]/70" > I accept the{" "} <Link href="/auth/terms" onClick={() => { const values = form.getValues(); localStorage.setItem("registrationDraft", JSON.stringify(values)); router.push("/terms"); }} className="text-[#ff7f3f] hover:text-[#ED5E20] transition-colors duration-200 hover:underline font-medium" > Terms and Conditions</Link> </label> </div>
 
             {/* Submit Button */}
             <Button
               type="submit"
               className="group relative inline-flex items-center justify-center
-                          w-full h-11 sm:h-12 rounded-xl text-base tracking-wide
-                          transition-all duration-300 cursor-pointer
-                          text-white shadow-[0_4px_18px_-4px_rgba(237,94,32,0.55)]
-                          hover:shadow-[0_6px_26px_-6px_rgba(237,94,32,0.65)]
-                          active:scale-[.97] focus:outline-none
-                          focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40"
+                w-full h-11 sm:h-12 rounded-xl text-base tracking-wide
+                transition-all duration-300 cursor-pointer
+                text-white shadow-[0_4px_18px_-4px_rgba(237,94,32,0.55)]
+                hover:shadow-[0_6px_26px_-6px_rgba(237,94,32,0.65)]
+                active:scale-[.97] focus:outline-none
+                focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40"
             >
               <span aria-hidden className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b]" />
               <span aria-hidden className="absolute inset-[2px] rounded-[10px] bg-[linear-gradient(145deg,rgba(255,255,255,0.28),rgba(255,255,255,0.07))] backdrop-blur-[2px]" />

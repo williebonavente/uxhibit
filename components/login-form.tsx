@@ -184,7 +184,7 @@ export default function LoginForm() {
 
           {/* Login Form */}
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+            <form onSubmit={form.handleSubmit(onSubmit)}>
               {/* Email Field */}
               <FormField
                 control={form.control}
@@ -197,7 +197,7 @@ export default function LoginForm() {
                         placeholder="Email"
                         type="email"
                         autoComplete="email"
-                        className="w-full h-11 sm:h-12 text-sm sm:text-base"
+                        className="w-full h-11 sm:h-12 text-sm sm:text-base mb-2"
                         {...field}
                       />
                     </FormControl>
@@ -225,17 +225,18 @@ export default function LoginForm() {
                   </FormItem>
                 )}
               />
+
               {/* Login Button */}
               <Button
                 type="submit"
                 className={`group relative inline-flex items-center justify-center
-                  w-full h-11 sm:h-12
+                  w-full h-11 sm:h-12 mt-5
                   rounded-xl text-base tracking-wide
                   transition-all duration-300 cursor-pointer
                   text-white shadow-[0_4px_18px_-4px_rgba(237,94,32,0.55)]
                   hover:shadow-[0_6px_26px_-6px_rgba(237,94,32,0.65)]
                   active:scale-[.97]
-                  focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40`}
+                  focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/4`}
               >
                 {/* Glow / gradient base */}
                 <span
@@ -284,7 +285,7 @@ export default function LoginForm() {
             type="button"
             onClick={handleFigmaLogin}
             className={`group relative inline-flex items-center justify-center
-                        w-full h-11 sm:h-12 mt-5
+                        w-full h-11 sm:h-12 mt-2
                         rounded-xl text-base tracking-wide
                         transition-all duration-300 cursor-pointer
                         text-white shadow-md

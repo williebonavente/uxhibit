@@ -130,7 +130,7 @@ export default function ResetPasswordPage() {
                   <FormControl>
                     <PasswordInput
                       id="confirmPassword"
-                      placeholder="Re-enter new password"
+                      placeholder="Confirm new password"
                       type="password"
                       autoComplete="new-password"
                       className="w-full h-11 sm:h-12 text-sm sm:text-base"
