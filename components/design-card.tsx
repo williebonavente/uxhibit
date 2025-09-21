@@ -84,7 +84,7 @@ export function DesignCard({
                     <Image
                         src={design.thumbnail_url || "/images/design-thumbnail.png"}
                         alt="Design thumbnail"
-                        className="object-cover"
+                        className="object-cover bg-white dark:bg-accent"
                         width={400}
                         height={400}
                     />

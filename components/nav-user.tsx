@@ -4,6 +4,7 @@ import {
   IconDotsVertical,
   IconLogout,
   IconNotification,
+  IconSettings,
   IconUserCircle,
 } from "@tabler/icons-react";
 
@@ -81,6 +82,19 @@ export function NavUser({ user }: { user: User | null }) {
   // TODO: BE DELTED
   const heartNotification = useDesignNotifications(user?.id ?? null);
   const hasHeartNotifications = heartNotification.length > 0;
+
+  const handleProfileClick = async () => {
+    const supabase = createClient();
+
+    // Get current user
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData?.user?.id) return;
+
+    const userId = authData.user.id;
+
+    // Redirect to your profile page
+    router.push(`/profile/${userId}`);
+  };
 
   const getProfile = useCallback(async () => {
     try {
@@ -167,6 +181,7 @@ export function NavUser({ user }: { user: User | null }) {
       }
     }
   };
+
   const handleDeleteNotification = async (notifId: string) => {
     const supabase = createClient();
     const { error } = await supabase
@@ -308,7 +323,7 @@ export function NavUser({ user }: { user: User | null }) {
             <DropdownMenuTrigger asChild>
               <SidebarMenuButton
                 size="lg"
-                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground py-7"
               >
                 <Avatar className="h-8 w-8 rounded-bl-full ">
                   {/* <AvatarImage src={profile?.avatar_url} alt={profile?.fullname} /> */}
@@ -373,13 +388,9 @@ export function NavUser({ user }: { user: User | null }) {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
-                <DropdownMenuItem onClick={handleAccountClick}>
+                <DropdownMenuItem onClick={handleProfileClick}>
                   <IconUserCircle />
-                  Account
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setShowDeleteDialog(true)}>
-                  <Trash />
-                  Delete Account
+                  My Profile
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setShowNotifModal(true)}>
                   <IconNotification />
@@ -389,12 +400,20 @@ export function NavUser({ user }: { user: User | null }) {
                   )}
                 </DropdownMenuItem>
                 <DropdownMenuItem>
+                  <UserRound />
+                  About Us
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleAccountClick}>
+                  <IconSettings />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem>
                   <Bug />
                   Report a Bug
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <UserRound />
-                  About Us
+                <DropdownMenuItem onClick={() => setShowDeleteDialog(true)}>
+                  <Trash />
+                  Delete Account
                 </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
