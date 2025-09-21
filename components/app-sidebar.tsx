@@ -53,12 +53,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       : "/uxhibit-logo-light-mode.svg";
 
   return (
-    <Sidebar className="p-8" collapsible="offcanvas" {...props}>
+    <Sidebar className="p-4" collapsible="offcanvas" {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <div className="aspect-square flex justify-center items-center">
-              <Image src={logoSrc} alt="Logo" fill priority />
+              <Image src={logoSrc} alt="Logo" fill priority className="p-4" />
             </div>
           </SidebarMenuItem>
         </SidebarMenu>

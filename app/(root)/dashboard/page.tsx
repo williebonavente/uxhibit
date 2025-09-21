@@ -115,7 +115,7 @@ export default async function Dashboard() {
       </div>
 
       <div className="border-b-2 p-2">
-        <h1 className="text-xl font-medium">My Works</h1>
+        <h1 className="text-2xl font-medium">My Works</h1>
       </div>
 
       <DesignsGallery />

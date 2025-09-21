@@ -4,7 +4,7 @@ export default function Explore() {
   return (
     <div className="space-y-5">
       <div className="border-b-2 p-2">
-        <h1 className="text-xl font-medium">Explore</h1>
+        <h1 className="text-2xl font-medium">Explore</h1>
       </div>
       <div className="p-2 m-5 flex items-center">
         <p className="text-sm sm:text-base text-gray-700 dark:text-gray-200 w-full sm:mb-0 font-['Poppins']">
