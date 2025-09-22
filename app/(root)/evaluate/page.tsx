@@ -713,7 +713,7 @@ export default function Evaluate() {
                 className="object-contain mb-6"
                 priority
               />
-              <h2 className="text-lg font-semibold text-[#ED5E20] mb-2">
+              <h2 className="gradient-text text-lg font-semibold mb-2">
                 Smart Evaluation Underway!
               </h2>
               <p className="text-gray-500 text-sm mb-4">

@@ -213,6 +213,14 @@
   }
 }
 
+.gradient-text {
+  background: linear-gradient(to right, #FF4D00, #ED5E20, #FFA600, #FFDB97);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
 /* sm ≥ 640px */
 @media (min-width: 640px) {
   .xhibit-gradient-text {

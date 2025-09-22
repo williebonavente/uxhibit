@@ -49,13 +49,40 @@ export default async function ProfilePage({ params }: { params: { id: string } }
     openTo: "Collaboration, Freelance, Full-time",
   };
 
+  const featuredWorks = [
+    {
+    title: "Mobile Banking App",
+    image: "https://assets.awwwards.com/awards/element/2022/05/627be98fa9616400863515.png",
+    description: "Redesigned for better accessibility and intuitive navigation.",
+    link: "https://yourwebsite.com/mobile-banking-case-study",
+    },
+    {
+      title: "E-Commerce Website",
+      image: "https://kinsta.com/wp-content/uploads/2019/01/portfolio-website-thumbnail-gallery.jpeg",
+      description: "Boosted conversion rates with streamlined checkout and product filtering.",
+      link: "https://yourwebsite.com/ecommerce-case-study",
+    },
+    {
+      title: "Fitness Tracker Dashboard",
+      image: "https://s3-alpha.figma.com/hub/file/1712964412/01a3dfa4-6614-4801-9617-932b46d23c6b-cover.png",
+      description: "Designed a responsive dashboard for tracking workouts and goals.",
+      link: "https://yourwebsite.com/fitness-tracker-case-study",
+    },
+    {
+      title: "Online Learning Platform",
+      image: "https://uihut-data.fra1.cdn.digitaloceanspaces.com/design/web-app/pack/thumbnail/UH27pM1N8dTXtxVq.webp",
+      description: "Enhanced course discovery and accessibility for diverse learners.",
+      link: "https://yourwebsite.com/learning-platform-case-study",
+    },
+  ];
+
   const caseStudies = [
     {
-      title: "Inclusive Travel App",
-      image: "https://s3-alpha.figma.com/hub/file/5171202716/bc6c04cc-1149-4577-8c6d-bde4eddc3259-cover.png",
-      summary: "Designed for WCAG 2.1 AA compliance, improving usability for low-vision users.",
-      outcome: "Increased user retention by 35%",
-      link: "https://www.figma.com/file/5171202716/Inclusive-Travel-App-Case-Study",
+    title: "Inclusive Travel App",
+    image: "https://s3-alpha.figma.com/hub/file/5171202716/bc6c04cc-1149-4577-8c6d-bde4eddc3259-cover.png",
+    summary: "Designed for WCAG 2.1 AA compliance, improving usability for low-vision users.",
+    outcome: "Increased user retention by 35%",
+    link: "https://www.figma.com/file/5171202716/Inclusive-Travel-App-Case-Study",
     },
     {
       title: "Accessible E-Learning Platform",
@@ -65,18 +92,18 @@ export default async function ProfilePage({ params }: { params: { id: string } }
       link: "https://yourwebsite.com/e-learning-case-study",
     },
     {
-      title: "Accessible E-Learning Platform",
-      image: "https://elements-resized.envatousercontent.com/elements-cover-images/bbd576b4-5842-49f1-995a-c52037bff2fc?w=433&cf_fit=scale-down&q=85&format=auto&s=ecae5006537ed362c9a196379797d9729eca2a8dfc7456461287b2e771e33eca",
-      summary: "Applied POUR principles to restructure content hierarchy and navigation.",
-      outcome: "Reduced bounce rate by 42%",
-      link: "https://yourwebsite.com/e-learning-case-study",
+      title: "Voice-Controlled Smart Home UI",
+      image: "https://mir-s3-cdn-cf.behance.net/projects/404/90bcea159012677.Y3JvcCwxNTM0LDEyMDAsMzQsMA.png",
+      summary: "Designed for hands-free interaction and screen reader compatibility.",
+      outcome: "Improved task completion rate by 28%",
+      link: "https://yourwebsite.com/smart-home-ui-case-study",
     },
     {
-      title: "Accessible E-Learning Platform",
-      image: "https://elements-resized.envatousercontent.com/elements-cover-images/bbd576b4-5842-49f1-995a-c52037bff2fc?w=433&cf_fit=scale-down&q=85&format=auto&s=ecae5006537ed362c9a196379797d9729eca2a8dfc7456461287b2e771e33eca",
-      summary: "Applied POUR principles to restructure content hierarchy and navigation.",
-      outcome: "Reduced bounce rate by 42%",
-      link: "https://yourwebsite.com/e-learning-case-study",
+      title: "Accessible Job Board",
+      image: "https://ictsolved.github.io/assets/images/blog/2019-11-30-bookstore-app-ui-designs-for-inspiration/bookstore-app-ui-cover.png",
+      summary: "Implemented semantic HTML and ARIA roles for screen reader support.",
+      outcome: "Increased job application submissions by 22%",
+      link: "https://yourwebsite.com/job-board-accessibility-case-study",
     },
   ];
 
@@ -87,39 +114,22 @@ export default async function ProfilePage({ params }: { params: { id: string } }
     { label: "WCAG Success Criteria Met", value: "100%" },
   ];
 
-  const featuredWorks = [
-    {
-      title: "Mobile Banking App",
-      image: "https://assets.awwwards.com/awards/element/2022/05/627be98fa9616400863515.png",
-      description: "Redesigned for better accessibility.",
-      link: "https://yourwebsite.com/mobile-banking-case-study",
-    },
-    {
-      title: "E-Commerce Website",
-      image: "https://kinsta.com/wp-content/uploads/2019/01/portfolio-website-thumbnail-gallery.jpeg",
-      description: "Improved conversion through better UI.",
-      link: "https://yourwebsite.com/ecommerce-case-study",
-    },
-  ];
-
-
   return (
-    <div className="relative min-h-screen flex items-center justify-center w-full overflow-hidden p-4 sm:p-10">
+    <div className="relative min-h-screen flex items-center justify-center w-full overflow-hidden">
       {/* Background */}
       <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover">
-        <source src="/images/uxhibit-gif-3(webm).webm" type="video/webm" />
+        <source src="/images/profile-bg.webm" type="video/webm" />
       </video>
       <div className="absolute inset-0 bg-black/50" />
 
       {/* Card */}
-      <div className="relative z-10 w-full max-w-7xl p-6 sm:p-10 md:p-12
-                      bg-white/10 dark:bg-black/10 backdrop-blur-xl rounded-2xl
-                      shadow-xl border border-white/20 space-y-6">
+      <div className="relative z-10 w-full p-6 sm:p-10 md:p-12
+                      bg-white/10 dark:bg-black/10 backdrop-blur-xl
+                      shadow-xl space-y-6">
 
         {/* Back Button */}
         <Link href="/dashboard" className="flex items-center gap-2 text-sm text-gray-200 hover:text-orange-400">
           <IconArrowLeft size={20} />
-          Back
         </Link>
 
         {/* Profile Header - centered layout */}
@@ -146,7 +156,7 @@ export default async function ProfilePage({ params }: { params: { id: string } }
                 {getInitials(fullName)}
               </AvatarFallback>
             </Avatar>
-            <div className="text-center">
+            <div className="text-start">
               <p className="font-semibold text-base sm:text-lg truncate max-w-[240px]">{fullName}</p>
               <p className="text-sm sm:text-base text-black/80 truncate max-w-[240px]">{role}</p>
             </div>
@@ -167,7 +177,7 @@ export default async function ProfilePage({ params }: { params: { id: string } }
               label: "Followers", value: 342, icon: <Users size={25} className="text-blue-400" />
             }].map((stat, i) => (
               <div key={i} className="flex flex-col sm:flex-row items-center sm:items-start gap-2 sm:gap-4 
-                                      bg-white/10 dark:bg-black/10 rounded-xl p-4 border border-white/20 break-words">
+                                      bg-white/40 dark:bg-black/40 rounded-xl p-4 break-words">
                 <div className="bg-white/10 p-3 rounded-full shrink-0">{stat.icon}</div>
                 <div className="text-center sm:text-left">
                   <p className="text-xl font-bold text-white truncate">{stat.value}</p>
@@ -179,11 +189,11 @@ export default async function ProfilePage({ params }: { params: { id: string } }
 
           {/* About & Skills */}
           <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
+            <div className="flex-1 bg-white/40 dark:bg-black/40 rounded-xl p-5">
               <h2 className="text-lg font-semibold mb-3 text-white">About</h2>
               <p className="text-sm text-gray-200">{bio}</p>
             </div>
-            <div className="flex-1 bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
+            <div className="flex-1 bg-white/40 dark:bg-black/40 rounded-xl p-5">
               <h2 className="text-lg font-semibold mb-3 text-white">Skills & Tools</h2>
               <ul className="flex flex-wrap gap-2">
                 {skills.map((skill, i) => (
@@ -195,7 +205,7 @@ export default async function ProfilePage({ params }: { params: { id: string } }
 
           {/* Design Philosophy & Career Highlights */}
           <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
+            <div className="flex-1 bg-white/40 dark:bg-black/40 rounded-xl p-5">
               <h2 className="text-lg font-semibold mb-3 text-white">Design Philosophy</h2>
               <p className="text-sm text-gray-300 mb-2">
                 I believe great design is invisible, inclusive, and intentional. Every pixel should serve a purpose—and every user should feel seen.
@@ -206,7 +216,7 @@ export default async function ProfilePage({ params }: { params: { id: string } }
                 <li>Iterative testing with real users</li>
               </ul>
             </div>
-            <div className="flex-1 bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
+            <div className="flex-1 bg-white/40 dark:bg-black/40 rounded-xl p-5">
               <h2 className="text-lg font-semibold mb-3 text-white">Career Highlights</h2>
               <ul className="space-y-2 text-sm text-gray-300">
                 <li className="flex items-center gap-2"><Book size={16} /> Graduated from UX Academy (2020)</li>
@@ -217,14 +227,14 @@ export default async function ProfilePage({ params }: { params: { id: string } }
           </div>
 
           {/* UXhibit Evaluations */}
-          <div className="bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
+          <div className="bg-white/40 dark:bg-black/40 rounded-xl p-5">
             <h2 className="text-lg font-semibold mb-2 text-white mb-5">UXhibit Evaluations</h2>
             <DesignsGallery />
           </div>
 
           {/* Portfolio & Case Studies */}
           <div className="flex flex-col gap-4">
-            <div className="bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
+            <div className="bg-white/40 dark:bg-black/40 rounded-xl p-5">
               <h2 className="text-lg font-semibold mb-3 text-white">Portfolio</h2>
               <div className="flex items-center gap-2 mb-4 flex-wrap">
                 <Globe size={20} className="text-orange-300" />
@@ -232,7 +242,7 @@ export default async function ProfilePage({ params }: { params: { id: string } }
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {featuredWorks.map((work, i) => (
-                  <Link key={i} href={work.link} target="_blank" className="group bg-white/5 rounded-lg p-3 hover:bg-white/10 transition border border-white/10">
+                  <Link key={i} href={work.link} target="_blank" className="group bg-white/5 rounded-lg p-3 hover:bg-white/10 transition">
                     <Image src={work.image} alt={work.title} width={400} height={200} className="rounded-md mb-3 object-cover w-full h-40" />
                     <h3 className="text-lg font-semibold text-orange-200 group-hover:underline mb-1">{work.title}</h3>
                     <p className="text-sm text-gray-300">{work.description}</p>
@@ -241,7 +251,7 @@ export default async function ProfilePage({ params }: { params: { id: string } }
               </div>
             </div>
 
-            <div className="bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
+            <div className="bg-white/40 dark:bg-black/40 rounded-xl p-5">
               <h2 className="text-lg font-semibold mb-3 text-white">Case Studies</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {caseStudies.map((study, i) => (
@@ -257,7 +267,7 @@ export default async function ProfilePage({ params }: { params: { id: string } }
           </div>
 
           {/* Impact Metrics */}
-          <div className="bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
+          <div className="bg-white/40 dark:bg-black/40 rounded-xl p-5">
             <h2 className="text-lg font-semibold mb-3 text-white">Impact Metrics</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {[{
@@ -282,7 +292,7 @@ export default async function ProfilePage({ params }: { params: { id: string } }
 
           {/* Testimonials & Contact */}
           <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
+            <div className="flex-1 bg-white/40 dark:bg-black/40 rounded-xl p-5">
               <h2 className="text-lg font-semibold mb-3 text-white">Testimonials</h2>
               <div className="space-y-4">
                 <blockquote className="text-sm text-gray-300 italic border-l-4 border-green-400 pl-4">
@@ -296,7 +306,7 @@ export default async function ProfilePage({ params }: { params: { id: string } }
               </div>
             </div>
 
-            <div className="flex-1 bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20 justify-center">
+            <div className="flex-1 bg-white/40 dark:bg-black/40 rounded-xl p-5 justify-center">
               <h2 className="text-lg font-semibold mb-3 text-white">Contact</h2>
               <div className="flex flex-col flex-wrap gap-4">
                 <div className="flex items-center gap-3 w-full sm:w-[calc(50%-0.5rem)]">
@@ -331,7 +341,6 @@ export default async function ProfilePage({ params }: { params: { id: string } }
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </div>
