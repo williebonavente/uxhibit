@@ -5,6 +5,10 @@ import { IconArrowLeft } from "@tabler/icons-react";
 import Link from "next/link";
 import DesignsGallery from "@/components/designs-gallery";
 import Image from "next/image";
+import { 
+  Book, Trophy, Rocket, ArrowUpRight, Mail, Globe,
+  Users, Heart, Eye, LayoutGrid, Accessibility, Star, FileText, Check
+} from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -39,18 +43,68 @@ export default async function ProfilePage({ params }: { params: { id: string } }
   const role = "UI/UX Designer";
   const skills = ["Figma", "Adobe XD", "Sketch", "React", "Usability Testing"];
   const portfolioLink = "https://yourportfolio.com";
-  const featuredWorks = [
-    { title: "Mobile Banking App", link: "#", description: "Redesigned for better accessibility." },
-    { title: "E-Commerce Website", link: "#", description: "Improved conversion through better UI." },
-  ];
   const contact = {
     email: "designer@example.com",
     website: "https://yourwebsite.com",
     openTo: "Collaboration, Freelance, Full-time",
   };
 
+  const caseStudies = [
+    {
+      title: "Inclusive Travel App",
+      image: "https://s3-alpha.figma.com/hub/file/5171202716/bc6c04cc-1149-4577-8c6d-bde4eddc3259-cover.png",
+      summary: "Designed for WCAG 2.1 AA compliance, improving usability for low-vision users.",
+      outcome: "Increased user retention by 35%",
+      link: "https://www.figma.com/file/5171202716/Inclusive-Travel-App-Case-Study",
+    },
+    {
+      title: "Accessible E-Learning Platform",
+      image: "https://elements-resized.envatousercontent.com/elements-cover-images/bbd576b4-5842-49f1-995a-c52037bff2fc?w=433&cf_fit=scale-down&q=85&format=auto&s=ecae5006537ed362c9a196379797d9729eca2a8dfc7456461287b2e771e33eca",
+      summary: "Applied POUR principles to restructure content hierarchy and navigation.",
+      outcome: "Reduced bounce rate by 42%",
+      link: "https://yourwebsite.com/e-learning-case-study",
+    },
+    {
+      title: "Accessible E-Learning Platform",
+      image: "https://elements-resized.envatousercontent.com/elements-cover-images/bbd576b4-5842-49f1-995a-c52037bff2fc?w=433&cf_fit=scale-down&q=85&format=auto&s=ecae5006537ed362c9a196379797d9729eca2a8dfc7456461287b2e771e33eca",
+      summary: "Applied POUR principles to restructure content hierarchy and navigation.",
+      outcome: "Reduced bounce rate by 42%",
+      link: "https://yourwebsite.com/e-learning-case-study",
+    },
+    {
+      title: "Accessible E-Learning Platform",
+      image: "https://elements-resized.envatousercontent.com/elements-cover-images/bbd576b4-5842-49f1-995a-c52037bff2fc?w=433&cf_fit=scale-down&q=85&format=auto&s=ecae5006537ed362c9a196379797d9729eca2a8dfc7456461287b2e771e33eca",
+      summary: "Applied POUR principles to restructure content hierarchy and navigation.",
+      outcome: "Reduced bounce rate by 42%",
+      link: "https://yourwebsite.com/e-learning-case-study",
+    },
+  ];
+
+  const metrics = [
+    { label: "Avg. Accessibility Score", value: "98/100" },
+    { label: "User Satisfaction", value: "4.8/5" },
+    { label: "Designs Published", value: 27 },
+    { label: "WCAG Success Criteria Met", value: "100%" },
+  ];
+
+  const featuredWorks = [
+    {
+      title: "Mobile Banking App",
+      image: "https://assets.awwwards.com/awards/element/2022/05/627be98fa9616400863515.png",
+      description: "Redesigned for better accessibility.",
+      link: "https://yourwebsite.com/mobile-banking-case-study",
+    },
+    {
+      title: "E-Commerce Website",
+      image: "https://kinsta.com/wp-content/uploads/2019/01/portfolio-website-thumbnail-gallery.jpeg",
+      description: "Improved conversion through better UI.",
+      link: "https://yourwebsite.com/ecommerce-case-study",
+    },
+  ];
+
+
   return (
-    <div className="relative min-h-screen flex items-center justify-center w-full overflow-hidden p-10 ">
+    <div className="relative min-h-screen flex items-center justify-center w-full overflow-hidden p-4 sm:p-10">
       {/* Background */}
       <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover">
         <source src="/images/uxhibit-gif-3(webm).webm" type="video/webm" />
@@ -65,6 +119,7 @@ export default async function ProfilePage({ params }: { params: { id: string } }
         {/* Back Button */}
         <Link href="/dashboard" className="flex items-center gap-2 text-sm text-gray-200 hover:text-orange-400">
           <IconArrowLeft size={20} />
+          Back
         </Link>
 
         {/* Profile Header - centered layout */}
@@ -98,64 +153,185 @@ export default async function ProfilePage({ params }: { params: { id: string } }
           </div>
         </div>
 
-
         {/* Sections */}
-        <div className="grid gap-5">
-          
-          <div className="flex justify-between gap-5">
-            {/* About */}
-            <div className=" w-1/2 bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
-              <h2 className="text-lg font-semibold mb-2 text-white mb-5">About</h2>
+        <div className="flex flex-col gap-5">
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[{
+              label: "Designs", value: 24, icon: <LayoutGrid size={25} className="text-orange-400" />
+            },{
+              label: "Likes", value: 1280, icon: <Heart size={25} className="text-red-400" />
+            },{
+              label: "Views", value: "15.2K", icon: <Eye size={25} className="text-green-400" />
+            },{
+              label: "Followers", value: 342, icon: <Users size={25} className="text-blue-400" />
+            }].map((stat, i) => (
+              <div key={i} className="flex flex-col sm:flex-row items-center sm:items-start gap-2 sm:gap-4 
+                                      bg-white/10 dark:bg-black/10 rounded-xl p-4 border border-white/20 break-words">
+                <div className="bg-white/10 p-3 rounded-full shrink-0">{stat.icon}</div>
+                <div className="text-center sm:text-left">
+                  <p className="text-xl font-bold text-white truncate">{stat.value}</p>
+                  <p className="text-sm text-gray-300 truncate">{stat.label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* About & Skills */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
+              <h2 className="text-lg font-semibold mb-3 text-white">About</h2>
               <p className="text-sm text-gray-200">{bio}</p>
             </div>
-
-            {/* Skills */}
-            <div className="w-1/2 bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
-              <h2 className="text-lg font-semibold mb-2 text-white mb-5">Skills & Tools</h2>
+            <div className="flex-1 bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
+              <h2 className="text-lg font-semibold mb-3 text-white">Skills & Tools</h2>
               <ul className="flex flex-wrap gap-2">
                 {skills.map((skill, i) => (
-                  <li key={i} className="px-5 py-2 bg-orange-500/30 text-orange-200 rounded-full text-xs">
-                    {skill}
-                  </li>
+                  <li key={i} className="px-4 py-2 bg-orange-500/30 text-orange-200 rounded-full text-xs">{skill}</li>
                 ))}
               </ul>
             </div>
           </div>
 
-          {/* Portfolio */}
-          <div className="bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
-            <h2 className="text-lg font-semibold mb-2 text-white mb-5">Portfolio</h2>
-            <p className="text-sm text-gray-300 mb-3">
-              View full portfolio: {" "}
-              <Link href={portfolioLink} className="text-orange-300 hover:underline">
-                {portfolioLink}
-              </Link>
-            </p>
-            <ul className="space-y-3">
-              {featuredWorks.map((work, i) => (
-                <li key={i} className="border-b border-white/20 pb-2">
-                  <Link href={work.link} className="font-medium text-orange-200 hover:underline">
-                    {work.title}
-                  </Link>
-                  <p className="text-sm text-gray-300">{work.description}</p>
-                </li>
-              ))}
-            </ul>
+          {/* Design Philosophy & Career Highlights */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
+              <h2 className="text-lg font-semibold mb-3 text-white">Design Philosophy</h2>
+              <p className="text-sm text-gray-300 mb-2">
+                I believe great design is invisible, inclusive, and intentional. Every pixel should serve a purpose—and every user should feel seen.
+              </p>
+              <ul className="list-disc list-inside text-sm text-gray-300 space-y-1">
+                <li>Accessibility-first from wireframe to deployment</li>
+                <li>Empathy-driven user research</li>
+                <li>Iterative testing with real users</li>
+              </ul>
+            </div>
+            <div className="flex-1 bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
+              <h2 className="text-lg font-semibold mb-3 text-white">Career Highlights</h2>
+              <ul className="space-y-2 text-sm text-gray-300">
+                <li className="flex items-center gap-2"><Book size={16} /> Graduated from UX Academy (2020)</li>
+                <li className="flex items-center gap-2"><Trophy size={16} /> Won “Best Accessibility Design” at DevCon (2022)</li>
+                <li className="flex items-center gap-2"><Rocket size={16} /> Launched 10+ inclusive web products</li>
+              </ul>
+            </div>
           </div>
 
-          {/* My Works */}
+          {/* UXhibit Evaluations */}
           <div className="bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
-            <h2 className="text-lg font-semibold mb-2 text-white mb-5">My Works</h2>
+            <h2 className="text-lg font-semibold mb-2 text-white mb-5">UXhibit Evaluations</h2>
             <DesignsGallery />
           </div>
 
-          {/* Contact */}
-          <div className="bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
-            <h2 className="text-lg font-semibold mb-2 text-white mb-5">Contact</h2>
-            <p className="text-sm text-gray-200">📧 {contact.email}</p>
-            <p className="text-sm text-gray-200">🌐 {contact.website}</p>
-            <p className="text-sm text-gray-300">Open to: {contact.openTo}</p>
+          {/* Portfolio & Case Studies */}
+          <div className="flex flex-col gap-4">
+            <div className="bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
+              <h2 className="text-lg font-semibold mb-3 text-white">Portfolio</h2>
+              <div className="flex items-center gap-2 mb-4 flex-wrap">
+                <Globe size={20} className="text-orange-300" />
+                <Link href={portfolioLink} target="_blank" className="text-sm text-orange-300 hover:underline truncate">{portfolioLink}</Link>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {featuredWorks.map((work, i) => (
+                  <Link key={i} href={work.link} target="_blank" className="group bg-white/5 rounded-lg p-3 hover:bg-white/10 transition border border-white/10">
+                    <Image src={work.image} alt={work.title} width={400} height={200} className="rounded-md mb-3 object-cover w-full h-40" />
+                    <h3 className="text-lg font-semibold text-orange-200 group-hover:underline mb-1">{work.title}</h3>
+                    <p className="text-sm text-gray-300">{work.description}</p>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
+              <h2 className="text-lg font-semibold mb-3 text-white">Case Studies</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {caseStudies.map((study, i) => (
+                  <Link key={i} href={study.link} target="_blank" className="group bg-white/5 rounded-lg p-3 hover:bg-white/10 transition">
+                    <Image src={study.image} alt={study.title} width={400} height={200} className="rounded-md mb-3 object-cover w-full h-40" />
+                    <h3 className="text-lg font-semibold text-orange-200 group-hover:underline mb-1">{study.title}</h3>
+                    <p className="text-sm text-gray-300 mb-1">{study.summary}</p>
+                    <p className="text-xs text-gray-400 italic flex items-center gap-1"><ArrowUpRight size={12}/> {study.outcome}</p>
+                  </Link>
+                ))}
+              </div>
+            </div>
           </div>
+
+          {/* Impact Metrics */}
+          <div className="bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
+            <h2 className="text-lg font-semibold mb-3 text-white">Impact Metrics</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[{
+                label: "Accessibility Score", value: "98/100", icon: <Accessibility size={25} className="text-green-400" />
+              },{
+                label: "User Satisfaction", value: "4.8/5", icon: <Star size={25} className="text-yellow-400" />
+              },{
+                label: "Designs Published", value: 27, icon: <FileText size={25} className="text-orange-400" />
+              },{
+                label: "WCAG Criteria Met", value: "100%", icon: <Check size={25} className="text-blue-400" />
+              }].map((metric, i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <div className="bg-white/10 p-3 rounded-full shrink-0">{metric.icon}</div>
+                  <div>
+                    <p className="text-xl font-bold text-white">{metric.value}</p>
+                    <p className="text-sm text-gray-300">{metric.label}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Testimonials & Contact */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20">
+              <h2 className="text-lg font-semibold mb-3 text-white">Testimonials</h2>
+              <div className="space-y-4">
+                <blockquote className="text-sm text-gray-300 italic border-l-4 border-green-400 pl-4">
+                  “Vanness has a rare ability to blend accessibility with stunning design. A true collaborator.”
+                  <footer className="mt-2 text-xs text-gray-400">— Jane Smith, Product Manager</footer>
+                </blockquote>
+                <blockquote className="text-sm text-gray-300 italic border-l-4 border-green-400 pl-4">
+                  “His attention to detail and POUR principles made our app usable for everyone.”
+                  <footer className="mt-2 text-xs text-gray-400">— Alex Tan, Frontend Engineer</footer>
+                </blockquote>
+              </div>
+            </div>
+
+            <div className="flex-1 bg-white/10 dark:bg-black/10 rounded-xl p-5 border border-white/20 justify-center">
+              <h2 className="text-lg font-semibold mb-3 text-white">Contact</h2>
+              <div className="flex flex-col flex-wrap gap-4">
+                <div className="flex items-center gap-3 w-full sm:w-[calc(50%-0.5rem)]">
+                  <div className="bg-white/10 p-3 rounded-full shrink-0">
+                    <Mail size={24} className="text-orange-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Email</p>
+                    <p className="text-sm text-orange-300 hover:underline truncate">{contact.email}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 w-full sm:w-[calc(50%-0.5rem)]">
+                  <div className="bg-white/10 p-3 rounded-full shrink-0">
+                    <Globe size={24} className="text-blue-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Website</p>
+                    <p className="text-sm text-orange-300 hover:underline truncate">{contact.website}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 w-full">
+                  <div className="bg-white/10 p-3 rounded-full shrink-0">
+                    <Users size={24} className="text-green-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Open to</p>
+                    <p className="text-sm text-gray-300 break-words whitespace-normal">{contact.openTo}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

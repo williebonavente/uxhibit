@@ -417,7 +417,7 @@ export default function DesignsGallery() {
           priority
         />
         <p className="text-gray-500 text-sm mb-4">
-          Loading your desings...
+          Loading your designs...
         </p>
       </div>
     );
@@ -684,7 +684,9 @@ function DesignCard({
             onFocus={(e) => e.stopPropagation()}
           />
         ) : (
-          <p className="text-lg text-black dark:text-white truncate flex-1">{design.title}</p>
+          <div className="w-full max-w-full overflow-hidden">
+            <p className="text-lg text-black dark:text-white truncate whitespace-nowrap overflow-ellipsis">{design.title}</p>
+          </div>
         )}
 
         {/* Buttons */}
@@ -798,7 +800,9 @@ function DesignListRow({
               onFocus={(e) => e.stopPropagation()}
             />
           ) : (
-            <p className="text-lg text-black dark:text-white truncate">{design.title}</p>
+            <div className="w-full max-w-full overflow-hidden">
+              <p className="text-lg text-black dark:text-white truncate whitespace-nowrap overflow-ellipsis">{design.title}</p>
+            </div>
           )}
 
           {/* Now Live badge */}
