@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { FrameCarousel } from "@/components/carousel/frame-carousel";
+import { IconLink } from "@tabler/icons-react";
 
 type ParsedMeta = {
   fileKey: string;
@@ -140,7 +141,8 @@ export default function Evaluate() {
       // Save the design and let the backend handle evaluation
       const saveRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/designs`, {
         method: "POST",
-        headers: { "Content-Type": "application/json",
+        headers: {
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           title: parsed.name,
@@ -189,7 +191,7 @@ export default function Evaluate() {
   }
 
   return (
-    <div 
+    <div
       className="min-h-screen flex items-center justify-center"
       style={cardCursor}
     >
@@ -198,7 +200,7 @@ export default function Evaluate() {
         style={cardCursor}
       >
         {/* Step Indicator */}
-        <div className="flex items-center justify-center gap-5 text-xs font-medium tracking-wide p-5 rounded-full"> 
+        <div className="flex items-center justify-center gap-5 text-xs font-medium tracking-wide p-5 rounded-full">
           {[1, 2, 3, 4].map((n, i) => (
             <div key={n} className="flex items-center gap-3">
               {/* Step Circle */}
@@ -216,11 +218,10 @@ export default function Evaluate() {
 
               {/* Step Label */}
               <span
-                className={`hidden sm:inline text-sm ${
-                  step >= n
+                className={`hidden sm:inline text-sm ${step >= n
                     ? "text-neutral-900 dark:text-neutral-100"
                     : "text-neutral-500 dark:text-neutral-600"
-                }`}
+                  }`}
               >
                 {n === 1 && "Parameters"}
                 {n === 2 && "Upload"}
@@ -262,7 +263,7 @@ export default function Evaluate() {
                                 p-5
                                 transition-colors
                                 focus-within:ring-1 focus-within:ring-[#ED5E20]/70 focus-within:border-[#ED5E20 border"
-                      style={cardCursor}>
+                style={cardCursor}>
                 <span className="text-[15px] font-semibold text-[#ED5E20] mb-2">
                   Generation
                 </span>
@@ -322,7 +323,7 @@ export default function Evaluate() {
                                 p-5
                                 transition-colors 
                                 focus-within:ring-1 focus-within:ring-[#ED5E20]/70 focus-within:border-[#ED5E20 border"
-                      style={cardCursor}>
+                style={cardCursor}>
                 <span className="text-[15px] font-semibold text-[#ED5E20] mb-2">
                   Occupation
                 </span>
@@ -431,30 +432,35 @@ export default function Evaluate() {
               </p>
             </div>
 
-            <input
-              type="url"
-              value={link}
-              onChange={(e) => setLink(e.target.value)}
-              placeholder="https://www.figma.com/design/..."
-              className="w-full h-14 px-4 rounded-lg bg-accent dark:bg-neutral-800/60 text-sm focus:outline-none focus:ring-1 focus:ring-[#ED5E20]/50"
-            />
-            {parsed && (
-              <div className="flex items-center gap-4 p-3 rounded-lg bg-accent dark:bg-neutral-800/60 border">
-                {parsed.thumbnail && (
-                  <Image
-                    src={parsed.thumbnail}
-                    alt="thumb"
-                    width={64}
-                    height={48}
-                    className="rounded object-cover"
-                  />
-                )}
-                <div className="text-xs md:text-sm">
-                  <div className="font-semibold">{parsed.name}</div>
-                  <div className="opacity-70 break-all">{parsed.fileKey}</div>
+            {/* Search Bar */}
+            <div className="sticky top-0 z-10 bg-white/80 dark:bg-[#1A1A1A] backdrop-blur-md rounded-xl shadow px-4 py-2 flex items-center gap-3 w-full mx-auto">
+              <IconLink size={20} className="text-[#ED5E20]" />
+              <input
+                type="url"
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                placeholder="https://www.figma.com/design/..."
+                className="w-full h-14 px-4 rounded-lg bg-accent/10 dark:bg-neutral-800/60 text-sm focus:outline-none focus:ring-1 focus:ring-[#ED5E20]/50"
+              />
+              {parsed && (
+                <div className="flex items-center gap-4 p-3 rounded-lg bg-accent dark:bg-neutral-800/60 border">
+                  {parsed.thumbnail && (
+                    <Image
+                      src={parsed.thumbnail}
+                      alt="thumb"
+                      width={64}
+                      height={48}
+                      className="rounded object-cover"
+                    />
+                  )}
+                  <div className="text-xs md:text-sm">
+                    <div className="font-semibold">{parsed.name}</div>
+                    <div className="opacity-70 break-all">{parsed.fileKey}</div>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+
             <div className="flex justify-between gap-4">
               <button
                 onClick={() => setStep(1)}
@@ -595,7 +601,7 @@ export default function Evaluate() {
                 </div>
               </div>
             </div>
-            
+
             <div className="flex justify-between gap-4">
               <button
                 onClick={() => setStep(2)}

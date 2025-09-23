@@ -11,7 +11,7 @@ export default async function RootLayout({
       <SidebarProvider>
         <div className="flex min-h-screen w-full">
           <AppSidebar />
-          <main className="flex-1 p-8 bg-white dark:bg-[#120F12] text-black dark:text-white overflow-y-auto overflow-x-hidden h-full">
+          <main className="flex-1 p-8 bg-accent/25 dark:bg-[#120F12] text-black dark:text-white overflow-y-auto overflow-x-hidden h-full">
             <div className="flex w-full">
               <div className="w-1/2 flex justify-start items-center">
                 <SidebarTrigger />

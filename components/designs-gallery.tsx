@@ -644,7 +644,7 @@ function DesignCard({
 
   return (
     <div
-      className="group bg-accent dark:bg-[#1A1A1A] rounded-xl shadow-md flex flex-col h-full p-3 relative cursor-pointer"
+      className="group bg-white dark:bg-[#1A1A1A] rounded-xl p-2 shadow-md flex flex-col h-full relative cursor-pointer"
       onClick={() => {
         if (!isEditing) {
           window.location.href = `/designs/${design.id}`;
@@ -657,7 +657,7 @@ function DesignCard({
           src={design.thumbnail_url || "/images/placeholder.png"}
           alt={design.title || "Design Preview"}
           fill
-          className="object-cover bg-white dark:bg-accent"
+          className="object-cover bg-accent/10 dark:bg-accent"
           sizes="(min-width:1280px) 1280px, 100vw"
           onError={async () => {
             if (design.thumbnail_storage_path && !design.thumbnail_storage_path.startsWith("http")) {
@@ -763,7 +763,7 @@ function DesignListRow({
 
   return (
     <div
-      className="relative group flex items-start gap-4 bg-accent dark:bg-[#1A1A1A] rounded-xl p-3 hover:bg-accent/80 transition cursor-pointer"
+      className="relative group flex items-start gap-4 bg-accent dark:bg-[#1A1A1A] rounded-xl p-2 hover:bg-accent/80 transition cursor-pointer"
       onClick={() => !isEditing && (window.location.href = `/designs/${design.id}`)}
     >
       {/* Thumbnail */}

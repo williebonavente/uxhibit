@@ -72,7 +72,7 @@ export function DesignCard({
     return (
         <div
             ref={viewRef}
-            className="bg-accent dark:bg-[#1A1A1A] rounded-xl shadow-md space-y-0 flex flex-col h-full p-2"
+            className="bg-white dark:bg-[#1A1A1A] rounded-b-xl shadow-md space-y-0 flex flex-col h-full p-3"
             key={design.design_id}
         >
             <Link
@@ -84,9 +84,8 @@ export function DesignCard({
                     <Image
                         src={design.thumbnail_url || "/images/design-thumbnail.png"}
                         alt="Design thumbnail"
-                        className="object-cover bg-white dark:bg-accent"
-                        width={400}
-                        height={400}
+                        fill
+                        className="object-cover rounded-lg bg-accent/10 dark:bg-accent"
                     />
                 </div>
             </Link>
@@ -139,16 +138,16 @@ export function DesignCard({
                                 className="flex items-center p-2 rounded-full transition"
                                 title="Comment on this design"
                                 aria-label="Comment"
-                                // onClick={() => {
-                                //     toast.error("Error");
-                                // }}
+                            // onClick={() => {
+                            //     toast.error("Error");
+                            // }}
                             >
                                 <MessageSquare size={19} />
                             </span>
                             <span className="text-xs text-gray-500 font-semibold">
                                 {/* TODO: Comment counter here */}
                                 1
-                                </span>
+                            </span>
                         </span>
                         {/* Views */}
                         <span className="flex items-center gap-2 ml-1">
