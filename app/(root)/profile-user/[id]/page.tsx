@@ -115,7 +115,8 @@ export default async function ProfilePage({ params }: { params: { id: string } }
   ];
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center w-full overflow-hidden">
+    <div className="relative min-h-screen flex items-center justify-center w-full overflow-hidden rounded-2xl">
+      
       {/* Background */}
       <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover">
         <source src="/images/profile-bg.webm" type="video/webm" />
@@ -127,10 +128,9 @@ export default async function ProfilePage({ params }: { params: { id: string } }
                       bg-white/10 dark:bg-black/10 backdrop-blur-xl
                       shadow-xl space-y-6">
 
-        {/* Back Button */}
-        <Link href="/dashboard" className="flex items-center gap-2 text-sm text-gray-200 hover:text-orange-400">
+        {/* <Link href="/dashboard" className="flex items-center gap-2 text-sm text-gray-200 hover:text-orange-400">
           <IconArrowLeft size={20} />
-        </Link>
+        </Link> */}
 
         {/* Profile Header - centered layout */}
         <div className="site-header flex flex-col items-center justify-center text-center gap-6 sm:gap-8 px-4 sm:px-0">
