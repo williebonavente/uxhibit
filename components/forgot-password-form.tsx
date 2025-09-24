@@ -34,7 +34,7 @@ export function ForgotPasswordForm() {
     };
     return (
         <div className="relative z-10 flex flex-col w-full max-w-sm sm:max-w-md md:max-w-lg 
-                    p-6 sm:p-8 md:p-10 bg-white/40 dark:bg-[#1E1E1E]/40 
+                    p-6 sm:p-8 md:p-10 bg-[#1E1E1E]/40 
                     backdrop-blur-xl rounded-2xl shadow-xl border border-white/20">
             {success ? (
                 <div className="flex flex-col items-center gap-4">
@@ -76,14 +76,11 @@ export function ForgotPasswordForm() {
                         Forgot Password
                     </h2>
                     {/* Subtitle */}
-                    <p className="mb-8 text-sm sm:text-base md:text-lg text-center text-[#1E1E1E]/70 dark:text-[#F5F5F5]/70">
+                    <p className="mb-8 text-sm sm:text-base md:text-lg text-center text-gray-500 dark:text-[#F5F5F5]/70">
                         Enter your email to get a reset link.
                     </p>
                     <form onSubmit={handleForgotPassword} className="space-y-5">
                         <div className="grid gap-2">
-                            <label htmlFor="email" className="text-sm font-medium">
-                                Email
-                            </label>
                             <Input
                                 id="email"
                                 type="email"
@@ -91,7 +88,7 @@ export function ForgotPasswordForm() {
                                 required
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="w-full h-11 sm:h-12 text-sm sm:text-base"
+                                className="w-full h-11 sm:h-12 text-sm sm:text-base text-accent border-white/20 text-accent"
                             />
                             {error && <p className="text-sm text-red-500">{error}</p>}
                         </div>

@@ -117,7 +117,7 @@ export default function RegistrationForm() {
       <div className="absolute inset-0 bg-black/40" />
 
       <div className="relative z-10 flex flex-col w-full max-w-sm sm:max-w-md md:max-w-lg xl:max-w-xl p-6 sm:p-8 md:p-10 lg:p-12
-                      bg-white/40 dark:bg-[#1E1E1E]/40 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20">
+                      bg-[#1E1E1E]/40 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20">
 
         <div className="flex justify-center mb-5">
           <Image
@@ -129,7 +129,7 @@ export default function RegistrationForm() {
           />
         </div>
 
-        <p className="text-sm sm:text-base md:text-lg text-center mb-8 text-[#1E1E1E]/70 dark:text-[#F5F5F5]/70">
+        <p className="text-sm sm:text-base md:text-lg text-center mb-8 text-gray-500 dark:text-[#F5F5F5]/70">
           Create your account and start designing with UXhibit
         </p>
 
@@ -145,7 +145,7 @@ export default function RegistrationForm() {
                     <Input
                       id="username"
                       placeholder="Username"
-                      className="w-full h-11 sm:h-12 text-sm sm:text-base"
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-accent"
                       {...field}
                     />
                   </FormControl>
@@ -164,7 +164,7 @@ export default function RegistrationForm() {
                     <Input
                       id="full_name"
                       placeholder="Full Name"
-                      className="w-full h-11 sm:h-12 text-sm sm:text-base"
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-accent"
                       {...field}
                     />
                   </FormControl>
@@ -184,7 +184,7 @@ export default function RegistrationForm() {
                       id="email"
                       placeholder="Email"
                       type="email"
-                      className="w-full h-11 sm:h-12 text-sm sm:text-base"
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-accent"
                       {...field}
                     />
                   </FormControl>
@@ -206,7 +206,7 @@ export default function RegistrationForm() {
                           id="age"
                           placeholder="Age"
                           type="number"
-                          className="w-full h-11 sm:h-12 text-sm sm:text-base"
+                          className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-accent"
                           {...field}
                         />
                       </FormControl>
@@ -225,7 +225,7 @@ export default function RegistrationForm() {
                         <Input
                           id="gender"
                           placeholder="Gender"
-                          className="w-full h-11 sm:h-12 text-sm sm:text-base"
+                          className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-accent"
                           {...field}
                         />
                       </FormControl>
@@ -247,7 +247,7 @@ export default function RegistrationForm() {
                       id="password"
                       placeholder="Password"
                       type="password"
-                      className="w-full h-11 sm:h-12 text-sm sm:text-base"
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-accent"
                       {...field}
                     />
                   </FormControl>
@@ -267,7 +267,7 @@ export default function RegistrationForm() {
                       id="confirmPassword"
                       placeholder="Confirm Password"
                       type="password"
-                      className="w-full h-11 sm:h-12 text-sm sm:text-base"
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-accent"
                       {...field}
                     />
                   </FormControl>
@@ -276,7 +276,7 @@ export default function RegistrationForm() {
               )}
             />
 
-            {/* Terms and Conditions Checkbox */} <div className="flex items-center space-x-2 mb-5"> <Checkbox id="terms" checked={termsAccepted} onCheckedChange={handleCheckboxChange} className="cursor-pointer" /> <label htmlFor="terms" className="text-sm text-[#1E1E1E]/70 dark:text-[#F5F5F5]/70" > I accept the{" "} <Link href="/auth/terms" onClick={() => { const values = form.getValues(); localStorage.setItem("registrationDraft", JSON.stringify(values)); router.push("/terms"); }} className="text-[#ff7f3f] hover:text-[#ED5E20] transition-colors duration-200 hover:underline font-medium" > Terms and Conditions</Link> </label> </div>
+            {/* Terms and Conditions Checkbox */} <div className="flex items-center space-x-2 mb-5"> <Checkbox id="terms" checked={termsAccepted} onCheckedChange={handleCheckboxChange} className="cursor-pointer" /> <label htmlFor="terms" className="text-sm text-gray-500 dark:text-[#F5F5F5]/70" > I accept the{" "} <Link href="/auth/terms" onClick={() => { const values = form.getValues(); localStorage.setItem("registrationDraft", JSON.stringify(values)); router.push("/terms"); }} className="text-[#ff7f3f] hover:text-[#ED5E20] transition-colors duration-200 hover:underline font-medium" > Terms and Conditions</Link> </label> </div>
 
             {/* Submit Button */}
             <Button
@@ -300,7 +300,7 @@ export default function RegistrationForm() {
           </form>
         </Form>
 
-        <div className="mt-6 text-center text-xs sm:text-sm text-[#1E1E1E]/60 dark:text-[#F5F5F5]/40">
+        <div className="mt-6 text-center text-xs sm:text-sm text-gray-500 dark:text-[#F5F5F5]/40">
           Already have an account?{" "}
           <Link
             href="/auth/login"

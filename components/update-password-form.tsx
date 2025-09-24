@@ -49,7 +49,7 @@ export function UpdatePasswordForm() {
 
   return (
     <div className="flex flex-col w-full max-w-sm sm:max-w-md md:max-w-lg 
-                    p-6 sm:p-8 md:p-10 bg-white/40 dark:bg-[#1E1E1E]/40 
+                    p-6 sm:p-8 md:p-10 bg-[#1E1E1E]/40 
                     backdrop-blur-xl rounded-2xl shadow-xl border border-white/20">
       {success ? (
         <div className="flex flex-col items-center gap-4 animate-fade-in">
@@ -63,7 +63,7 @@ export function UpdatePasswordForm() {
           <h2 className="text-2xl sm:text-3xl font-bold text-center text-[#ED5E20] mb-4">
             Password Changed
           </h2>
-          <p className="mb-2 text-sm sm:text-base md:text-lg text-[#1E1E1E]/70 dark:text-[#F5F5F5]/70">
+          <p className="mb-2 text-sm sm:text-base md:text-lg text-gray-500 dark:text-[#F5F5F5]/70">
             Your password has been updated successfully. You can now log in with your new credentials.
           </p>
           <div className="flex items-center gap-2 text-[#ED5E20] text-sm">
@@ -85,13 +85,10 @@ export function UpdatePasswordForm() {
           <h2 className="text-2xl sm:text-3xl font-bold text-center text-[#ED5E20] mb-4">
             Set New Password
           </h2>
-          <p className="mb-8 text-sm sm:text-base md:text-lg text-center text-[#1E1E1E]/70 dark:text-[#F5F5F5]/70">
+          <p className="mb-8 text-sm sm:text-base md:text-lg text-center text-gray-500 dark:text-[#F5F5F5]/70">
             Enter your new password below to reset your account.
           </p>
           <div className="grid gap-2">
-            <label htmlFor="password" className="text-sm font-medium">
-              New Password
-            </label>
             <PasswordInput
               id="password"
               type="password"
@@ -99,14 +96,11 @@ export function UpdatePasswordForm() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full h-11 sm:h-12 text-sm sm:text-base"
+              className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-accent"
               autoComplete="new-password"
             />
           </div>
           <div className="grid gap-2">
-            <label htmlFor="confirmPassword" className="text-sm font-medium">
-              Confirm Password
-            </label>
             <PasswordInput
               id="confirmPassword"
               type="password"
@@ -114,7 +108,7 @@ export function UpdatePasswordForm() {
               required
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full h-11 sm:h-12 text-sm sm:text-base"
+              className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-accent"
               autoComplete="new-password"
             />
           </div>

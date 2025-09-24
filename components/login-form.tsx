@@ -164,7 +164,7 @@ export default function LoginForm() {
 
         {/* Centered Login Card */}
         <div className="relative z-10 flex flex-col w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-md xl:max-w-lg p-6 sm:p-8 md:p-10 lg:p-12 
-                        bg-white/40 dark:bg-[#1E1E1E]/40 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20">
+                        bg-[#1E1E1E]/40 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20">
 
           {/* Centered Logo */}
           <div className="flex justify-center">
@@ -178,7 +178,7 @@ export default function LoginForm() {
           </div>
 
           {/* Subtitle */}
-          <p className="text-sm sm:text-base md:text-lg text-center mb-10 text-[#1E1E1E]/70 dark:text-[#F5F5F5]/70">
+          <p className="text-sm sm:text-base md:text-lg text-center mb-10 text-gray-500 dark:text-[#F5F5F5]/70">
             Welcome Back, Please Log In to Continue
           </p>
 
@@ -197,7 +197,7 @@ export default function LoginForm() {
                         placeholder="Email"
                         type="email"
                         autoComplete="email"
-                        className="w-full h-11 sm:h-12 text-sm sm:text-base mb-2"
+                        className="w-full h-11 sm:h-12 text-sm sm:text-base mb-2 border-white/20 text-accent"
                         {...field}
                       />
                     </FormControl>
@@ -217,7 +217,7 @@ export default function LoginForm() {
                         id="password"
                         placeholder="Password"
                         autoComplete="current-password"
-                        className="w-full h-11 sm:h-12 text-sm sm:text-base"
+                        className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-accent"
                         {...field}
                       />
                     </FormControl>
@@ -318,7 +318,7 @@ export default function LoginForm() {
           </Button>
 
           {/* Links: Sign Up + Forgot Password */}
-          <div className="mt-8 text-center text-xs sm:text-sm text-[#1E1E1E]/60 dark:text-[#F5F5F5]/40">
+          <div className="mt-8 text-center text-xs sm:text-sm text-gray-500 dark:text-[#F5F5F5]/40">
             Don&apos;t have an account?{" "}
             <Link
               href="/auth/signup"
@@ -329,7 +329,7 @@ export default function LoginForm() {
             <div className="mt-2">
               <Link
                 href="/auth/forgot-password"
-                className="text-[#1E1E1E]/60 dark:text-[#F5F5F5]/40 hover:text-[#ED5E20] transition-colors duration-200 hover:underline"
+                className="text-gray-500 dark:text-[#F5F5F5]/40 hover:text-[#ED5E20] transition-colors duration-200 hover:underline"
               >
                 Forgot Password
               </Link>
