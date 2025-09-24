@@ -26,10 +26,14 @@ export default function DeleteAccountPage({
     if (!open) return null;
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm cursor-pointer"
+            onClick={() => setOpen(false)} // close when background is clicked
+        >
             {/* Centered Delete Account Card */}
             <div className="relative z-10 flex flex-col w-full max-w-sm sm:max-w-md md:max-w-lg 
-                      p-6 sm:p-8 md:p-10 bg-white/40 dark:bg-[#1A1A1A] rounded-2xl shadow-xl border border-white/20 text-center">
+                      p-6 sm:p-8 md:p-10 bg-white dark:bg-[#1A1A1A] rounded-2xl shadow-xl border border-white/20 text-center cursor-default"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Logo */}
                 <div className="flex justify-center">
                     <Image
@@ -46,8 +50,8 @@ export default function DeleteAccountPage({
                 </h2>
                 {/* Subtitle */}
                 <p className="mb-6 text-sm sm:text-base md:text-lg text-center text-[#1E1E1E]/70 dark:text-[#F5F5F5]/70">
-                    Are you sure you want to delete your account? This action cannot be undone.<br />
-                    Please enter your password to confirm.
+                    Are you sure you want to delete your account?<br />
+                    <span className="text-xs">This action cannot be undone. Please enter your password to confirm.</span>
                 </p>
                 <form
                     onSubmit={async (e) => {
@@ -82,33 +86,36 @@ export default function DeleteAccountPage({
                         className="mb-2 h-12 text-lg"
                         disabled={isDeleting}
                     />
-                    <div className="flex flex-col-2 gap-5 mt-6 h-12">
+                    <div className="flex gap-5 mt-6 h-12 w-full">
+                        {/* Cancel Button */}
                         <Button
                             type="button"
                             variant="outline"
                             onClick={() => setOpen(false)}
                             disabled={isDeleting}
-                            className={`w-1/2 ${isDeleting ? "cursor-not-allowed" : "cursor-pointer"} inline-flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-sm font-medium
-                                        border border-neutral-300/70 dark:border-neutral-600/60 
-                                        bg-white/60 dark:bg-neutral-800/50
+                            className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl text-sm font-medium
+                                        border border-neutral-300/70 dark:border-neutral-600/60 cursor-pointer
+                                        bg-white/60 dark:bg-neutral-800/50 h-full
                                         text-neutral-700 dark:text-neutral-200
                                         shadow-sm backdrop-blur
                                         hover:bg-white/80 dark:hover:bg-neutral-800/70
                                         hover:border-neutral-400 dark:hover:border-neutral-500
                                         transition-colors
                                         focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ED5E20]/60
-                                        focus:ring-offset-white dark:focus:ring- cursor-pointer h-full` }
+                                        focus:ring-offset-white dark:focus:ring-offset-[#1A1A1A]"
                         >
                             Cancel
                         </Button>
+
+                        {/* Delete Button */}
                         <Button
                             type="submit"
                             disabled={!password || isDeleting}
-                            className={`group relative inline-flex items-center justify-center
-                                w-1/2 px-9 py-2.5 rounded-xl text-sm text-white font-semibold tracking-wide
-                                transition-all duration-300 h-full
-                                focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40
-                                ${(!password || isDeleting) ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}
+                            className={`group relative flex-1 inline-flex items-center justify-center
+                                        rounded-xl text-sm text-white font-semibold tracking-wide
+                                        transition-all duration-300 h-full overflow-hidden
+                                        focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40 cursor-pointer
+                                        ${(!password || isDeleting) ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}
                         >
                             {/* Glow / gradient base */}
                             <span
@@ -129,8 +136,8 @@ export default function DeleteAccountPage({
                                     className="absolute -left-1 -right-1 top-0 h-full overflow-hidden rounded-xl"
                                 >
                                     <span className="absolute inset-y-0 -left-full w-1/2 translate-x-0 
-                                bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 
-                                transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70" />
+                          bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 
+                          transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70" />
                                 </span>
                             )}
 

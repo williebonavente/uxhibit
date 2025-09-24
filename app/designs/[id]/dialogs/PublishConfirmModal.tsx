@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 
 interface PublishConfirmModalProps {
     open: boolean;
@@ -23,34 +24,28 @@ const PublishConfirmModal: React.FC<PublishConfirmModalProps> = ({
             {/* Card */}
             <div
                 className="relative z-10 flex flex-col w-full max-w-sm sm:max-w-md md:max-w-lg 
-                            p-6 sm:p-8 md:p-10 bg-white/40 dark:bg-[#1A1A1A] 
+                            p-6 sm:p-8 md:p-10 bg-white dark:bg-[#1A1A1A] 
                             rounded-2xl shadow-xl border border-white/20 text-center cursor-default"
                 onClick={(e) => e.stopPropagation()} // prevent close when clicking inside
             >
                 {/* Icon */}
-                <div className="flex justify-center mb-6">
+                <div className="flex justify-center">
                     {isPublish ? (
-                        <svg width="64" height="64" fill="none" viewBox="0 0 24 24">
-                            <circle cx="12" cy="12" r="12" fill="#ED5E20" fillOpacity="0.15" />
-                            <path
-                                d="M7 12l3 3 7-7"
-                                stroke="#ED5E20"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            />
-                        </svg>
+                        <Image 
+                            src="/images/publish-design.svg" 
+                            alt="Publish design illustration"
+                            width={150}
+                            height={150}
+                            className="object-contain mb-6"
+                        />
                     ) : (
-                        <svg width="64" height="64" fill="none" viewBox="0 0 24 24">
-                            <circle cx="12" cy="12" r="12" fill="#6B7280" fillOpacity="0.15" />
-                            <path
-                                d="M7 7l10 10M17 7l-10 10"
-                                stroke="#6B7280"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            />
-                        </svg>
+                        <Image 
+                            src="/images/unpublish-design.svg" 
+                            alt="Unpublish design illustration"
+                            width={150}
+                            height={150}
+                            className="object-contain mb-6"
+                        />
                     )}
                 </div>
 
@@ -60,10 +55,20 @@ const PublishConfirmModal: React.FC<PublishConfirmModalProps> = ({
                 </h2>
 
                 {/* Subtitle */}
-                <p className="mb-6 text-sm sm:text-base md:text-lg text-center text-[#1E1E1E]/70 dark:text-[#F5F5F5]/70">
-                    {isPublish
-                        ? "Are you sure you want to publish this project? It will be visible to others, just like sharing a post on social media."
-                        : "Are you sure you want to unpublish this project? It will no longer be visible to others."}
+                <p className="mb-6 text-base md:text-lg text-center leading-relaxed text-gray-700 dark:text-gray-300">
+                    {isPublish ? (
+                        <>
+                            Are you sure you want to publish this project?{" "}
+                            <br />
+                            <span className="text-xs">It will be visible to others, just like sharing a post on social media.</span>
+                        </>
+                    ) : (
+                        <>
+                            Are you sure you want to unpublish this project?{" "}
+                            <br />
+                            <span className="text-xs">It will no longer be visible to others.</span>
+                        </>
+                    )}
                 </p>
 
                 {/* Buttons */}

@@ -1495,9 +1495,18 @@ export default function DesignDetailPage({
 
   if (designLoading)
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Spinner className="w-8 h-8 text-[#ED5E20]" />
-        <span className="ml-4 text-lg font-medium text-[#ED5E20]">Loading Design...</span>
+      <div className="flex flex-col items-center justify-center h-screen animate-pulse">
+        <Image
+          src="/images/loading-your-designs.svg"
+          alt="Loading designs illustration"
+          height={150}
+          width={150}
+          className="object-contain mb-6"
+          priority
+        />
+        <p className="text-gray-500 text-sm mb-4">
+          Loading your designs...
+        </p>
       </div>
     );
 
