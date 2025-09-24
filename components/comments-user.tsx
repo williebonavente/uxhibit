@@ -36,7 +36,7 @@ interface CommentItemProps {
     // setReplyingToId: (id: string | null) => void;
     onDelete: (id: string) => void;
     depth?: number;
-    //  onReply: (parentId: string, replyText: string) => Promise<void>;
+    handleAddReply: (parentId: string, replyText: string) => Promise<void>;
 }
 
 export const CommentItem: React.FC<CommentItemProps> = ({
@@ -47,6 +47,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
     // setReplyingToId,
     onDelete,
     // onReply,
+    handleAddReply,
     depth = 0,
 }) => {
 
@@ -168,30 +169,12 @@ export const CommentItem: React.FC<CommentItemProps> = ({
         onDelete(comment.id);
     };
 
-    const handleAddReply = async () => {
+    const handleAddReplySubmit = async () => {
         if (!replyText.trim() || !currentUserId) return;
         setPostingReply(true);
-        // await onReply(comment.id, replyText);
-        const designId = comment.design_id;
-        const { error } = await supabase
-            .from("comments")
-            .insert([
-                {
-                    user_id: currentUserId,
-                    design_id: designId,
-                    text: replyText,
-                    parent_id: comment.id,
-                    local_time: new Date().toLocaleTimeString(),
-                },
-            ]);
+        await handleAddReply(comment.id, replyText); 
         setPostingReply(false);
-        if (error) {
-            toast.error("Failed to add reply!");
-            console.error(error.message);
-            return;
-        }
         setReplyText("");
-        // setReplyingToId(null);
         setIsReplying(false);
     };
 
@@ -201,7 +184,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
             setCurrentUserId(user?.id ?? null);
         };
         getUser();
-    },);
+    }, [supabase.auth]);
 
 
     return (
@@ -317,7 +300,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
                     />
                     <div className="flex gap-2">
                         <button
-                            onClick={handleAddReply}
+                            onClick={handleAddReplySubmit}
                             className="bg-blue-500  
                             hover:bg-blue-600 cursor-pointer text-white px-3 py-1 rounded text-sm transition-colors disabled:opacity-50"
                             disabled={!replyText.trim() || postingReply}
@@ -385,6 +368,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
                                             // replyingToId={replyingToId}
                                             // setReplyingToId={setReplyingToId}
                                             onDelete={onDelete}
+                                            handleAddReply={handleAddReply}
                                             depth={depth + 1}
                                         />
                                     </div>

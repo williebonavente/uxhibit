@@ -24,7 +24,7 @@ export default function EmailSentPage() {
       <div className="relative z-10 flex flex-col w-full max-w-sm sm:max-w-md md:max-w-lg 
                       p-6 sm:p-8 md:p-10 bg-white/40 dark:bg-[#1E1E1E]/40 
                       backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 text-center">
-        
+
         {/* Logo */}
         <div className="flex justify-center">
           <Image
@@ -43,9 +43,8 @@ export default function EmailSentPage() {
 
         {/* Message */}
         <p className="mb-8 text-sm sm:text-base md:text-lg text-[#1E1E1E]/70 dark:text-[#F5F5F5]/70">
-          We’ve sent you a link to reset your password. Please check your email.
+          We&rsquo;ve sent you a link to reset your password. Please check your email.
         </p>
-
         {/* Back to Login */}
         <Link
           href="/auth/login"

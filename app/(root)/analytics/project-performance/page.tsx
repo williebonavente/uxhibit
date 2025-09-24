@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   IconChevronUp,
   IconChevronDown,
@@ -18,7 +18,10 @@ import {
   TableCell,
 } from "@/components/ui/table"; // Adjust import path if needed
 
+import { createClient } from "@/utils/supabase/client";
+
 interface ProjectData {
+  id: string;
   title: string;
   score: number;
   submissionDate: string;
@@ -29,67 +32,190 @@ interface ProjectData {
 
 export default function ProjectPerformanceComparisonPage() {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [projectData, setProjectData] = useState<ProjectData[]>([]);
 
   // Sample data for the project performance table
   //TODO: Data fetching needed
-  const projectData: ProjectData[] = [
-    {
-      title: "Project 07",
-      score: 95,
-      submissionDate: "June 10, 2025",
-      feedbackItems: 12,
-      severity: "Minor",
-      dateSort: new Date("2025-06-10"),
-    },
-    {
-      title: "Project 06",
-      score: 70,
-      submissionDate: "June 01, 2025",
-      feedbackItems: 13,
-      severity: "Minor",
-      dateSort: new Date("2025-06-01"),
-    },
-    {
-      title: "Project 05",
-      score: 65,
-      submissionDate: "May 25, 2025",
-      feedbackItems: 14,
-      severity: "Minor",
-      dateSort: new Date("2025-05-25"),
-    },
-    {
-      title: "Project 04",
-      score: 50,
-      submissionDate: "May 12, 2025",
-      feedbackItems: 15,
-      severity: "Major",
-      dateSort: new Date("2025-05-12"),
-    },
-    {
-      title: "Project 03",
-      score: 40,
-      submissionDate: "April 10, 2025",
-      feedbackItems: 16,
-      severity: "Major",
-      dateSort: new Date("2025-04-10"),
-    },
-    {
-      title: "Project 02",
-      score: 20,
-      submissionDate: "March 18, 2025",
-      feedbackItems: 17,
-      severity: "Major",
-      dateSort: new Date("2025-03-18"),
-    },
-    {
-      title: "Project 01",
-      score: 25,
-      submissionDate: "March 20, 2025",
-      feedbackItems: 18,
-      severity: "Major",
-      dateSort: new Date("2025-03-20"),
-    },
-  ];
+  // const projectData: ProjectData[] = [
+  //   {
+  //     title: "Project 07",
+  //     score: 95,
+  //     submissionDate: "June 10, 2025",
+  //     feedbackItems: 12,
+  //     severity: "Minor",
+  //     dateSort: new Date("2025-06-10"),
+  //   },
+  //   {
+  //     title: "Project 06",
+  //     score: 70,
+  //     submissionDate: "June 01, 2025",
+  //     feedbackItems: 13,
+  //     severity: "Minor",
+  //     dateSort: new Date("2025-06-01"),
+  //   },
+  //   {
+  //     title: "Project 05",
+  //     score: 65,
+  //     submissionDate: "May 25, 2025",
+  //     feedbackItems: 14,
+  //     severity: "Minor",
+  //     dateSort: new Date("2025-05-25"),
+  //   },
+  //   {
+  //     title: "Project 04",
+  //     score: 50,
+  //     submissionDate: "May 12, 2025",
+  //     feedbackItems: 15,
+  //     severity: "Major",
+  //     dateSort: new Date("2025-05-12"),
+  //   },
+  //   {
+  //     title: "Project 03",
+  //     score: 40,
+  //     submissionDate: "April 10, 2025",
+  //     feedbackItems: 16,
+  //     severity: "Major",
+  //     dateSort: new Date("2025-04-10"),
+  //   },
+  //   {
+  //     title: "Project 02",
+  //     score: 20,
+  //     submissionDate: "March 18, 2025",
+  //     feedbackItems: 17,
+  //     severity: "Major",
+  //     dateSort: new Date("2025-03-18"),
+  //   },
+  //   {
+  //     title: "Project 01",
+  //     score: 25,
+  //     submissionDate: "March 20, 2025",
+  //     feedbackItems: 18,
+  //     severity: "Major",
+  //     dateSort: new Date("2025-03-20"),
+  //   },
+  // ];
+
+
+  useEffect(() => {
+    const fetchProjectData = async () => {
+      const supabase = createClient();
+
+      // 1. Get the current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        console.error("Error fetching user or user not logged in:", userError);
+        setProjectData([]);
+        return;
+      }
+      const currentUserId = user.id;
+
+      // 2. Fetch all versions for designs owned by the user
+      const { data, error } = await supabase
+        .from("design_versions")
+        .select(`
+        id, design_id, version, file_key,
+        node_id, thumbnail_url, ai_summary,
+        ai_data, snapshot, created_by, created_at,
+        total_score, updated_at, designs (title)
+      `)
+        .eq("created_by", currentUserId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching project data:", error);
+        return;
+      }
+
+      // 3. Keep only the latest version per design
+      const latestVersionsMap = new Map();
+      (data || []).forEach((row: any) => {
+        if (!latestVersionsMap.has(row.design_id)) {
+          latestVersionsMap.set(row.design_id, row);
+        }
+      });
+      const latestVersions = Array.from(latestVersionsMap.values());
+
+      // 4. Fetch all frames for these latest versions
+      const versionIds = latestVersions.map((row: any) => row.id);
+      const frameFeedbackMap = new Map();
+      if (versionIds.length > 0) {
+        const { data: framesData, error: framesError } = await supabase
+          .from("design_frame_evaluations")
+          .select("version_id, ai_data")
+          .in("version_id", versionIds);
+
+        if (framesError) {
+          console.error("Error fetching frame evaluations:", framesError);
+        } else {
+          (framesData || []).forEach((frame: any) => {
+            let aiData = frame.ai_data;
+            if (typeof aiData === "string") {
+              try { aiData = JSON.parse(aiData); } catch { aiData = {}; }
+            }
+            const count = aiData?.issues?.length ?? 0;
+            frameFeedbackMap.set(
+              frame.version_id,
+              (frameFeedbackMap.get(frame.version_id) || 0) + count
+            );
+          });
+        }
+      }
+
+      // 5. Map to ProjectData
+      const mapped: ProjectData[] = latestVersions.map((row: any) => {
+        // Parse version-level ai_data
+        let aiData = row.ai_data;
+        if (typeof aiData === "string") {
+          try {
+            aiData = JSON.parse(aiData);
+          } catch {
+            aiData = {};
+          }
+        }
+
+        // Version-level issues
+        const versionIssues = aiData?.issues?.length ?? 0;
+
+        // Frame-level issues (from frameFeedbackMap)
+        const frameIssues = frameFeedbackMap.get(row.id) || 0;
+
+        // Total feedback items
+        const feedbackItems = versionIssues + frameIssues;
+
+        // Severity logic (still from aiData)
+        const severity =
+          aiData?.issues?.some((issue: any) => issue.severity === "Major")
+            ? "Major"
+            : "Minor";
+
+        // Log for debugging
+        console.log("Project:", row.designs?.title, {
+          versionIssues,
+          frameIssues,
+          feedbackItems,
+          aiData,
+          row,
+        });
+
+        return {
+          id: row.id,
+          title: row.designs?.title || "Untitled",
+          score: row.total_score ?? 0,
+          submissionDate: new Date(row.created_at).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          }),
+          feedbackItems,
+          severity,
+          dateSort: new Date(row.created_at),
+        };
+      });
+      setProjectData(mapped);
+    };
+
+    fetchProjectData();
+  }, []);
 
   // State for sorting and filtering
   const [sortConfig, setSortConfig] = useState<{
@@ -214,7 +340,7 @@ export default function ProjectPerformanceComparisonPage() {
       <div className="p-2 m-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
         <p className="text-sm sm:text-base text-gray-700 dark:text-gray-200 w-full sm:mb-0 font-['Poppins']">
           Compare all your submitted projects at a glance. This section displays
-          each design's usability score, submission date, number of feedback
+          each design&apos;s usability score, submission date, number of feedback
           items, and the average severity of the issues. Use this to track your
           progress and identify which projects need more work—or show off your
           best ones.
@@ -222,11 +348,10 @@ export default function ProjectPerformanceComparisonPage() {
         <button
           onClick={handleExportReport}
           disabled={isGeneratingPDF}
-          className={`w-full sm:w-auto px-6 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors font-['Poppins'] font-medium mt-4 sm:mt-0 sm:ml-6 cursor-pointer ${
-            isGeneratingPDF
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-[#ED5E20] hover:bg-[#d44e0f]"
-          } text-white`}
+          className={`w-full sm:w-auto px-6 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors font-['Poppins'] font-medium mt-4 sm:mt-0 sm:ml-6 cursor-pointer ${isGeneratingPDF
+            ? "bg-gray-400 cursor-not-allowed"
+            : "bg-[#ED5E20] hover:bg-[#d44e0f]"
+            } text-white`}
         >
           <span>
             {isGeneratingPDF ? (
@@ -322,7 +447,7 @@ export default function ProjectPerformanceComparisonPage() {
                   onClick={() => handleSort("feedbackItems")}
                   className="flex items-center justify-center space-x-1 hover:bg-[#d44e0f] px-1 py-1 rounded transition-colors"
                 >
-                  <span>Number of Feedback</span>
+                  <span>Feedback Items (Issues Found)</span>
                   {getSortIcon("feedbackItems")}
                 </button>
               </TableHead>
@@ -340,7 +465,7 @@ export default function ProjectPerformanceComparisonPage() {
           <TableBody>
             {filteredAndSortedData.map((project) => (
               <TableRow
-                key={project.title}
+                key={project.id || project.title}
                 className="bg-white dark:bg-[#19181D]"
               >
                 {/* Project Title */}
@@ -393,9 +518,9 @@ export default function ProjectPerformanceComparisonPage() {
           <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-2">
             {filteredAndSortedData.length > 0
               ? Math.round(
-                  filteredAndSortedData.reduce((sum, p) => sum + p.score, 0) /
-                    filteredAndSortedData.length
-                )
+                filteredAndSortedData.reduce((sum, p) => sum + p.score, 0) /
+                filteredAndSortedData.length
+              )
               : 0}
           </div>
           <div className="text-sm text-gray-600 dark:text-gray-400 font-['Poppins']">
@@ -406,11 +531,11 @@ export default function ProjectPerformanceComparisonPage() {
           <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mb-2">
             {filteredAndSortedData.length > 0
               ? Math.round(
-                  filteredAndSortedData.reduce(
-                    (sum, p) => sum + p.feedbackItems,
-                    0
-                  ) / filteredAndSortedData.length
-                )
+                filteredAndSortedData.reduce(
+                  (sum, p) => sum + p.feedbackItems,
+                  0
+                ) / filteredAndSortedData.length
+              )
               : 0}
           </div>
           <div className="text-sm text-gray-600 dark:text-gray-400 font-['Poppins']">
@@ -421,11 +546,11 @@ export default function ProjectPerformanceComparisonPage() {
           <div className="text-2xl font-bold text-red-600 dark:text-red-400 mb-2">
             {filteredAndSortedData.length > 0
               ? Math.round(
-                  (filteredAndSortedData.filter((p) => p.severity === "Major")
-                    .length /
-                    filteredAndSortedData.length) *
-                    100
-                )
+                (filteredAndSortedData.filter((p) => p.severity === "Major")
+                  .length /
+                  filteredAndSortedData.length) *
+                100
+              )
               : 0}
             %
           </div>

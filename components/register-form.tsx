@@ -79,7 +79,7 @@ export default function RegistrationForm() {
         email: values.email,
         password: values.password,
         options: {
-          emailRedirectTo: `${origin}/auth/confirm?next=/auth/login`,
+          emailRedirectTo: `${origin}/auth/login`,
           data: {
             username: values.username,
             full_name: values.full_name,
