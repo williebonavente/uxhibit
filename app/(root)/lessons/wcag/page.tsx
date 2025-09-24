@@ -55,7 +55,7 @@ export default function Wcag() {
         {lessons.map((lesson, index) => (
           <div
             key={index}
-            className="border rounded-lg transition bg-accent dark:bg-[#1A1A1A]"
+            className="border rounded-lg transition bg-white dark:bg-[#1A1A1A]"
           >
             <div
               className="flex items-center justify-between p-5 cursor-pointer"
@@ -72,7 +72,7 @@ export default function Wcag() {
               />
             </div>
             {openIndexes.includes(index) && (
-              <div className="p-5 pt-0 text-gray-700 dark:text-gray-200 text-sm">
+              <div className="p-5 pt-0 text-gray-700 dark:text-gray-200 text-sm bg-white dark:bg-[#1A1A1A]">
                 {lesson.content}
               </div>
             )}

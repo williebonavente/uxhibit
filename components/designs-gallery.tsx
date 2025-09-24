@@ -772,7 +772,7 @@ function DesignListRow({
           src={design.thumbnail_url || "/images/placeholder.png"}
           alt={design.title || "Design Preview"}
           fill
-          className="object-cover bg-white dark:bg-accent"
+          className="object-cover dark:bg-accent"
           onError={async () => {
             if (design.thumbnail_storage_path && !design.thumbnail_storage_path.startsWith("http")) {
               const newUrl = await resolveThumbnail(design.thumbnail_storage_path);

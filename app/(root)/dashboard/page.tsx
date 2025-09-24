@@ -66,23 +66,21 @@ export default async function Dashboard() {
           </p>
         </div>
         <div className="user-card hidden sm:flex items-center gap-3 sm:gap-4 bg-white/5 rounded-xl p-2 sm:p-3 backdrop-blur supports-[backdrop-filter]:bg-white/10">
-          <Link href={`/profile/${userId}`} className="shrink-0">
-            <Avatar className="h-24 w-24 sm:h-14 sm:w-14 md:h-16 md:w-16 rounded-bl-full">
-              <AvatarImage
-                src={
-                  avatarUrl
-                    ? avatarUrl.startsWith("http")
-                      ? avatarUrl
-                      : `/api/avatars?path=${encodeURIComponent(avatarUrl)}`
-                    : undefined
-                }
-                alt={fullName}
-              />
-              <AvatarFallback className="rounded-lg text-black dark:text-white">
-                {getInitials(fullName)}
-              </AvatarFallback>
-            </Avatar>
-          </Link>
+          <Avatar className="h-24 w-24 sm:h-14 sm:w-14 md:h-16 md:w-16 rounded-bl-full">
+            <AvatarImage
+              src={
+                avatarUrl
+                  ? avatarUrl.startsWith("http")
+                    ? avatarUrl
+                    : `/api/avatars?path=${encodeURIComponent(avatarUrl)}`
+                  : undefined
+              }
+              alt={fullName}
+            />
+            <AvatarFallback className="rounded-lg text-black dark:text-white">
+              {getInitials(fullName)}
+            </AvatarFallback>
+          </Avatar>
           <div className="min-w-0">
             <p className="font-semibold text-sm sm:text-base truncate max-w-[240px]">
               {fullName}
@@ -95,23 +93,21 @@ export default async function Dashboard() {
 
         {/* Mobile */}
         <div className="user-card-mobile sm:hidden flex flex-col items-center gap-2">
-          <Link href={`/profile/${userId}`} className="shrink-0">
-            <Avatar className="h-19 w-19 rounded-bl-full">
-              <AvatarImage
-                src={
-                  avatarUrl
-                    ? avatarUrl.startsWith("http")
-                      ? avatarUrl
-                      : `/api/avatars?path=${encodeURIComponent(avatarUrl)}`
-                    : undefined
-                }
-                alt={fullName}
-              />
-              <AvatarFallback className="rounded-lg text-black dark:text-white">
-                {getInitials(fullName)}
-              </AvatarFallback>
-            </Avatar>
-          </Link>
+          <Avatar className="h-19 w-19 rounded-bl-full">
+            <AvatarImage
+              src={
+                avatarUrl
+                  ? avatarUrl.startsWith("http")
+                    ? avatarUrl
+                    : `/api/avatars?path=${encodeURIComponent(avatarUrl)}`
+                  : undefined
+              }
+              alt={fullName}
+            />
+            <AvatarFallback className="rounded-lg text-black dark:text-white">
+              {getInitials(fullName)}
+            </AvatarFallback>
+          </Avatar>
           <div className="min-w-0 text-center">
             <p className="font-semibold text-base truncate">{fullName}</p>
             <p className="text-sm text-black/80 truncate">{bio}</p>

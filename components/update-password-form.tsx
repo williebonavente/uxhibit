@@ -82,7 +82,7 @@ export function UpdatePasswordForm() {
               className="object-contain mb-6"
             />
           </div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-center text-[#ED5E20] mb-4">
+          <h2 className="text-2xl sm:text-3xl font-bold text-center gradient-text mb-4">
             Set New Password
           </h2>
           <p className="mb-8 text-sm sm:text-base md:text-lg text-center text-gray-500 dark:text-[#F5F5F5]/70">

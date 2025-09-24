@@ -146,10 +146,10 @@ export default function WcagPourContent() {
       {/* Lesson Footer */}
       <div className="text-center space-y-2">
         <p className="text-gray-600 dark:text-gray-300">
-          🎉 Congratulations! You've gone through the POUR principles. Apply these lessons in your next web project to make it accessible to everyone.
+          Congrats! You've gone through the POUR principles. Apply these lessons in your next web project to make it accessible to everyone.
         </p>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Learn more from the official <a href="https://www.w3.org/WAI/WCAG21/quickref/" target="_blank" className="underline text-[#ED5E20]">WCAG 2.1 Quick Reference</a>.
+          Learn more from the official <a href="https://www.w3.org/WAI/WCAG21/quickref/" target="_blank" className="hover:underline text-orange-300 hover:text-[#ED5E20]">WCAG 2.1 Quick Reference</a>.
         </p>
       </div>
     </div>

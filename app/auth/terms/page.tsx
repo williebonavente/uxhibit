@@ -27,7 +27,7 @@ export default function TermsPage() {
       <div className="absolute inset-0 bg-black/40" />
 
       {/* Content box */}
-      <div className="relative z-10 flex flex-col w-full max-w-3xl p-8 bg-white/40 dark:bg-[#1E1E1E]/40 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20">
+      <div className="relative z-10 flex flex-col w-full max-w-3xl p-8 bg-[#1E1E1E]/40 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20">
         <div className="flex justify-center mb-2">
           <Image
             src="/images/dark-header-icon.png"
@@ -38,12 +38,12 @@ export default function TermsPage() {
           />
         </div>
 
-        <h2 className="text-xl font-bold text-center text-[#ED5E20]">
+        <h2 className="text-xl font-bold text-center gradient-text">
           Terms and Conditions
         </h2>
 
         {/* Scrollable Terms Section */}
-        <div className="text-sm sm:text-base text-[#1E1E1E]/80 dark:text-[#F5F5F5]/60 mb-6 space-y-6 max-h-[400px] overflow-y-auto leading-relaxed mt-10">
+        <div className="text-sm sm:text-base text-gray-500 dark:text-[#F5F5F5]/70 mb-6 space-y-6 max-h-[400px] overflow-y-auto leading-relaxed mt-10">
           {/* Agreement to Our Legal Terms */}        
           <section>
             <h3 className="font-semibold text-lg mb-5">Agreement to Our Legal Terms</h3>
@@ -455,7 +455,7 @@ export default function TermsPage() {
                 localStorage.removeItem("registrationDraft");
                 router.push("/auth/signup");
               }}
-              className="inline-flex items-center justify-center w-full h-11 sm:h-12 rounded-xl text-base
+              className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-sm font-medium
                         border border-neutral-300/70 dark:border-neutral-600/60 
                         bg-white/60 dark:bg-neutral-800/50
                         text-neutral-700 dark:text-neutral-200
@@ -464,7 +464,7 @@ export default function TermsPage() {
                         hover:border-neutral-400 dark:hover:border-neutral-500
                         transition-colors
                         focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ED5E20]/60
-                        focus:ring-offset-white dark:focus:ring-offset-neutral-900 cursor-pointer"
+                        focus:ring-offset-white dark:focus:ring- cursor-pointer"
             >
               Decline
             </Button>

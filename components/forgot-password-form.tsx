@@ -72,7 +72,7 @@ export function ForgotPasswordForm() {
                         />
                     </div>
                     {/* Title */}
-                    <h2 className="text-2xl sm:text-3xl font-bold text-center text-[#ED5E20] mb-4">
+                    <h2 className="text-2xl sm:text-3xl font-bold text-center gradient-text mb-4">
                         Forgot Password
                     </h2>
                     {/* Subtitle */}

@@ -78,14 +78,14 @@ const heuristics = [
 
 export default function HeuristicCarousel() {
   return (
-    <div className="grid grid-cols-5 gap-5">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
       {heuristics.map((h, i) => (
         <div
           key={i}
-          className="bg-accent dark:bg-[#1A1A1A] rounded-xl shadow-md flex flex-col p-3 hover:scale-[1.05] transition-transform duration-200 cursor-pointer gap-2 justify-center"
+          className="bg-white dark:bg-[#1A1A1A] rounded-xl shadow-md flex flex-col p-3 hover:scale-[1.05] transition-transform duration-200 cursor-pointer gap-2 justify-center"
         >
           <Link href={h.link} target="_blank" rel="noopener noreferrer">
-            <div className="w-full h-40 relative rounded-lg overflow-hidden bg-white dark:bg-accent mb-3 border">
+            <div className="w-full h-40 relative rounded-lg overflow-hidden bg-white dark:bg-accent mb-1 border">
               <Image
                 src={h.icon}
                 alt={h.name}
@@ -96,7 +96,7 @@ export default function HeuristicCarousel() {
           </Link>
 
           <div className="flex flex-col text-start gap-2 h-full justify-start">
-            <span className="font-semibold break-words leading-5">{h.name}</span>
+            <span className="font-semibold break-words leading-5 text-[#ED5E20]">{h.name}</span>
             <p className="text-xs text-gray-800 dark:text-gray-400">
               {h.description}
             </p>

@@ -15,7 +15,7 @@ export default function WcagContent() {
       </div>
 
       {/* What is WCAG Card */}
-      <div className="bg-white dark:bg-neutral-800 p-6 rounded-xl shadow-md border border-gray-200 dark:border-neutral-700 space-y-4">
+      <div className="bg-white dark:bg-neutral-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 space-y-4">
         <div className="flex items-center space-x-3">
           <Globe className="w-6 h-6 text-[#ED5E20]" />
           <h2 className="text-xl font-semibold text-gray-800 dark:text-white">What Is WCAG?</h2>
@@ -32,7 +32,7 @@ export default function WcagContent() {
       </div>
 
       {/* POUR Principles Overview Card */}
-      <div className="bg-white dark:bg-neutral-800 p-6 rounded-xl shadow-md border border-gray-200 dark:border-neutral-700 space-y-4">
+      <div className="bg-white dark:bg-neutral-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 space-y-4">
         <div className="flex items-center space-x-3">
           <Book className="w-6 h-6 text-[#ED5E20]" />
           <h2 className="text-xl font-semibold text-gray-800 dark:text-white">POUR Principles Overview</h2>
@@ -47,7 +47,7 @@ export default function WcagContent() {
             { title: "Understandable", desc: "Content should be clear, predictable, and easy to follow.", icon: <Book className="w-10 h-10 text-[#ED5E20]" /> },
             { title: "Robust", desc: "Ensure compatibility across devices, browsers, and assistive technologies.", icon: <Lightbulb className="w-10 h-10 text-[#ED5E20]" /> },
           ].map((principle) => (
-            <div key={principle.title} className="flex items-center space-x-5 p-5 bg-gray-50 dark:bg-neutral-700 rounded-lg shadow-sm hover:shadow-md transition">
+            <div key={principle.title} className="flex items-center space-x-5 p-5 bg-white dark:bg-neutral-700 rounded-lg shadow-sm hover:shadow-sm transition">
               {principle.icon}
               <div>
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white">{principle.title}</h3>
@@ -59,7 +59,7 @@ export default function WcagContent() {
       </div>
 
       {/* Focus on Perceivable */}
-      <div className="bg-white dark:bg-neutral-800 p-6 rounded-xl shadow-md border border-gray-200 dark:border-neutral-700 space-y-4">
+      <div className="bg-white dark:bg-neutral-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 space-y-4">
         <div className="flex items-center space-x-3">
           <Eye className="w-6 h-6 text-[#ED5E20]" />
           <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Focus on “Perceivable”</h2>
@@ -79,7 +79,7 @@ export default function WcagContent() {
       </div>
 
       {/* Why It Matters */}
-      <div className="bg-white dark:bg-neutral-800 p-6 rounded-xl shadow-md border border-gray-200 dark:border-neutral-700 space-y-4">
+      <div className="bg-white dark:bg-neutral-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 space-y-4">
         <div className="flex items-center space-x-3">
           <Lightbulb className="w-6 h-6 text-[#ED5E20]" />
           <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Why It Matters</h2>
@@ -92,7 +92,7 @@ export default function WcagContent() {
       </div>
 
       {/* Visual Overview */}
-      <div className="bg-white dark:bg-neutral-800 p-6 rounded-xl shadow-md border border-gray-200 dark:border-neutral-700 space-y-4">
+      <div className="bg-white dark:bg-neutral-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 space-y-4">
         <div className="flex items-center space-x-3">
           <Image className="w-6 h-6 text-[#ED5E20]" />
           <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Visual Overview</h2>
@@ -106,7 +106,7 @@ export default function WcagContent() {
         <img
           src="https://www.webyes.com/wp-content/uploads/2024/11/wcag-pour-accessibility-1-1024x576.jpg"
           alt="WCAG POUR Principles Diagram"
-          className="w-full rounded-lg shadow-md"
+          className="w-full rounded-lg shadow-sm"
         />
         <div className="bg-[#ED5E20]/25 dark:bg-[#ED5E20]/50 p-3 rounded-lg border-l-4 border-[#ED5E20] dark:border-[#ED5E20]">
           <strong>Tip:</strong> Use this diagram as a mental map to connect each principle to real-world design practices.
@@ -116,10 +116,10 @@ export default function WcagContent() {
       {/* Lesson Footer */}
       <div className="text-center space-y-2">
         <p className="text-gray-600 dark:text-gray-300">
-          🎉 Congrats! You now understand the POUR principles. Apply them to make your web projects accessible to everyone.
+          Congrats! You now understand the POUR principles. Apply them to make your web projects accessible to everyone.
         </p>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Learn more from the official <a href="https://www.w3.org/WAI/WCAG21/quickref/" target="_blank" className="underline text-[#ED5E20]">WCAG 2.1 Quick Reference</a>.
+          Learn more from the official <a href="https://www.w3.org/WAI/WCAG21/quickref/" target="_blank" className="hover:underline text-orange-300 hover:text-[#ED5E20]">WCAG 2.1 Quick Reference</a>.
         </p>
       </div>
 
