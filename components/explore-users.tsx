@@ -6,6 +6,8 @@ import {
   useCallback
 } from "react";
 import {
+  IconEye,
+  IconHeart,
   IconSearch,
 } from "@tabler/icons-react";
 import Image from "next/image";
@@ -262,7 +264,7 @@ export default function ExplorePage() {
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(search);
-    }, 300); 
+    }, 300);
     return () => clearTimeout(handler);
   }, [search]);
 
@@ -399,32 +401,36 @@ export default function ExplorePage() {
     return <LoadingInspiration />
   }
   return (
-    <div className="p-t-10 space-y-5">
-      {/* Search */}
-     <div className="flex items-center border rounded-lg px-4 py-2 w-full max-w-md mx-auto">
+    <div className="max-w-3xl mx-auto p-4 space-y-6">
+      {/* Search Bar */}
+      <div className="sticky top-0 z-10 bg-white/80 dark:bg-[#1A1A1A] backdrop-blur-md rounded-xl shadow px-4 py-2 flex items-center gap-3 w-full mx-auto">
         <IconSearch size={20} className="text-gray-500" />
         <input
           type="text"
-          placeholder="Search users..."
-          className="ml-3 w-full focus:outline-none bg-transparent"
+          placeholder="Search creators or projects..."
+          className="w-full h-14 px-4 rounded-lg bg-accent/10 dark:bg-neutral-800/60 text-sm focus:outline-none focus:ring-1 focus:ring-[#ED5E20]/50"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
 
-      {/* User Cards */}
-      {filteredUsers.map((user) => (
-        <div key={user.user_id} className="border rounded-xl shadow p-5 mb-10">
-          <div className="flex items-center gap-3 mb-4">
-            <UserAvatar avatarPath={user.user_avatar} alt={user.name} />
-            <h2 className="text-lg font-medium">{user.name}</h2>
-          </div>
 
-          {/* User Designs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-            {user.designs.map((design) => (
+      {/* Feed */}
+      <div className="flex flex-col items-center space-y-8">
+        {filteredUsers.flatMap((user) =>
+          user.designs.map((design) => (
+            <div
+              key={design.design_id}
+              className="bg-white dark:bg-neutral-900 rounded-2xl shadow-md overflow-hidden w-full"
+            >
+              {/* Post Header */}
+              <div className="flex items-center gap-3 p-4 bg-white dark:bg-[#1A1A1A]">
+                <UserAvatar avatarPath={user.user_avatar} alt={user.name} />
+                <h2 className="font-semibold text-gray-800 dark:text-gray-200">{user.name}</h2>
+              </div>
+
+              {/* Design Card */}
               <DesignCard
-                key={design.design_id}
                 design={design}
                 user={user}
                 currentUserId={currentUserId}
@@ -432,10 +438,10 @@ export default function ExplorePage() {
                 handleToggleLike={handleToggleLike}
                 fetchUsersWithDesigns={fetchUsersWithDesigns}
               />
-            ))}
-          </div>
-        </div>
-      ))}
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

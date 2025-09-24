@@ -17,7 +17,7 @@ export default function Page() {
 
       {/* Dark Overlay */}
       <div className="absolute inset-0 bg-black/40" />
-
+      
       {/* Centered Forgot Password Card */}
       <div className="relative z-10 w-full max-w-sm">
         <ForgotPasswordForm />

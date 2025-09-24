@@ -49,6 +49,7 @@ export default function Home() {
           </div>
         </div>
       </header>
+      
       {/* Background Video */}
       <div className="fixed inset-0 w-full h-full overflow-hidden -z-10">
         <video

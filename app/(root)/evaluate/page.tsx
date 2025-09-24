@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { FrameCarousel } from "@/components/carousel/frame-carousel";
+import { IconLink } from "@tabler/icons-react";
 
 type ParsedMeta = {
   fileKey: string;
@@ -140,7 +141,8 @@ export default function Evaluate() {
       // Save the design and let the backend handle evaluation
       const saveRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/designs`, {
         method: "POST",
-        headers: { "Content-Type": "application/json",
+        headers: {
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           title: parsed.name,
@@ -189,67 +191,53 @@ export default function Evaluate() {
   }
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center rounded-2xl overflow-hidden mt-5">
-      {/* Orange gradient background */}
-      <div
-        className="absolute inset-0 w-full h-full orange-gradient-bg opacity-45"
-        style={{
-          zIndex: 0,
-          background:
-            "linear-gradient(135deg, #ffb347 0%, #ed5e20 60%, #f97316 100%)",
-        }}
-      >
-        <style>
-          {`
-            @media (prefers-color-scheme: dark) {
-              .orange-gradient-bg {
-                background: linear-gradient(135deg, #ed5e20 0%, #f59e0b 60%, #ffb347 100%);
-              }
-            }
-          `}
-        </style>
-      </div>
-
-      {/* CHANGED: layered glass overlays for readability (lighter in light mode, subtle in dark) */}
-      <div className="absolute inset-0">
-        {/* base blur + tint */}
-        <div className="absolute inset-0 backdrop-blur-md bg-white/35 dark:bg-black/40 " />
-        {/* gradient to increase contrast behind center content */}
-        <div className="absolute inset-0 bg-gradient-to-b from-white/70 via-white/40 to-white/20 dark:from-black/60 dark:via-black/50 dark:to-black/40 rounded-2xl" />
-        {/* slight inner ring for glass edge definition */}
-        <div className="absolute inset-0 ring-1 ring-white/40 dark:ring-white/10 pointer-events-none" />
-      </div>
-
+    <div
+      className="min-h-screen flex items-center justify-center"
+      style={cardCursor}
+    >
       <div
         className="relative z-10 p-6 md:p-10 flex flex-col gap-8"
         style={cardCursor}
       >
         {/* Step Indicator */}
-        <div className="flex items-center justify-center gap-4 text-xs font-medium tracking-wide">
-          {[1, 2, 3, 4].map((n) => (
-            <div key={n} className={`flex items-center gap-2`}>
+        <div className="flex items-center justify-center gap-5 text-xs font-medium tracking-wide p-5 rounded-full">
+          {[1, 2, 3, 4].map((n, i) => (
+            <div key={n} className="flex items-center gap-3">
+              {/* Step Circle */}
               <span
-                className={`h-7 w-7 rounded-full flex items-center justify-center text-[11px]
-                ${step === n
-                    ? "bg-[#ED5E20] text-white"
-                    : "bg-white/70 dark:bg-black/40 text-neutral-600 dark:text-neutral-300"
+                className={`relative h-9 w-9 rounded-full flex items-center justify-center text-[12px] font-semibold transition-all
+                  ${step === n
+                    ? "bg-[#ED5E20] text-white drop-shadow-[0_0_8px_#ED5E20] animate-pulse"
+                    : step > n
+                      ? "bg-[#ED5E20] text-white"
+                      : "bg-neutral-200 dark:bg-neutral-800 text-neutral-500"
                   }`}
               >
                 {n}
               </span>
+
+              {/* Step Label */}
               <span
-                className={`hidden sm:inline ${step === n
-                  ? "text-neutral-900 dark:text-neutral-100"
-                  : "text-neutral-500 dark:text-neutral-400"
+                className={`hidden sm:inline text-sm ${step >= n
+                    ? "text-neutral-900 dark:text-neutral-100"
+                    : "text-neutral-500 dark:text-neutral-600"
                   }`}
               >
                 {n === 1 && "Parameters"}
                 {n === 2 && "Upload"}
                 {n === 3 && "Review"}
-                {n === 4 && "AI Evaluation"}
+                {n === 4 && "Evaluation"}
               </span>
-              {n < 4 && (
-                <div className="h-px w-10 bg-gradient-to-r from-transparent via-neutral-300/60 dark:via-neutral-600/50 to-transparent" />
+
+              {/* Connector Line */}
+              {i < 3 && (
+                <div
+                  className={`h-0.5 w-14 rounded-full transition-colors duration-300
+                    ${step > n
+                      ? "bg-[#ED5E20]"
+                      : "bg-neutral-300 dark:bg-neutral-700"
+                    }`}
+                />
               )}
             </div>
           ))}
@@ -257,25 +245,36 @@ export default function Evaluate() {
 
         {/* STEP 1 */}
         {step === 1 && (
-          <div className="space-y-8">
+          <div className="space-y-5">
             <div className="text-center space-y-2">
-              <p className="text-sm md:text-base font-medium tracking-wide">
-                Select audience parameters first.
+              <p className="text-lg font-bold uppercase text-[#ED5E20]">
+                Select Target Audience's Generation & Occupation
               </p>
-              <p className="text-xs md:text-sm text-neutral-600 dark:text-neutral-400">
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">
                 These guide how the evaluation is framed.
               </p>
             </div>
 
-            <fieldset className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <fieldset className="grid grid-cols-1 gap-6">
               {/* Generation */}
-              <label className="group relative flex flex-col gap-2 rounded-xl border border-neutral-200/70 dark:border-neutral-700/60 bg-white/55 dark:bg-neutral-900/60 backdrop-blur-sm p-4 hover:border-neutral-300 dark:hover:border-neutral-600 transition-colors focus-within:ring-2 focus-within:ring-[#ED5E20]/60 focus-within:border-[#ED5E20]">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+              <label className="group relative flex flex-col rounded-xl
+                                bg-accent dark:bg-neutral-800/60
+                                text-white
+                                p-5
+                                transition-colors
+                                focus-within:ring-1 focus-within:ring-[#ED5E20]/70 focus-within:border-[#ED5E20 border"
+                style={cardCursor}>
+                <span className="text-[15px] font-semibold text-[#ED5E20] mb-2">
                   Generation
                 </span>
+                {!age && (
+                  <span className="text-[13px] text-neutral-700 dark:text-neutral-500 dark:text-neutral-100 mb-5">
+                    Please select a target age.
+                  </span>
+                )}
                 <div className="relative flex items-center gap-2">
                   <svg
-                    className="h-4 w-4 text-[#ED5E20] opacity-80"
+                    className="h-8 w-8 text-[#ED5E20]"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -283,14 +282,26 @@ export default function Evaluate() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   >
-                    <path d="M12 3l4 4-4 4" />
-                    <path d="M8 17l-4-4 4-4" />
-                    <path d="M8 17h8l4-4" />
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                   </svg>
                   <select
                     value={age}
                     onChange={(e) => setAge(e.target.value)}
-                    className={buildSelectClass(!!age)}
+                    className="w-full
+                              rounded-lg
+                              bg-white dark:bg-neutral-800/70
+                              text-sm font-md
+                              text-neutral-900 dark:text-neutral-200
+                              px-3 py-2
+                              appearance-none
+                              focus:outline-none
+                              focus:ring-.5 focus:ring-[#ED5E20]
+                              transition
+                              hover:border-[#ED5E20]/50
+                              cursor-pointer"
                   >
                     <option value="">Select Generation</option>
                     <option value="Gen Z">Gen Z (1997-2012)</option>
@@ -303,21 +314,27 @@ export default function Evaluate() {
                     ▾
                   </span>
                 </div>
-                {!age && (
-                  <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
-                    Choose target cohort
-                  </span>
-                )}
               </label>
 
               {/* Occupation */}
-              <label className="group relative flex flex-col gap-2 rounded-xl border border-neutral-200/70 dark:border-neutral-700/60 bg-white/55 dark:bg-neutral-900/60 backdrop-blur-sm p-4 hover:border-neutral-300 dark:hover:border-neutral-600 transition-colors focus-within:ring-2 focus-within:ring-[#ED5E20]/60 focus-within:border-[#ED5E20]">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+              <label className="group relative flex flex-col rounded-xl
+                                bg-accent dark:bg-neutral-800/60
+                                text-white
+                                p-5
+                                transition-colors 
+                                focus-within:ring-1 focus-within:ring-[#ED5E20]/70 focus-within:border-[#ED5E20 border"
+                style={cardCursor}>
+                <span className="text-[15px] font-semibold text-[#ED5E20] mb-2">
                   Occupation
                 </span>
+                {!occupation && (
+                  <span className="text-[13px] text-neutral-700 dark:text-neutral-500 dark:text-neutral-100 mb-5">
+                    Please select a target role.
+                  </span>
+                )}
                 <div className="relative flex items-center gap-2">
                   <svg
-                    className="h-4 w-4 text-[#ED5E20] opacity-80"
+                    className="h-8 w-8 text-[#ED5E20]"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -325,31 +342,39 @@ export default function Evaluate() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   >
-                    <path d="M12 12l8-4-8-4-8 4 8 4z" />
-                    <path d="M4 12l8 4 8-4" />
-                    <path d="M4 16l8 4 8-4" />
+                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                    <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
                   </svg>
                   <select
                     value={occupation}
                     onChange={(e) => setOccupation(e.target.value)}
-                    className={buildSelectClass(!!occupation)}
+                    className="
+                      w-full
+                      rounded-lg
+                      bg-white dark:bg-neutral-800/70
+                      text-sm font-md
+                      text-neutral-900 dark:text-neutral-200
+                      px-3 py-2
+                      appearance-none
+                      focus:outline-none
+                      focus:ring-.5 focus:ring-[#ED5E20]
+                      transition
+                      hover:border-[#ED5E20]/50
+                      cursor-pointer"
                   >
-                    <option value="">Select Occupation</option>
-                    <option value="Student">Student</option>
-                    <option value="Freelancer">Freelancer</option>
-                    <option value="Designer">Designer</option>
-                    <option value="Developer">Developer</option>
-                    <option value="Educator">Educator</option>
+                    <option value="" className="dark:text-neutral-500 dark:text-neutral-100">
+                      Select Occupation
+                    </option>
+                    <option value="Student" className="text-neutral-700">Student</option>
+                    <option value="Freelancer" className="text-neutral-700">Freelancer</option>
+                    <option value="Designer" className="text-neutral-700">Designer</option>
+                    <option value="Developer" className="text-neutral-700">Developer</option>
+                    <option value="Educator" className="text-neutral-700">Educator</option>
                   </select>
                   <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 dark:text-neutral-400 group-focus-within:text-[#ED5E20]">
                     ▾
                   </span>
                 </div>
-                {!occupation && (
-                  <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
-                    Select target role
-                  </span>
-                )}
               </label>
             </fieldset>
 
@@ -397,34 +422,45 @@ export default function Evaluate() {
 
         {/* STEP 2 */}
         {step === 2 && (
-          <div className="space-y-6">
-            <p className="text-center text-sm md:text-base">
-              Paste your Figma link and preview.
-            </p>
-            <input
-              type="url"
-              value={link}
-              onChange={(e) => setLink(e.target.value)}
-              placeholder="https://www.figma.com/design/..."
-              className="w-full h-14 px-4 rounded-lg border bg-white dark:bg-neutral-900 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-[#ED5E20]"
-            />
-            {parsed && (
-              <div className="flex items-center gap-4 p-3 rounded-lg bg-white/70 dark:bg-neutral-800/60">
-                {parsed.thumbnail && (
-                  <Image
-                    src={parsed.thumbnail}
-                    alt="thumb"
-                    width={64}
-                    height={48}
-                    className="rounded object-cover"
-                  />
-                )}
-                <div className="text-xs md:text-sm">
-                  <div className="font-semibold">{parsed.name}</div>
-                  <div className="opacity-70 break-all">{parsed.fileKey}</div>
+          <div className="space-y-5">
+            <div className="text-center space-y-2">
+              <p className="text-lg font-bold uppercase text-[#ED5E20]">
+                Paste Figma Design Link
+              </p>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                Make sure the file is only from figma.com domain and is public or shared with you.
+              </p>
+            </div>
+
+            {/* Search Bar */}
+            <div className="sticky top-0 z-10 bg-white/80 dark:bg-[#1A1A1A] backdrop-blur-md rounded-xl shadow px-4 py-2 flex items-center gap-3 w-full mx-auto">
+              <IconLink size={20} className="text-[#ED5E20]" />
+              <input
+                type="url"
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                placeholder="https://www.figma.com/design/..."
+                className="w-full h-14 px-4 rounded-lg bg-accent/10 dark:bg-neutral-800/60 text-sm focus:outline-none focus:ring-1 focus:ring-[#ED5E20]/50"
+              />
+              {parsed && (
+                <div className="flex items-center gap-4 p-3 rounded-lg bg-accent dark:bg-neutral-800/60 border">
+                  {parsed.thumbnail && (
+                    <Image
+                      src={parsed.thumbnail}
+                      alt="thumb"
+                      width={64}
+                      height={48}
+                      className="rounded object-cover"
+                    />
+                  )}
+                  <div className="text-xs md:text-sm">
+                    <div className="font-semibold">{parsed.name}</div>
+                    <div className="opacity-70 break-all">{parsed.fileKey}</div>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+
             <div className="flex justify-between gap-4">
               <button
                 onClick={() => setStep(1)}
@@ -486,50 +522,86 @@ export default function Evaluate() {
 
         {/* STEP 3 */}
         {step === 3 && parsed && (
-          <div className="space-y-6">
-            <p className="text-center text-sm md:text-base">
-              Review and submit.
-            </p>
-            <div className="grid gap-4">
-              <div className="rounded-lg p-4 border bg-white/70 dark:bg-neutral-800/60">
-                <h3 className="font-semibold text-sm mb-2">Parameters</h3>
-                <p className="text-xs md:text-sm">
-                  Generation: <span className="font-medium">{age}</span>
-                </p>
-                <p className="text-xs md:text-sm">
-                  Occupation:{" "}
-                  <span className="font-medium">{occupation}</span>
-                </p>
-              </div>
-              <div className="rounded-lg p-4 border bg-white/70 dark:bg-neutral-800/60">
-                <h3 className="font-semibold text-sm mb-2">Design</h3>
+          <div className="space-y-5">
+            <div className="text-center space-y-2">
+              <p className="text-lg font-bold uppercase text-[#ED5E20]">
+                Review Information and Evaluate
+              </p>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                Carefully check the provided details and ensure all information is correct before proceeding.
+              </p>
+            </div>
 
+            <div className="grid gap-4">
+              <div className="rounded-lg p-4 bg-accent dark:bg-neutral-800/60 border">
+                <h3 className="text-[18px] font-semibold mb-3 p-3 text-center text-neutral-900 dark:text-neutral-100">{parsed.name}</h3>
                 {parsed.frameImages && Object.keys(parsed.frameImages).length > 0 ? (
                   <FrameCarousel frameImages={parsed.frameImages} />
-                ) : (
-                  parsed.thumbnail && (
+                ) : parsed.thumbnail ? (
+                  <div className="thumbnail-wrapper mb-3">
                     <Image
                       src={parsed.thumbnail}
-                      alt="thumb"
+                      alt="Thumbnail preview"
                       width={320}
                       height={200}
-                      className="rounded mb-3 object-cover"
+                      className="rounded object-cover shadow-sm transition-transform hover:scale-105"
                     />
-                  )
-                )}
-                <p className="text-xs md:text-sm font-medium">
-                  {parsed.name}
-                </p>
-                <p className="text-[11px] opacity-70 break-all">
-                  File Key: {parsed.fileKey}
-                </p>
-                {parsed.nodeId && (
-                  <p className="text-[11px] opacity-70 break-all">
-                    Node: {parsed.nodeId}
-                  </p>
+                  </div>
+                ) : (
+                  <div className="text-muted text-sm">No preview available</div>
                 )}
               </div>
             </div>
+
+            <div className="rounded-lg p-4 bg-accent dark:bg-neutral-800/60 border">
+              <h3 className="text-[18px] font-semibold mb-3 p-3 text-center text-neutral-900 dark:text-neutral-100">Parameters</h3>
+              <div className="flex justify-between gap-2 text-center">
+                {/* Generation Card */}
+                <div className="flex w-1/2 h-[50px] bg-[#ED5E20]/5 p-2 rounded-lg justify-center items-center gap-3">
+                  <div className="flex items-center justify-center gap-2 text-base font-semibold text-[#ED5E20]">
+                    {age && (
+                      <svg
+                        className="h-5 w-5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                      </svg>
+                    )}
+                    <span>{age || "—"}</span>
+                  </div>
+                </div>
+
+                {/* Occupation Card */}
+                <div className="flex w-1/2 h-[50px] bg-[#ED5E20]/5 p-2 rounded-lg justify-center items-center gap-3">
+                  <div className="flex items-center justify-center gap-2 text-base font-semibold text-[#ED5E20]">
+                    {occupation && (
+                      <svg
+                        className="h-5 w-5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                        <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+                      </svg>
+                    )}
+                    <span>{occupation || "—"}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="flex justify-between gap-4">
               <button
                 onClick={() => setStep(2)}
@@ -594,7 +666,7 @@ export default function Evaluate() {
                     setStep(4);
                   }}
                   className="group relative inline-flex items-center justify-center
-                  px-9 py-2.5 rounded-xl text-sm font-semibold tracking-wide
+                  px-9 py-2.5 rounded-xl text-sm text-white font-semibold tracking-wide
                   transition-all duration-300
                   focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40 cursor pointer"
                 >
@@ -637,7 +709,7 @@ export default function Evaluate() {
 
         {/* STEP 4: Running AI Evaluation */}
         {step === 4 && (
-          <div className="space-y-6">
+          <div className="space-y-5">
             <div className="flex flex-col items-center justify-center text-center py-24 animate-pulse">
               <Image
                 src="/images/smart-evaluation-underway.svg"
@@ -647,7 +719,7 @@ export default function Evaluate() {
                 className="object-contain mb-6"
                 priority
               />
-              <h2 className="text-lg font-semibold text-[#ED5E20] mb-2">
+              <h2 className="gradient-text text-lg font-semibold mb-2">
                 Smart Evaluation Underway!
               </h2>
               <p className="text-gray-500 text-sm mb-4">

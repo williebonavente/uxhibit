@@ -37,7 +37,7 @@ export default function EmailSentPage() {
         </div>
 
         {/* Title */}
-        <h2 className="text-2xl sm:text-3xl font-bold text-center text-[#ED5E20] mb-4">
+        <h2 className="gradient-text text-2xl sm:text-3xl font-bold text-center mb-4">
           Email Sent
         </h2>
 

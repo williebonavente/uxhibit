@@ -2,6 +2,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import DesignsGallery from "@/components/designs-gallery";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -65,21 +66,23 @@ export default async function Dashboard() {
           </p>
         </div>
         <div className="user-card hidden sm:flex items-center gap-3 sm:gap-4 bg-white/5 rounded-xl p-2 sm:p-3 backdrop-blur supports-[backdrop-filter]:bg-white/10">
-          <Avatar className="h-24 w-24 sm:h-14 sm:w-14 md:h-16 md:w-16 rounded-bl-full shrink-0">
-            <AvatarImage
-              src={
-                avatarUrl
-                  ? avatarUrl.startsWith("http")
-                    ? avatarUrl
-                    : `/api/avatars?path=${encodeURIComponent(avatarUrl)}`
-                  : undefined
-              }
-              alt={fullName}
-            />
-            <AvatarFallback className="rounded-lg text-black dark:text-white">
-              {getInitials(fullName)}
-            </AvatarFallback>
-          </Avatar>
+          <Link href={`/profile/${userId}`} className="shrink-0">
+            <Avatar className="h-24 w-24 sm:h-14 sm:w-14 md:h-16 md:w-16 rounded-bl-full">
+              <AvatarImage
+                src={
+                  avatarUrl
+                    ? avatarUrl.startsWith("http")
+                      ? avatarUrl
+                      : `/api/avatars?path=${encodeURIComponent(avatarUrl)}`
+                    : undefined
+                }
+                alt={fullName}
+              />
+              <AvatarFallback className="rounded-lg text-black dark:text-white">
+                {getInitials(fullName)}
+              </AvatarFallback>
+            </Avatar>
+          </Link>
           <div className="min-w-0">
             <p className="font-semibold text-sm sm:text-base truncate max-w-[240px]">
               {fullName}
@@ -92,21 +95,23 @@ export default async function Dashboard() {
 
         {/* Mobile */}
         <div className="user-card-mobile sm:hidden flex flex-col items-center gap-2">
-          <Avatar className="h-19 w-19 rounded-bl-full shrink-0">
-            <AvatarImage
-              src={
-                avatarUrl
-                  ? avatarUrl.startsWith("http")
-                    ? avatarUrl
-                    : `/api/avatars?path=${encodeURIComponent(avatarUrl)}`
-                  : undefined
-              }
-              alt={fullName}
-            />
-            <AvatarFallback className="rounded-lg text-black dark:text-white">
-              {getInitials(fullName)}
-            </AvatarFallback>
-          </Avatar>
+          <Link href={`/profile/${userId}`} className="shrink-0">
+            <Avatar className="h-19 w-19 rounded-bl-full">
+              <AvatarImage
+                src={
+                  avatarUrl
+                    ? avatarUrl.startsWith("http")
+                      ? avatarUrl
+                      : `/api/avatars?path=${encodeURIComponent(avatarUrl)}`
+                    : undefined
+                }
+                alt={fullName}
+              />
+              <AvatarFallback className="rounded-lg text-black dark:text-white">
+                {getInitials(fullName)}
+              </AvatarFallback>
+            </Avatar>
+          </Link>
           <div className="min-w-0 text-center">
             <p className="font-semibold text-base truncate">{fullName}</p>
             <p className="text-sm text-black/80 truncate">{bio}</p>
@@ -115,9 +120,8 @@ export default async function Dashboard() {
       </div>
 
       <div className="border-b-2 p-2">
-        <h1 className="text-xl font-medium">My Works</h1>
+        <h1 className="text-2xl font-medium">My Works</h1>
       </div>
-
       <DesignsGallery />
     </div>
   );

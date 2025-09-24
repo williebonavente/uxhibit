@@ -333,7 +333,7 @@ export default function ProjectPerformanceComparisonPage() {
   return (
     <div className="space-y-5">
       <div className="border-b-2 p-2">
-        <h1 className="text-xl font-medium text-black dark:text-white font-['Poppins']">
+        <h1 className="text-2xl font-medium">
           Project Performance Comparison
         </h1>
       </div>
