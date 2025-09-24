@@ -83,7 +83,7 @@ export function NavUser({ user }: { user: User | null }) {
   const unreadNotifications = notifications.filter(n => !n.read);
   const readNotifications = notifications.filter(n => n.read);
 
-  // TODO: BE DELTED
+  // TODO: BE DELETED
   const heartNotification = useDesignNotifications(user?.id ?? null);
   const hasHeartNotifications = heartNotification.length > 0;
 
@@ -97,7 +97,7 @@ export function NavUser({ user }: { user: User | null }) {
     const userId = authData.user.id;
 
     // Redirect to your profile page
-    router.push(`/profile/${userId}`);
+    router.push(`/profile-user/${userId}`);
   };
 
   const getProfile = useCallback(async () => {
