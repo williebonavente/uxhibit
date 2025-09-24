@@ -3,6 +3,7 @@ import Image from "next/image";
 import { Spinner } from "@/components/ui/shadcn-io/spinner/index";
 import { IconTrash } from "@tabler/icons-react";
 import { toast } from "sonner";
+import { createClient } from "@/utils/supabase/client";
 
 interface VersionHistoryModalProps {
     open: boolean;
@@ -21,6 +22,7 @@ interface VersionHistoryModalProps {
     setVersionChanged: (fn: (v: number) => number) => void;
     setEvalResult: (result: any) => void;
     setShowEval: (show: boolean) => void;
+    setFrameEvaluations: (frames: any[]) => void;
 }
 
 const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
@@ -40,10 +42,81 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
     setVersionChanged,
     setEvalResult,
     setShowEval,
+    setFrameEvaluations
 
 }) => {
     if (!open) return null;
 
+    async function fetchFramesForVersion(versionId: string, designId: string) {
+        const supabase = createClient();
+
+        // Fetch the overall summary for this version
+        const { data: versionData, error: versionError } = await supabase
+            .from("design_versions")
+            .select(`
+            id, design_id, version, file_key, node_id, thumbnail_url, created_by,
+            ai_summary, ai_data, snapshot, created_at, updated_at, total_score
+        `)
+            .eq("design_id", designId)
+            .eq("id", versionId)
+            .maybeSingle();
+
+        if (versionError) {
+            console.error("Failed to fetch overall evaluation:", versionError.message);
+            return [];
+        }
+        if (!versionData) {
+            console.warn("No version data found for design:", designId, "version:", versionId);
+            return [];
+        }
+
+        // Parse AI data for the overall frame
+        let aiData = versionData.ai_data;
+        if (typeof aiData === "string") {
+            try {
+                aiData = JSON.parse(aiData);
+            } catch (e) {
+                aiData = {};
+            }
+        }
+
+        const overall = {
+            id: "overallFrame",
+            design_id: versionData.design_id,
+            version_id: versionData.id,
+            file_key: versionData.file_key,
+            node_id: versionData.node_id,
+            thumbnail_url: versionData.thumbnail_url,
+            owner_id: versionData.created_by,
+            ai_summary: versionData.ai_summary,
+            ai_data: aiData,
+            snapshot: versionData.snapshot,
+            created_at: versionData.created_at,
+            updated_at: versionData.updated_at,
+            total_score: versionData.total_score,
+        };
+
+        // Fetch all frames for this version
+        const { data: frameData, error: frameError } = await supabase
+            .from("design_frame_evaluations")
+            .select("*")
+            .eq("design_id", designId)
+            .eq("version_id", versionId)
+            .order("created_at", { ascending: true });
+
+        if (frameError) {
+            console.error("Failed to fetch frame evaluations for version:", frameError.message);
+            return [overall];
+        }
+
+        const frames = (frameData || []).map((frame: any) => ({
+            ...frame,
+            ai_data: typeof frame.ai_data === "string" ? JSON.parse(frame.ai_data) : frame.ai_data,
+        }));
+
+        // Combine overall and frames
+        return [overall, ...frames];
+    }
     return (
         <div className="fixed inset-0 flex items-center justify-center pl-20 pr-20 cursor-pointer z-50">
             <div
@@ -94,8 +167,6 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                                     <th className="p-2 border">AI Summary</th>
                                     <th className="p-2 border">Parameter</th>
                                     <th className="p-2 border">Thumbnail</th>
-                                    {/* TODO: REMOVE THE NODE ID */}
-                                    {/* <th className="p-2 border">Node ID</th> */}
                                     <th className="p-2 border">Evaluated at</th>
                                     <th className="p-2 border text-center">Delete</th>
                                 </tr>
@@ -120,6 +191,8 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                                                 onClick={async () => {
                                                     setSelectedVersion(v);
                                                     try {
+                                                        const frames = await fetchFramesForVersion(v.id, design.id);
+                                                        setFrameEvaluations(frames);
                                                         const versions = await fetchDesignVersions(design.id);
                                                         const latest = versions.find(ver => ver.id === v.id);
 
@@ -246,9 +319,6 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                                                     )}
                                                 </td>
 
-                                                {/*TODO: REMOVE THE NODE ID*/}
-                                                {/* <td className="p-2 border text-gray-700 dark:text-gray-200 text-center">{v.node_id}</td> */}
-
                                                 {/*EVALUATION TIME*/}
                                                 <td className="p-2 border text-gray-700 dark:text-gray-200 text-center">{v.created_at ? new Date(v.created_at).toLocaleString() : "-"}</td>
 
@@ -365,14 +435,14 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                                 onClick={() => setPage(Math.max(0, page - 1))}
                                 disabled={page === 0}
                                 className={`group relative flex items-center justify-center px-4 py-2 rounded-full
-                      bg-white/80 dark:bg-[#232323]/80 shadow-lg border border-[#ED5E20]/30
-                      text-[#ED5E20] dark:text-[#ED5E20] font-bold text-base
-                      transition-all duration-300
-                      hover:bg-[#ED5E20] hover:text-white hover:scale-110 active:scale-95
-                      disabled:opacity-40 disabled:cursor-not-allowed
-                      outline-none focus:ring-2 focus:ring-[#ED5E20]/40
-                      cursor-pointer
-                      `}
+                                    bg-white/80 dark:bg-[#232323]/80 shadow-lg border border-[#ED5E20]/30
+                                    text-[#ED5E20] dark:text-[#ED5E20] font-bold text-base
+                                    transition-all duration-300
+                                    hover:bg-[#ED5E20] hover:text-white hover:scale-110 active:scale-95
+                                    disabled:opacity-40 disabled:cursor-not-allowed
+                                    outline-none focus:ring-2 focus:ring-[#ED5E20]/40
+                                    cursor-pointer
+                                    `}
                                 aria-label="Previous Page"
                             >
                                 <svg width="20" height="20" fill="none" viewBox="0 0 24 24" className="mr-1">
@@ -387,15 +457,14 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                             <button
                                 onClick={() => setPage(Math.min(Math.ceil(versions.length / pageSize) - 1, page + 1))}
                                 disabled={(page + 1) * pageSize >= versions.length}
-                                className={`
-                      group relative flex items-center justify-center px-4 py-2 rounded-full
-                      bg-white/80 dark:bg-[#232323]/80 shadow-lg border border-[#ED5E20]/30
-                      text-[#ED5E20] dark:text-[#ED5E20] font-bold text-base
-                      transition-all duration-300
-                      hover:bg-[#ED5E20] hover:text-white hover:scale-110 active:scale-95
-                      disabled:opacity-40 disabled:cursor-not-allowed
-                      outline-none focus:ring-2 focus:ring-[#ED5E20]/40
-                      cursor-pointer`}
+                                className={`group relative flex items-center justify-center px-4 py-2 rounded-full
+                                    bg-white/80 dark:bg-[#232323]/80 shadow-lg border border-[#ED5E20]/30
+                                    text-[#ED5E20] dark:text-[#ED5E20] font-bold text-base
+                                    transition-all duration-300
+                                    hover:bg-[#ED5E20] hover:text-white hover:scale-110 active:scale-95
+                                    disabled:opacity-40 disabled:cursor-not-allowed
+                                    outline-none focus:ring-2 focus:ring-[#ED5E20]/40
+                                    cursor-pointer`}
                                 aria-label="Next Page"
                             >
                                 Next

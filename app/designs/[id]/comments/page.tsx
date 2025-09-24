@@ -14,7 +14,7 @@ interface CommentsSectionProps {
     setReplyingToId: (id: string | null) => void;
     handleDeleteComment: (id: string) => void;
     postingComment: boolean;
-    // handleAddReply: (parentId: string, replyText: string) => Promise<void>
+    handleAddReply: (parentId: string, replyText: string) => Promise<void>
 }
 
 export const CommentsSection: React.FC<CommentsSectionProps> = ({
@@ -28,9 +28,12 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
     // replyingToId,
     // setReplyingToId,
     handleDeleteComment,
-    // handleAddReply,
+    handleAddReply,
     postingComment
-}) => (
+}) => {
+    console.log("Comment section props.comments: ", comments);
+    
+    return (
     <div className="mb-6">
         {/* Input Area */}
         <div className="flex items-center gap-2 mb-4 bg-white/80 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 shadow-sm focus-within:shadow-md transition">
@@ -83,12 +86,12 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
                         setEditingId={setEditingId}
                         // replyingToId={replyingToId}
                         // setReplyingToId={setReplyingToId}
-                        // onReply={handleAddReply}
+                        handleAddReply={handleAddReply}
                         onDelete={handleDeleteComment}
                     />
                 ))
             )}
         </div>
     </div>
-
-);
+    );
+};

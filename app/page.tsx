@@ -1,8 +1,18 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
+import { useEffect } from "react";
 
 export default function Home() {
+  useEffect(() => {
+    fetch("/api/ux_averages")
+      .then(res => res.json())
+      .then(data => {
+        console.log("Average UX Ratings:", data);
+      });
+  }, []);
   return (
     <>
       {/* Header */}

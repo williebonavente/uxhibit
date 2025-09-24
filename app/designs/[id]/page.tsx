@@ -24,6 +24,7 @@ import DesignHeaderActions from "./dialogs/DesignHeader";
 import ZoomControls from "./dialogs/ZoomControls";
 import { CommentsSection } from "./comments/page";
 import { Comment } from "@/components/comments-user";
+import EvaluationParamsModal from "@/components/evaluation-params-modal";
 
 
 interface FrameEvaluation {
@@ -95,6 +96,7 @@ export type Design = {
   frames?: { id: string | number; name: string;[key: string]: any }[];
   published_version_id?: string;
   published_at?: string;
+  figma_link?: string;
 };
 
 type EvaluateInput = {
@@ -104,6 +106,7 @@ type EvaluateInput = {
   scale?: number;
   fallbackImageUrl?: string;
   snapshot: Snapshot;
+  url?: string;
 }
 
 type EvalResponse = {
@@ -156,6 +159,7 @@ export async function evaluateDesign(input: EvaluateInput): Promise<EvalResponse
     console.error('Evaluate failed:', data);
     throw new Error(data?.error || "Failed to evaluate");
   }
+  console.log("Existing data: ", data);
   return data as EvalResponse;
 }
 
@@ -194,6 +198,8 @@ export default function DesignDetailPage({
   const [showComments, setShowComments] = useState(false);
   const [loadingComments, setLoadingComments] = useState(false);
   const [currentUserProfile, setCurrentUserProfile] = useState<{ fullName: string; avatarUrl: string } | null>(null);
+  const [showEvalParams, setShowEvalParams] = useState(false);
+  const [pendingParams, setPendingParams] = useState<any>(null);
 
   const [page, setPage] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(700);
@@ -255,6 +261,57 @@ export default function DesignDetailPage({
   function handlePanEnd() {
     setIsPanning(false);
   }
+
+  function handleOpenEvalParams() {
+
+    const thumbnailUrl =
+      thumbUrl ||
+      design?.thumbnail ||
+      design?.imageUrl ||
+      "/images/design-thumbnail.png";
+
+    setPendingParams({
+      designId: design?.id,
+      fileKey: design?.fileKey,
+      nodeId: design?.nodeId,
+      scale: 3,
+      snapshot: design?.snapshot,
+      url: design?.figma_link,
+      fallbackImageUrl: thumbnailUrl
+    });
+    setShowEvalParams(true);
+  }
+
+  async function handleEvalParamsSubmit(params) {
+    setShowEvalParams(false);
+
+    // Always build the snapshot from the latest params
+    const latestSnapshot = {
+      age: params.generation,
+      occupation: params.occupation,
+    };
+
+    await handleEvaluateWithParams({
+      ...params,
+      snapshot: latestSnapshot,
+    });
+  }
+
+  async function handleEvaluateWithParams(params) {
+    setLoadingEval(true);
+    setEvalError(null);
+
+    try {
+      const data = await evaluateDesign(params);
+      setEvalResult(data);
+    } catch (e: any) {
+      setEvalError(e.message || "Failed to evaluate");
+    }
+    finally {
+      setLoadingEval(false);
+    }
+  }
+
 
   const sortedFrameEvaluations = React.useMemo(() => {
     if (sortOrder === "default") return frameEvaluations;
@@ -362,7 +419,10 @@ export default function DesignDetailPage({
   }
   const handleEvaluate = React.useCallback(async () => {
     if (!design?.id || !design?.fileKey) {
-      console.error('Missing required design data:', { id: design?.id, fileKey: design?.fileKey });
+      console.error('Missing required design data:', {
+        id: design?.id,
+        fileKey: design?.fileKey
+      });
       setEvalError("Missing required design data");
       return;
     }
@@ -384,11 +444,12 @@ export default function DesignDetailPage({
       }
 
       console.log('Starting evaluation with:', {
-        designId: design.id,  // Make sure this exists
+        designId: design.id,
         fileKey: design.fileKey,
         nodeId: design.nodeId,
-        thumbnail: design.thumbnail,
+        thumbnail: imageUrlForAI,
         snapshot: design.snapshot,
+        url: design.figma_link,
       });
 
       const data = await evaluateDesign({
@@ -396,8 +457,10 @@ export default function DesignDetailPage({
         fileKey: design.fileKey,
         nodeId: design.nodeId,
         scale: 3,
-        fallbackImageUrl: imageUrlForAI, // Use the signed URL here
+        fallbackImageUrl: imageUrlForAI,
+        // TODO: HERE 
         snapshot: typeof design?.snapshot === "string" ? JSON.parse(design.snapshot) : design?.snapshot,
+        url: design.figma_link
       });
 
 
@@ -427,6 +490,8 @@ export default function DesignDetailPage({
 
     }
   }, [design, setEvalError, setLoadingEval, setEvalResult, setDesign, setLoadingVersions]);
+
+
   const syncPublishedState = React.useCallback(async (): Promise<void> => {
     const supabase = createClient();
     const { data: userData } = await supabase.auth.getUser();
@@ -521,7 +586,6 @@ export default function DesignDetailPage({
       .eq("user_id", userId);
 
     if (!error) {
-      // Instantly update local state so UI reflects unpublished status
       setDesign((prev) =>
         prev ? { ...prev, is_active: false } : prev
       );
@@ -547,6 +611,7 @@ export default function DesignDetailPage({
       console.error("Failed to fetch comment with profile:", error);
       return null;
     }
+
     return {
       id: data.id,
       text: data.text,
@@ -593,146 +658,68 @@ export default function DesignDetailPage({
   }
 
   const handleAddComment = async () => {
-  const supabase = createClient();
-  if (!newCommentText.trim() || !currentUserId || !currentUserProfile || !design) return;
+    const supabase = createClient();
+    if (!newCommentText.trim() || !currentUserId || !currentUserProfile || !design) return;
 
-  setPostingComment(true);
+    setPostingComment(true);
 
-  // Optimistically add the comment to UI
-  const tempId = "temp-" + Date.now();
-  const optimisticComment = {
-    id: tempId,
-    text: newCommentText,
-    user: {
-      id: currentUserId,
-      fullName: currentUserProfile.fullName,
-      avatarUrl: currentUserProfile.avatarUrl,
-    },
-    replies: [],
-    parentId: null,
-    createdAt: new Date(),
-    updatedAt: undefined,
-    localTime: new Date().toLocaleTimeString(),
-    design_id: design.id,
-    is_read: false,
-  };
-  setComments(prev => [optimisticComment, ...prev]);
+    const { error } = await supabase
+      .from("comments")
+      .insert([
+        {
+          user_id: currentUserId,
+          design_id: design.id,
+          text: newCommentText,
+          parent_id: null,
+          local_time: new Date().toLocaleTimeString(),
+        },
+      ]);
 
-  const { data, error } = await supabase
-    .from("comments")
-    .insert([
-      {
-        user_id: currentUserId,
-        design_id: design.id,
-        text: newCommentText,
-        parent_id: null,
-        local_time: new Date().toLocaleTimeString(),
-      },
-    ])
-    .select()
-    .single();
+    if (error) {
+      toast.error(`Failed to add comment!, ${error.message}`);
+      console.error(error.message);
+      setPostingComment(false);
+      return;
+    }
 
-  if (error) {
-    toast.error("Failed to add comment!");
-    console.error(error.message);
-    // Remove the optimistic comment if insert fails
-    setComments(prev => prev.filter(c => c.id !== tempId));
+    setNewCommentText("");
     setPostingComment(false);
-    return;
-  }
+    fetchComments();
+  };
 
-  // Optionally: Replace the optimistic comment with the real one (if needed)
-  // But the realtime handler will fetch and render the new comment anyway
-  setNewCommentText("");
-  setPostingComment(false);
-  console.log("[AddComment] Comment successfully added:", data);
-};
+  const handleAddReply = async (parentId: string, replyText: string) => {
+    console.log("Parent handleAddReply called with:", parentId, replyText);
+    const supabase = createClient();
+    if (!replyText.trim() || !currentUserId || !currentUserProfile || !design) return;
 
-// const handleAddReply = async (parentId: string, replyText: string) => {
-//   const supabase = createClient();
-//   if (!replyText.trim() || !currentUserId || !currentUserProfile || !design) return;
+    setPostingComment(true);
 
-//   setPostingComment(true);
+    const { error } = await supabase
+      .from("comments")
+      .insert([
+        {
+          user_id: currentUserId,
+          design_id: design.id,
+          text: replyText,
+          parent_id: parentId,
+          local_time: new Date().toLocaleTimeString(),
+        },
+      ]);
 
-//   // Create a temporary optimistic reply
-//   const tempId = "temp-reply-" + Date.now();
-//   const optimisticReply = {
-//     id: tempId,
-//     text: replyText,
-//     user: {
-//       id: currentUserId,
-//       fullName: currentUserProfile.fullName,
-//       avatarUrl: currentUserProfile.avatarUrl,
-//     },
-//     replies: [],
-//     parentId: parentId,
-//     createdAt: new Date(),
-//     updatedAt: undefined,
-//     localTime: new Date().toLocaleTimeString(),
-//     design_id: design.id,
-//     is_read: false,
-//   };
+    if (error) {
+      toast.error(`Failed to add reply! ${error.message}`);
+      setPostingComment(false);
+      return;
+    }
 
-//   // Optimistically add the reply to the parent comment
-//   setComments(prev => {
-//     function addReply(comments) {
-//       return comments.map(comment => {
-//         if (comment.id === parentId) {
-//           return {
-//             ...comment,
-//             replies: [optimisticReply, ...(comment.replies || [])],
-//           };
-//         }
-//         return {
-//           ...comment,
-//           replies: comment.replies ? addReply(comment.replies) : [],
-//         };
-//       });
-//     }
-//     return addReply(prev);
-//   });
+    setPostingComment(false);
+    fetchComments();
+    console.log("fetchComments called after reply");
 
-//   // Insert reply in the database
-//   const { data, error } = await supabase
-//     .from("comments")
-//     .insert([
-//       {
-//         user_id: currentUserId,
-//         design_id: design.id,
-//         text: replyText,
-//         parent_id: parentId,
-//         local_time: new Date().toLocaleTimeString(),
-//       },
-//     ])
-//     .select()
-//     .single();
-
-//   if (error) {
-//     toast.error("Failed to add reply!");
-//     console.error(error.message);
-//     // Remove the optimistic reply if insert fails
-//     setComments(prev => {
-//       function removeTemp(comments) {
-//         return comments.map(comment => ({
-//           ...comment,
-//           replies: comment.replies
-//             ? comment.replies.filter(r => r.id !== tempId)
-//             : [],
-//         }));
-//       }
-//       return removeTemp(prev);
-//     });
-//     setPostingComment(false);
-//     return;
-//   }
-
-//   // The realtime handler will fetch and render the real reply
-//   setPostingComment(false);
-//   console.log("[AddReply] Reply successfully added:", data);
-// };
-
+  };
 
   const fetchComments = useCallback(async () => {
+
 
     const supabase = createClient();
 
@@ -749,8 +736,8 @@ export default function DesignDetailPage({
         )
       `)
       .eq("design_id", design?.id)
-      .order("created_at", { ascending: false })
-      .range(0, 19);
+      .order("created_at", { ascending: false });
+    // .range(0, 19);
 
     if (error) {
       console.log("Supabase error:", error);
@@ -774,10 +761,13 @@ export default function DesignDetailPage({
       design_id: comment.design_id,
     }));
 
+    console.log("commentsWithUser", commentsWithUser);
+
     const commentMap: { [id: string]: any } = {};
     commentsWithUser.forEach(comment => {
       commentMap[comment.id] = { ...comment, replies: [] };
     });
+
 
     const rootComments: any[] = [];
     commentsWithUser.forEach(comment => {
@@ -789,12 +779,14 @@ export default function DesignDetailPage({
         rootComments.push(commentMap[comment.id]);
       }
     });
+    console.log("rootComments", rootComments);
     setComments(rootComments);
     // setLoadingComments(false);
   }, [design?.id]);
 
   const handleDeleteComment = (id: string) => {
     setComments(comments.filter(comment => comment.id !== id));
+    fetchComments();
   }
 
   // Helper to update a comment in the tree
@@ -855,11 +847,12 @@ export default function DesignDetailPage({
     };
   }, [showSortOptions]);
 
+
   useEffect(() => {
-    if (design) {
+    if (design?.id) {
       syncPublishedState();
     }
-  }, [design?.id, syncPublishedState, design]);
+  }, [design?.id, syncPublishedState]);
 
   useEffect(() => {
     async function loadDesign() {
@@ -867,7 +860,6 @@ export default function DesignDetailPage({
       try {
         const supabase = createClient();
 
-        // 1. Always fetch the design and its versions
         const { data: designData, error: designError } = await supabase
           .from("designs")
           .select(`
@@ -898,7 +890,6 @@ export default function DesignDetailPage({
           .maybeSingle();
 
 
-        // 3. Normalize design object
         const latestVersion = designData.design_versions?.[0];
         let parsedAiData = null;
         if (latestVersion?.ai_data) {
@@ -923,8 +914,38 @@ export default function DesignDetailPage({
           is_active: publishedData?.is_active ?? false,
           published_version_id: publishedData?.published_version_id ?? "",
           published_at: publishedData?.published_at ?? "",
+          figma_link: designData.figma_link || "",
         };
         setDesign(normalized);
+        console.log("Design loaded: ", normalized);
+        // TODO: HERE FETCHING THE LATEST VERSION HERE
+        // Fetch frames for the latest version
+        const latestVersionId = latestVersion?.id;
+        console.log("Latest Version Data: ", latestVersion);
+        if (latestVersionId) {
+          const { data: frameData, error: frameError } = await supabase
+            .from("design_frame_evaluations")
+            .select(`id, design_id, version_id, file_key, node_id, thumbnail_url, owner_id,
+              ai_summary, ai_data, snapshot, created_at, updated_at
+              `)
+            .eq("design_id", normalized.id)
+            .eq("version_id", latestVersionId)
+            .order("created_at", { ascending: true });
+
+          if (frameError) {
+            console.error("Failed to fetch frame evaluations:", frameError.message);
+          } else {
+            const frames = (frameData || []).map((frame: any) => ({
+              ...frame,
+              ai_data: typeof frame.ai_data === "string" ? JSON.parse(frame.ai_data) : frame.ai_data,
+            }));
+
+            // Optionally, add the overall frame as the first item if you want
+            // setFrameEvaluations([overall, ...frames]);
+            setFrameEvaluations(frames);
+            setSelectedFrameIndex(0);
+          }
+        }
 
         if (latestVersion?.ai_data) {
           const overall: FrameEvaluation = {
@@ -975,54 +996,145 @@ export default function DesignDetailPage({
     loadDesign();
   }, [id]);
 
+  // useEffect(() => {
+  //   if (!design?.id) return;
+  //   const supabase = createClient();
+
+  //   async function fetchEvaluations() {
+  //     const { data: versionData, error: versionError } = await supabase
+  //       .from("design_versions")
+  //       .select(`
+  //       id, design_id, version, file_key, node_id, thumbnail_url, created_by,
+  //       ai_summary, ai_data, snapshot, created_at, updated_at, total_score
+  //     `)
+  //       .eq("design_id", design?.id)
+  //       .order("created_at", { ascending: false })
+  //       .limit(1)
+  //       .maybeSingle();
+
+  //     if (versionError) {
+  //       console.error("Failed to fetch overall evaluation:", versionError.message);
+  //       return;
+  //     }
+
+  //     let overall: FrameEvaluation | null = null;
+  //     if (versionData) {
+  //       let aiData = versionData.ai_data;
+  //       if (typeof aiData === "string") {
+  //         try {
+  //           aiData = JSON.parse(aiData);
+  //         } catch (e) {
+  //           aiData = {};
+  //         }
+  //       }
+  //       overall = {
+  //         id: "overallFrame",
+  //         design_id: versionData.design_id,
+  //         version_id: versionData.id,
+  //         file_key: versionData.file_key,
+  //         node_id: versionData.node_id,
+  //         thumbnail_url: versionData.thumbnail_url,
+  //         owner_id: versionData.created_by,
+  //         ai_summary: versionData.ai_summary,
+  //         ai_data: aiData,
+  //         snapshot: versionData.snapshot,
+  //         created_at: versionData.created_at,
+  //         updated_at: versionData.updated_at,
+  //         total_score: versionData.total_score,
+  //       };
+  //     }
+  //     // TODO: DOUBLE CHECK THE FOLLOWING THING AGAIN AND AGAIN AND AGAIN
+  //     const { data: frameData, error: frameError } = await supabase
+  //       .from("design_frame_evaluations")
+  //       .select(`
+  //       id, design_id, version_id, file_key, node_id, thumbnail_url, owner_id,
+  //       ai_summary, ai_data, snapshot, created_at, updated_at
+  //     `)
+  //       .eq("design_id", design?.id)
+  //       // TODO: 
+  //       .eq("version_id", selectedVersion?.id)
+  //       .order("created_at", { ascending: false });
+
+  //     if (frameError) {
+  //       console.error("Failed to fetch frame evaluations:", frameError.message);
+  //       return;
+  //     }
+
+  //     const frames = (frameData || []).map((frame: any) => ({
+  //       ...frame,
+  //       ai_data: typeof frame.ai_data === "string" ? JSON.parse(frame.ai_data) : frame.ai_data,
+  //     }));
+
+  //     const combined = overall ? [overall, ...frames] : frames;
+  //     setFrameEvaluations(combined);
+  //   }
+
+  //   fetchEvaluations();
+  // }, [design?.id]);
+
   useEffect(() => {
-    if (!design?.id) return;
+    if (!design?.id) {
+      console.log("[fetchEvaluations] No design id, skipping.");
+      return;
+    }
     const supabase = createClient();
 
     async function fetchEvaluations() {
-      // 1. Fetch overall evaluation from design_versions (latest)
+      console.log("[fetchEvaluations] Fetching latest version for design:", design.id);
+
+      // 1. Fetch the latest version for this design
       const { data: versionData, error: versionError } = await supabase
         .from("design_versions")
         .select(`
         id, design_id, version, file_key, node_id, thumbnail_url, created_by,
         ai_summary, ai_data, snapshot, created_at, updated_at, total_score
       `)
-        .eq("design_id", design?.id)
+        .eq("design_id", design.id)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (versionError) {
-        console.error("Failed to fetch overall evaluation:", versionError.message);
+        console.error("[fetchEvaluations] Failed to fetch overall evaluation:", versionError.message);
+        return;
+      }
+      if (!versionData) {
+        console.warn("[fetchEvaluations] No version data found for design:", design.id);
+        setFrameEvaluations([]);
         return;
       }
 
-      let overall: FrameEvaluation | null = null;
-      if (versionData) {
-        let aiData = versionData.ai_data;
-        if (typeof aiData === "string") {
-          try {
-            aiData = JSON.parse(aiData);
-          } catch (e) {
-            aiData = {};
-          }
+      console.log("[fetchEvaluations] Latest version data:", versionData);
+
+      // 2. Parse AI data for the overall frame
+      let aiData = versionData.ai_data;
+      if (typeof aiData === "string") {
+        try {
+          aiData = JSON.parse(aiData);
+        } catch (e) {
+          console.error("[fetchEvaluations] Failed to parse ai_data:", e, versionData.ai_data);
+          aiData = {};
         }
-        overall = {
-          id: "overallFrame",
-          design_id: versionData.design_id,
-          version_id: versionData.id,
-          file_key: versionData.file_key,
-          node_id: versionData.node_id,
-          thumbnail_url: versionData.thumbnail_url,
-          owner_id: versionData.created_by,
-          ai_summary: versionData.ai_summary,
-          ai_data: aiData,
-          snapshot: versionData.snapshot,
-          created_at: versionData.created_at,
-          updated_at: versionData.updated_at,
-          total_score: versionData.total_score,
-        };
       }
+
+      const overall: FrameEvaluation = {
+        id: "overallFrame",
+        design_id: versionData.design_id,
+        version_id: versionData.id,
+        file_key: versionData.file_key,
+        node_id: versionData.node_id,
+        thumbnail_url: versionData.thumbnail_url,
+        owner_id: versionData.created_by,
+        ai_summary: versionData.ai_summary,
+        ai_data: aiData,
+        snapshot: versionData.snapshot,
+        created_at: versionData.created_at,
+        updated_at: versionData.updated_at,
+        total_score: versionData.total_score,
+      };
+
+      // 3. Fetch all frames for this version
+      console.log("[fetchEvaluations] Fetching frames for version_id:", versionData.id);
 
       const { data: frameData, error: frameError } = await supabase
         .from("design_frame_evaluations")
@@ -1030,26 +1142,31 @@ export default function DesignDetailPage({
         id, design_id, version_id, file_key, node_id, thumbnail_url, owner_id,
         ai_summary, ai_data, snapshot, created_at, updated_at
       `)
-        .eq("design_id", design?.id)
-        .order("created_at", { ascending: false });
+        .eq("design_id", design.id)
+        .eq("version_id", versionData.id)
+        .order("created_at", { ascending: true });
 
       if (frameError) {
-        console.error("Failed to fetch frame evaluations:", frameError.message);
+        console.error("[fetchEvaluations] Failed to fetch frame evaluations:", frameError.message);
+        setFrameEvaluations([overall]);
         return;
       }
+
+      console.log("[fetchEvaluations] Frame data for version:", frameData);
 
       const frames = (frameData || []).map((frame: any) => ({
         ...frame,
         ai_data: typeof frame.ai_data === "string" ? JSON.parse(frame.ai_data) : frame.ai_data,
       }));
 
-      const combined = overall ? [overall, ...frames] : frames;
+      // 4. Combine overall and frames
+      const combined = [overall, ...frames];
       setFrameEvaluations(combined);
+      console.log("[fetchEvaluations] Combined frame evaluations set:", combined);
     }
 
     fetchEvaluations();
   }, [design?.id]);
-
   useEffect(() => {
     if (frameEvaluations[selectedFrameIndex]) {
       setEvalResult(mapFrameToEvalResponse(frameEvaluations[selectedFrameIndex], selectedFrameIndex));
@@ -1181,7 +1298,6 @@ export default function DesignDetailPage({
     } else {
       document.body.style.overflow = "";
     }
-    // Clean up in case the component unmounts while modal is open
     return () => {
       document.body.style.overflow = "";
     };
@@ -1221,7 +1337,6 @@ export default function DesignDetailPage({
       if (!isNaN(num) && num > 0 && num < sortedFrameEvaluations.length) {
         setSelectedFrameIndex(num);
       } else {
-        // Fallback: find by text match
         const idx = sortedFrameEvaluations.findIndex(
           (frame, i) =>
             i > 0 &&
@@ -1273,12 +1388,12 @@ export default function DesignDetailPage({
       fetchComments();
     }
   }, [design?.id, fetchComments]);
-  
-  useEffect(() => {
-    if (sidebarTab === "comments" && design?.id) {
-      fetchComments();
-    }
-  }, [sidebarTab, design?.id, fetchComments]);
+
+  // useEffect(() => {
+  //   if (sidebarTab === "comments" && design?.id) {
+  //     fetchComments();
+  //   }
+  // }, [sidebarTab, design?.id, fetchComments]);
 
   useEffect(() => {
     if (!design?.id) {
@@ -1303,61 +1418,40 @@ export default function DesignDetailPage({
 
           if (payload.eventType === 'INSERT') {
             console.log("[Realtime] INSERT event for comment id:", payload.new.id);
-            const newComment = await fetchCommentWithProfile(payload.new.id);
-            console.log("[Realtime] Fetched new comment with profile:", newComment);
-            if (!newComment) {
-              console.warn("[Realtime] New comment fetch failed or returned null.");
-              return;
+
+            let newComment = null;
+            for (let i = 0; i < 5; i++) {
+              newComment = await fetchCommentWithProfile(payload.new.id);
+              if (newComment) break;
+              await new Promise(res => setTimeout(res, 250));
             }
 
-            setComments(prev => {
-              console.log("[Realtime] Previous comments before INSERT:", prev);
-              if (!newComment.parentId) {
-                const result = [newComment, ...prev];
-                console.log("[Realtime] New root comment array after INSERT:", result);
-                return result;
-              }
-              function addReply(comments) {
-                return comments.map(comment => {
-                  if (comment.id === newComment.parentId) {
-                    const updated = {
-                      ...comment,
-                      replies: [newComment, ...(comment.replies || [])],
-                    };
-                    console.log("[Realtime] Added reply to comment id:", comment.id, updated);
-                    return updated;
-                  }
-                  return {
-                    ...comment,
-                    replies: comment.replies ? addReply(comment.replies) : [],
-                  };
-                });
-              }
-              const result = addReply(prev);
-              console.log("[Realtime] Comments after adding reply:", result);
-              return result;
-            });
+            console.log("[Realtime] Fetched new comment with profile (after retry):", newComment);
+            if (!newComment) {
+              console.warn("[Realtime] New comment fetch failed or returned null after retries.");
+              return;
+            }
+            fetchComments();
           }
 
           else if (payload.eventType === 'UPDATE') {
             console.log("[Realtime] UPDATE event for comment id:", payload.new.id);
+
+            // Fetch the updated comment with profile info
+            let updatedComment = null;
+            for (let i = 0; i < 5; i++) {
+              updatedComment = await fetchCommentWithProfile(payload.new.id);
+              if (updatedComment) break;
+              await new Promise(res => setTimeout(res, 250));
+            }
+
+            if (!updatedComment) {
+              console.warn("[Realtime] Updated comment fetch failed or returned null after retries.");
+              return;
+            }
+
             setComments(prev => {
-              const updated = updateCommentTree(prev, {
-                id: payload.new.id,
-                text: payload.new.text,
-                user: {
-                  id: payload.new.user_id,
-                  fullName: "",
-                  avatarUrl: "",
-                },
-                replies: [],
-                parentId: payload.new.parent_id,
-                createdAt: new Date(payload.new.created_at),
-                updatedAt: payload.new.updated_at ? new Date(payload.new.updated_at) : undefined,
-                localTime: payload.new.local_time,
-                design_id: payload.new.design_id,
-                is_read: payload.new.is_read,
-              });
+              const updated = updateCommentTree(prev, updatedComment);
               console.log("[Realtime] Comments after UPDATE:", updated);
               return updated;
             });
@@ -1374,15 +1468,14 @@ export default function DesignDetailPage({
         }
       )
       .subscribe();
-
+    console.log("[Realtime] Setting up subscription for design:", design.id);
     return () => {
       console.log("[Realtime] Cleaning up subscription for design:", design.id);
       supabase.removeChannel(channel);
     };
-  }, [design?.id, deleteCommentTree, updateCommentTree]);
+  }, [design?.id, deleteCommentTree, updateCommentTree, fetchComments]);
 
   useEffect(() => {
-    // If the comment being edited or replied to is no longer present, reset state
     if (editingId && !comments.some(c => c.id === editingId)) {
       setEditingId(null);
     }
@@ -1398,6 +1491,7 @@ export default function DesignDetailPage({
       setReplyingToId(null);
     }
   }, [sidebarTab]);
+
 
   if (designLoading)
     return (
@@ -1569,7 +1663,7 @@ export default function DesignDetailPage({
                   )}
                 </div>
 
-                <div className="mt-auto pt-4">
+                {/* <div className="mt-auto pt-4">
                   <button
                     onClick={handleEvaluate}
                     disabled={loadingEval}
@@ -1577,6 +1671,21 @@ export default function DesignDetailPage({
                   >
                     {loadingEval ? "Evaluating..." : "Re-Evaluate"}
                   </button>
+                </div> */}
+                <div className="mt-auto pt-4">
+                  <button
+                    onClick={handleOpenEvalParams}
+                    disabled={loadingEval}
+                    className="w-full px-4 py-2 text-sm rounded-md bg-[#ED5E20] text-white hover:bg-orange-600 disabled:opacity-50 cursor-pointer"
+                  >
+                    {loadingEval ? "Evaluating..." : "Re-Evaluate"}
+                  </button>
+                  <EvaluationParamsModal
+                    open={showEvalParams}
+                    onClose={() => setShowEvalParams(false)}
+                    onSubmit={handleEvalParamsSubmit}
+                    initialParams={pendingParams || {}}
+                  />
                 </div>
               </>
             )}
@@ -1588,7 +1697,7 @@ export default function DesignDetailPage({
                   setNewCommentText={setNewCommentText}
                   currentUserId={currentUserId}
                   handleAddComment={handleAddComment}
-                  // handleAddReply={handleAddReply}
+                  handleAddReply={handleAddReply}
                   editingId={editingId}
                   setEditingId={setEditingId}
                   replyingToId={replyingToId}
@@ -1633,6 +1742,7 @@ export default function DesignDetailPage({
           setVersionChanged={setVersionChanged}
           setEvalResult={setEvalResult}
           setShowEval={setShowEval}
+          setFrameEvaluations={setFrameEvaluations}
         />
       )}
     </div>

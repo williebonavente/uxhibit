@@ -1,5 +1,5 @@
 // DesignCard.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useOnScreen } from "./countViews/view-counter";
 import { createClient } from "@/utils/supabase/client";
 import Image from "next/image";
@@ -46,6 +46,28 @@ export function DesignCard({
     fetchUsersWithDesigns: () => void;
 }) {
     const [hasViewed, setHasViewed] = useState(false);
+    const [commentCount, setCommentCount] = useState<number>(0);
+
+    useEffect(() => {
+        const fetchCommentCount = async () => {
+            const supabase = createClient();
+            const { count, error } = await supabase
+                .from("comments") 
+                .select("*", { count: "exact", head: true })
+                .eq("design_id", design.design_id)
+                .neq("user_id", user.user_id);
+
+            if (error) {
+                console.error(
+                    "[CommentCounter] Error fetching comment count:",
+                    { error, design_id: design.design_id, user_id: user.user_id }
+                );
+            } else {
+                setCommentCount(count || 0);
+            }
+        };
+        fetchCommentCount();
+    }, [design.design_id, user.user_id]);
 
     // Use Intersection Observer to increment views when card is visible
     const viewRef = useOnScreen(async () => {
@@ -139,16 +161,14 @@ export function DesignCard({
                                 className="flex items-center p-2 rounded-full transition"
                                 title="Comment on this design"
                                 aria-label="Comment"
-                                // onClick={() => {
-                                //     toast.error("Error");
-                                // }}
+                            // Optionally, add onClick to open a comment/reply modal
+                            // onClick={handleOpenComments}
                             >
                                 <MessageSquare size={19} />
                             </span>
                             <span className="text-xs text-gray-500 font-semibold">
-                                {/* TODO: Comment counter here */}
-                                1
-                                </span>
+                                {commentCount}
+                            </span>
                         </span>
                         {/* Views */}
                         <span className="flex items-center gap-2 ml-1">

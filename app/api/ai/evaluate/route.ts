@@ -37,35 +37,53 @@ async function critiqueWithMistral(
     const prompt = `You are a senior UI/UX reviewer. Critique the provided UI screenshot with concrete, actionable feedback.
     Be specific about issues such as contrast, spacing, alignment, tap targets, font sizes, and colors.
     Identify the main color palette and any unique visual identity elements.
-    
+
     Context:
     - heuristics: ${JSON.stringify(heuristics)}
     ${snapshot ? `- persona: ${JSON.stringify(snapshot)}` : ""}
-    
     Return ONLY valid JSON in the following format:
     {
-        "overall_score": number (0-100),
-        "summary": string, 
-        "strengths": string[],
-        "weaknesses": string[],
-        "issues": [
-            { "id": string, "severity": "low|medium|high", "message": string, "suggestion": string }
-        ],
-        "category_scores": {
-            "accessibility": number,
-            "typography": number,
-            "color": number,
-            "layout": number,
-            "hierarchy": number,
-            "usability": number
-            }
+    "overall_score": number (0-100),
+    "summary": string, 
+    "strengths": string[],
+    "weaknesses": string[],
+    "issues": [
+        { 
+          "id": string, 
+          "heuristic": string (e.g. "01" for Visibility of System Status, "02" for Match Between System and the Real World, ... "10" for Help and Documentation),
+          "severity": "low|medium|high", 
+          "message": string, // This must clearly explain why the heuristic is violated in this UI/frame 
+          "suggestion": string 
         }
+    ],
+    "category_scores": {
+        "accessibility": number,
+        "typography": number,
+        "color": number,
+        "layout": number,
+        "hierarchy": number,
+        "usability": number
+        }
+    }
         Rules:
         - Output valid JSON only, no extra commentary.
+        - For each issue, always include the "heuristic" field as a two-digit string ("01"-"10") matching Jakob Nielsen's 10 Usability Heuristics.
+        - For each issue, the "message" field must clearly explain why this heuristic is violated in this specific UI/frame.
         - Be specific and actionable in your feedback.
         - In the "summary", explicitly mention how the design meets or misses expectations of the persona/demographics (e.g., Gen Z prefers vibrant colors, developers need clear dashboards).
         - If a category does not apply, set its score to 0.
-    `;
+        - For each issue, the "heuristic" field must match one of the following:
+        "01" - Visibility of System Status
+        "02" - Match Between System and the Real World
+        "03" - User Control and Freedom
+        "04" - Consistency and Standards
+        "05" - Error Prevention
+        "06" - Recognition Rather than Recall
+        "07" - Flexibility and Efficiency of Use
+        "08" - Aesthetic and Minimalist Design
+        "09" - Help Users Recognize, Diagnose, and Recover from Errors
+        "10" - Help and Documentation
+`;
 
 
     try {
@@ -126,7 +144,7 @@ async function critiqueWithMistral(
 }
 
 export async function POST(req: Request) {
-    const { url, designId, nodeId, thumbnailUrl, snapshot } = await req.json();
+    const { url, designId, nodeId, thumbnailUrl, fallbackImageUrl, snapshot } = await req.json();
 
     if (!url) {
         return NextResponse.json({ error: "Missing Figma URL" }, { status: 400 });
@@ -252,12 +270,11 @@ export async function POST(req: Request) {
     try {
         const nextVersion = await getNextVersion(supabase, designId);
         console.error("Next version for design_versions:", nextVersion);
-
         const upsertPayload = {
             design_id: designId,
             file_key: fileKey,
             node_id: nodeId,
-            thumbnail_url: thumbnailUrl,
+            thumbnail_url: thumbnailUrl || fallbackImageUrl,
             ai_summary: summary,
             ai_data: frameResults,
             total_score,
@@ -272,13 +289,56 @@ export async function POST(req: Request) {
             version: nextVersion,
             created_by: user.id
         };
-        console.error("Upsert payload for design_versions:", upsertPayload);
-
         const { error, data } = await supabase.from("design_versions")
-        .upsert(upsertPayload)
-        .select();
+            // .upsert(upsertPayload)
+            .insert(upsertPayload)
+            .select();
         console.error("Upsert response - error:", error, "data:", data);
 
+        const { data: versionRows, error: versionError } = await supabase
+            .from("design_versions")
+            .select("id")
+            .eq("design_id", designId)
+            .eq("version", nextVersion)
+            .maybeSingle();
+
+        if (versionError || !versionRows) {
+            console.error("Failed to fetch new version id:", versionError);
+        } else {
+            const versionId = versionRows.id;
+            console.log("Inserting frames for version_id:", versionId);
+            for (const frame of frameResults) {
+                const { error: frameError, data: frameData } = await supabase
+                    .from("design_frame_evaluations")
+                    .insert({
+                        design_id: designId,
+                        version_id: versionId,
+                        file_key: fileKey,
+                        node_id: frame.node_id,
+                        thumbnail_url: frame.thumbnail_url,
+                        ai_summary: frame.ai?.summary || null,
+                        ai_data: frame.ai,
+                        ai_error: frame.ai_error,
+                        created_at: new Date().toISOString(),
+                        snapshot: (() => {
+                            if (!snapshot) return null;
+                            if (typeof snapshot === "string") {
+                                try { return JSON.parse(snapshot); } catch { return null; }
+                            }
+                            return snapshot;
+                        })(),
+                        owner_id: user.id
+                    });
+                if (frameError) {
+                    console.error("Error inserting frame evaluation:", frameError);
+                } else {
+                    console.log(
+                        `Inserted frame evaluation for node_id: ${frame.node_id} with version_id: ${versionId}`,
+                        frameData
+                    );
+                }
+            }
+        }
         if (error) {
             console.error("Supabase upsert error (design_versions):", error);
         } else {
@@ -287,6 +347,7 @@ export async function POST(req: Request) {
     } catch (err) {
         console.error("Error in Supabase save (aggregate):", err);
     }
+    console.log("Received snapshot:", snapshot);
 
     return NextResponse.json({
         results: frameResults,

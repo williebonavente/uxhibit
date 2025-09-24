@@ -30,11 +30,24 @@ export async function updateSession(request: NextRequest) {
   );
 
   const PUBLIC_PATHS = [
-    "/", "/login", "/signup", "/forgot-password", "/reset-password",
-    "/api/check_email", "/auth/processing"
+    "/",
+    "/login",
+    "/signup",
+    "/reset-password",
+    "/api/check_email",
+    "/auth/forgot-password",
+    "/auth/email-sent",
+    "/auth/testing_pass",
+    "/auth/processing",
+    // "/auth/callback",
   ];
+
   const PUBLIC_PREFIXES = [
-    "/_next", "/images", "/api/auth", "/auth", "/api" 
+    "/_next",
+    "/images",
+    "/api/auth",
+    "/auth",
+    "/api"
   ];
 
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   AreaChart,
   Area,
@@ -13,19 +13,60 @@ import { generateUsabilityTrendReport } from "@/lib/trendPdfGenerator";
 // import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { IconLoader2, IconDownload } from "@tabler/icons-react";
+import { createClient } from "@/utils/supabase/client";
 
 export default function UsabilityScoreTrendPage() {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [trendData, setTrendData] = useState<
+    { version: string; score: number; label: string }[]
+  >([]);
 
-  // Sample data for the usability score trend
-  const trendData = [
-    { version: "Q1", score: 1.2, label: "01" },
-    { version: "Q2", score: 7.8, label: "02" },
-    { version: "Q3", score: 6.1, label: "03" },
-    { version: "Q4", score: 8.7, label: "04" },
-    { version: "Q5", score: 9.4, label: "05" },
-  ];
+  // // Sample data for the usability score trend
+  // const trendData = [
+  //   { version: "Q1", score: 1.2, label: "01" },
+  //   { version: "Q2", score: 7.8, label: "02" },
+  //   { version: "Q3", score: 6.1, label: "03" },
+  //   { version: "Q4", score: 8.7, label: "04" },
+  //   { version: "Q5", score: 9.4, label: "05" },
+  // ];
 
+  useEffect(() => {
+    const fetchTrendData = async () => {
+      const supabase = createClient();
+
+      // 1. Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        toast.error("User not logged in");
+        return;
+      }
+      const currentUserId = user.id;
+
+      // 2. Fetch all versions for the user's designs (or a selected design)
+      // You may want to filter by a specific design_id if needed
+      const { data, error } = await supabase
+        .from("design_versions")
+        .select("version, total_score, created_at")
+        .eq("created_by", currentUserId)
+        .order("created_at", { ascending: true });
+
+      if (error) {
+        toast.error("Error fetching trend data");
+        return;
+      }
+
+      // 3. Map to chart data format
+      const mapped = (data || []).map((row: any, idx: number) => ({
+        version: `V${row.version ?? idx + 1}`,
+        score: row.total_score ?? 0,
+        label: (idx + 1).toString().padStart(2, "0"),
+      }));
+
+      setTrendData(mapped);
+    };
+
+    fetchTrendData();
+  }, []);
   const handleExportReport = async () => {
     setIsGeneratingPDF(true);
     try {
@@ -59,11 +100,10 @@ export default function UsabilityScoreTrendPage() {
         <button
           onClick={handleExportReport}
           disabled={isGeneratingPDF}
-          className={`w-full sm:w-auto px-6 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors font-['Poppins'] font-medium mt-4 sm:mt-0 sm:ml-6 cursor-pointer ${
-            isGeneratingPDF
+          className={`w-full sm:w-auto px-6 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors font-['Poppins'] font-medium mt-4 sm:mt-0 sm:ml-6 cursor-pointer ${isGeneratingPDF
               ? "bg-gray-400 cursor-not-allowed"
               : "bg-[#ED5E20] hover:bg-[#d44e0f]"
-          } text-white`}
+            } text-white`}
         >
           <span>
             {isGeneratingPDF ? (
