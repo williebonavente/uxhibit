@@ -143,10 +143,18 @@ export default function LoginForm() {
     }
   }
 
+  const whiteCursor: React.CSSProperties = {
+    cursor:
+      "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' stroke='%23ffffff' fill='none' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 3l7 17 2-7 7-2-16-8Z'/></svg>\") 2 2, pointer",
+  };
+
   return (
     <>
       {/* Page Container with background video */}
-      <div className="relative min-h-screen flex items-center justify-center w-full overflow-hidden p-5">
+      <div 
+        style={whiteCursor}
+        className="relative min-h-screen flex items-center justify-center w-full overflow-hidden p-5"
+      >
         {/* Fullscreen Video Background */}
         <video
           autoPlay
@@ -178,7 +186,7 @@ export default function LoginForm() {
           </div>
 
           {/* Subtitle */}
-          <p className="text-sm sm:text-base md:text-lg text-center mb-10 text-gray-500 dark:text-[#F5F5F5]/70">
+          <p className="text-sm sm:text-base md:text-lg text-center mb-10 text-white dark:text-[#F5F5F5]/70">
             Welcome Back, Please Log In to Continue
           </p>
 
@@ -197,7 +205,7 @@ export default function LoginForm() {
                         placeholder="Email"
                         type="email"
                         autoComplete="email"
-                        className="w-full h-11 sm:h-12 text-sm sm:text-base mb-2 border-white/20 text-accent"
+                        className="w-full h-11 sm:h-12 text-sm sm:text-base mb-2 border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
                         {...field}
                       />
                     </FormControl>
@@ -217,7 +225,7 @@ export default function LoginForm() {
                         id="password"
                         placeholder="Password"
                         autoComplete="current-password"
-                        className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-accent"
+                        className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
                         {...field}
                       />
                     </FormControl>
@@ -318,7 +326,7 @@ export default function LoginForm() {
           </Button>
 
           {/* Links: Sign Up + Forgot Password */}
-          <div className="mt-8 text-center text-xs sm:text-sm text-gray-500 dark:text-[#F5F5F5]/40">
+          <div className="mt-8 text-center text-xs sm:text-sm text-white font-light">
             Don&apos;t have an account?{" "}
             <Link
               href="/auth/signup"
@@ -329,7 +337,7 @@ export default function LoginForm() {
             <div className="mt-2">
               <Link
                 href="/auth/forgot-password"
-                className="text-gray-500 dark:text-[#F5F5F5]/40 hover:text-[#ED5E20] transition-colors duration-200 hover:underline"
+                className="text-white hover:text-[#ED5E20] transition-colors duration-200"
               >
                 Forgot Password
               </Link>

@@ -63,7 +63,7 @@ export function UpdatePasswordForm() {
           <h2 className="text-2xl sm:text-3xl font-bold text-center text-[#ED5E20] mb-4">
             Password Changed
           </h2>
-          <p className="mb-2 text-sm sm:text-base md:text-lg text-gray-500 dark:text-[#F5F5F5]/70">
+          <p className="mb-2 text-sm sm:text-base md:text-lg text-white">
             Your password has been updated successfully. You can now log in with your new credentials.
           </p>
           <div className="flex items-center gap-2 text-[#ED5E20] text-sm">
@@ -85,34 +85,36 @@ export function UpdatePasswordForm() {
           <h2 className="text-2xl sm:text-3xl font-bold text-center gradient-text mb-4">
             Set New Password
           </h2>
-          <p className="mb-8 text-sm sm:text-base md:text-lg text-center text-gray-500 dark:text-[#F5F5F5]/70">
+          <p className="mb-8 text-sm sm:text-base md:text-lg text-center text-white">
             Enter your new password below to reset your account.
           </p>
-          <div className="grid gap-2">
-            <PasswordInput
-              id="password"
-              type="password"
-              placeholder="Enter new password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-accent"
-              autoComplete="new-password"
-            />
+          <div className="space-y-2">
+            <div className="grid">
+              <PasswordInput
+                id="password"
+                type="password"
+                placeholder="Enter new password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="grid">
+              <PasswordInput
+                id="confirmPassword"
+                type="password"
+                placeholder="Confirm new password"
+                required
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
+                autoComplete="new-password"
+              />
+            </div>
+            {error && <p className="text-sm text-red-500">{error}</p>}
           </div>
-          <div className="grid gap-2">
-            <PasswordInput
-              id="confirmPassword"
-              type="password"
-              placeholder="Confirm new password"
-              required
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-accent"
-              autoComplete="new-password"
-            />
-          </div>
-          {error && <p className="text-sm text-red-500">{error}</p>}
           <Button
             type="submit"
             disabled={isLoading}

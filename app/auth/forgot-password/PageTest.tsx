@@ -118,7 +118,7 @@ export default function ForgotPasswordPage() {
         </h2>
 
         {/* Subtitle */}
-        <p className="mb-8 text-sm sm:text-base md:text-lg text-center text-[#1E1E1E]/70 dark:text-[#F5F5F5]/70">
+        <p className="mb-8 text-sm sm:text-base md:text-lg text-center text-white">
           Enter your email to get a reset link.
         </p>
 

@@ -763,7 +763,7 @@ function DesignListRow({
 
   return (
     <div
-      className="relative group flex items-start gap-4 bg-accent dark:bg-[#1A1A1A] rounded-xl p-2 hover:bg-accent/80 transition cursor-pointer"
+      className="relative group flex items-start gap-4 bg-white dark:bg-[#1A1A1A] rounded-xl p-2 transition cursor-pointer shadow-md"
       onClick={() => !isEditing && (window.location.href = `/designs/${design.id}`)}
     >
       {/* Thumbnail */}
@@ -772,7 +772,7 @@ function DesignListRow({
           src={design.thumbnail_url || "/images/placeholder.png"}
           alt={design.title || "Design Preview"}
           fill
-          className="object-cover dark:bg-accent"
+          className="object-cover bg-accent/10 dark:bg-accent"
           onError={async () => {
             if (design.thumbnail_storage_path && !design.thumbnail_storage_path.startsWith("http")) {
               const newUrl = await resolveThumbnail(design.thumbnail_storage_path);

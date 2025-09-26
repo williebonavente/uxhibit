@@ -12,8 +12,16 @@ export default function TermsPage() {
     router.push("/auth/signup");
   };
 
+  const whiteCursor: React.CSSProperties = {
+    cursor:
+      "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' stroke='%23ffffff' fill='none' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 3l7 17 2-7 7-2-16-8Z'/></svg>\") 2 2, pointer",
+  };
+
   return (
-    <div className="relative min-h-screen flex items-center justify-center w-full overflow-hidden p-5">
+    <div 
+      style={whiteCursor}
+      className="relative min-h-screen flex items-center justify-center w-full overflow-hidden p-5"
+    >
       {/* Background video */}
       <video
         autoPlay
@@ -43,8 +51,8 @@ export default function TermsPage() {
         </h2>
 
         {/* Scrollable Terms Section */}
-        <div className="text-sm sm:text-base text-gray-500 dark:text-[#F5F5F5]/70 mb-6 space-y-6 max-h-[400px] overflow-y-auto leading-relaxed mt-10">
-          {/* Agreement to Our Legal Terms */}        
+        <div className="text-sm sm:text-base text-white dark:text-[#F5F5F5]/70 mb-6 space-y-6 max-h-[400px] overflow-y-auto leading-relaxed mt-10">
+          {/* Agreement to Our Legal Terms */}
           <section>
             <h3 className="font-semibold text-lg mb-5">Agreement to Our Legal Terms</h3>
             <div className="pl-7 space-y-1">
@@ -66,7 +74,7 @@ export default function TermsPage() {
               We recommend that you print a copy of these Legal Terms for your records.
             </div>
           </section>
-          
+
           {/* Table of Contents */}
           <section>
             <h3 className="font-semibold text-lg mb-2">Table of Contents</h3>
@@ -103,7 +111,7 @@ export default function TermsPage() {
           <section>
             <h3 className="font-semibold text-lg mb-2">1. Our Services</h3>
             <div className="pl-7 space-y-1">
-              The information provided when using the Services is not intended for distribution 
+              The information provided when using the Services is not intended for distribution
               to any person or entity where such distribution would be contrary to law.
             </div>
           </section>
@@ -123,7 +131,7 @@ export default function TermsPage() {
 
               <strong className="text-base">Your Use of Our Services</strong>
               <br /><br />
-              Subject to your compliance with these Legal Terms, including the <strong>"PROHIBITED ACTIVITIES"</strong> section below, we grant you a non-exclusive, non-transferable, revocable license to 
+              Subject to your compliance with these Legal Terms, including the <strong>"PROHIBITED ACTIVITIES"</strong> section below, we grant you a non-exclusive, non-transferable, revocable license to
               <ol className="list-disc pl-7 space-y-1">
                 <li>access the Services; and</li>
                 <li>download or print a copy of any portion of the Content to which you have properly gained access, solely for your personal, non-commercial use or internal business purpose.</li>
@@ -137,8 +145,8 @@ export default function TermsPage() {
               <br /><br />
               We reserve all rights not expressly granted to you in and to the Services, Content, and Marks.
               <br /><br />
-              Any breach of these Intellectual Property Rights will constitute a material breach of our Legal Terms and your right to use our Services will terminate immediately. 
-            
+              Any breach of these Intellectual Property Rights will constitute a material breach of our Legal Terms and your right to use our Services will terminate immediately.
+
               <strong className="text-base">Your Submissions and Contributions</strong>
               <br /><br />
               Please review this section and the <strong>"PROHIBITED ACTIVITIES"</strong>section carefully prior to using our Services to understand the (a) rights you give us and (b) obligations you have when you post or upload any content through the Services.
@@ -166,7 +174,7 @@ export default function TermsPage() {
               <br /><br />
               <strong>We may remove or edit your Content: </strong>Although we have no obligation to monitor any Contributions, we shall have the right to remove or edit any Contributions at any time without notice if, in our reasonable opinion, we consider such Contributions harmful or in breach of these Legal Terms. If we remove or edit any such Contributions, we may also suspend or disable your account and report you to the authorities.
 
-             <strong className="text-base">Copyright Infringement</strong>
+              <strong className="text-base">Copyright Infringement</strong>
               <br /><br />
               We respect the intellectual property rights of others. If you believe that any material available on or through the Services infringes upon any copyright you own or control, please immediately refer to the <strong>"COPYRIGHT INFRINGEMENTS"</strong>section below.
               <br /><br />
@@ -225,7 +233,7 @@ export default function TermsPage() {
               </ol>
             </div>
           </section>
-          
+
           {/* User Generated Contributions */}
           <section>
             <h3 className="font-semibold text-lg mb-2">6. User Generated Contributions</h3>
@@ -247,7 +255,7 @@ export default function TermsPage() {
                 <li>Your Contributions do not otherwise violate, or link to material that violates, any provision of these Legal Terms, or any applicable law or regulation.</li>
               </ol>
               <br /><br />
-                Any use of the Services in violation of the foregoing violates these Legal Terms and may result in, among other things, termination or suspension of your rights to use the Services.
+              Any use of the Services in violation of the foregoing violates these Legal Terms and may result in, among other things, termination or suspension of your rights to use the Services.
             </div>
           </section>
 
@@ -255,7 +263,7 @@ export default function TermsPage() {
           <section>
             <h3 className="font-semibold text-lg mb-2">7. Contribution License</h3>
             <div className="pl-7 space-y-1">
-              All content, source code, designs, and trademarks are owned or licensed by us. 
+              All content, source code, designs, and trademarks are owned or licensed by us.
               You may only use the Services for personal, non-commercial purposes.
             </div>
           </section>
@@ -291,7 +299,7 @@ export default function TermsPage() {
               As part of the functionality of the Services, you may link your account with online accounts you have with third-party service providers (each such account, a "Third-Party Account") by either: (1) providing your Third-Party Account login information through the Services; or (2) allowing us to access your Third-Party Account, as is permitted under the applicable terms and conditions that govern your use of each Third-Party Account. You represent and warrant that you are entitled to disclose your Third-Party Account login information to us and/or grant us access to your Third-Party Account, without breach by you of any of the terms and conditions that govern your use of the applicable Third-Party Account, and without obligating us to pay any fees or making us subject to any usage limitations imposed by the third-party service provider of the Third-Party Account. By granting us access to any Third-Party Accounts, you understand that (1) we may access, make available, and store (if applicable) any content that you have provided to and stored in your Third-Party Account (the "Social Network Content") so that it is available on and through the Services via your account, including without limitation any friend lists and (2) we may submit to and receive from your Third-Party Account additional information to the extent you are notified when you link your account with the Third-Party Account. Depending on the Third-Party Accounts you choose and subject to the privacy settings that you have set in such Third-Party Accounts, personally identifiable information that you post to your Third-Party Accounts may be available on and through your account on the Services. Please note that if a Third-Party Account or associated service becomes unavailable or our access to such Third-Party Account is terminated by the third-party service provider, then Social Network Content may no longer be available on and through the Services. You will have the ability to disable the connection between your account on the Services and your Third-Party Accounts at any time. PLEASE NOTE THAT YOUR RELATIONSHIP WITH THE THIRD-PARTY SERVICE PROVIDERS ASSOCIATED WITH YOUR THIRD-PARTY ACCOUNTS IS GOVERNED SOLELY BY YOUR AGREEMENT(S) WITH SUCH THIRD-PARTY SERVICE PROVIDERS. We make no effort to review any Social Network Content for any purpose, including but not limited to, for accuracy, legality, or non-infringement, and we are not responsible for any Social Network Content. You acknowledge and agree that we may access your email address book associated with a Third-Party Account and your contacts list stored on your mobile device or tablet computer solely for purposes of identifying and informing you of those contacts who have also registered to use the Services. You can deactivate the connection between the Services and your Third-Party Account by contacting us using the contact information below or through your account settings (if applicable). We will attempt to delete any information stored on our servers that was obtained through such Third-Party Account, except the username and profile picture that become associated with your account.
             </div>
           </section>
-        
+
           {/* Third-Party Websites and Content */}
           <section>
             <h3 className="font-semibold text-lg mb-2">10. Third-Party Websites and Content</h3>
@@ -343,7 +351,7 @@ export default function TermsPage() {
               We cannot guarantee the Services will be available at all times. We may experience hardware, software, or other problems or need to perform maintenance related to the Services, resulting in interruptions, delays, or errors. We reserve the right to change, revise, update, suspend, discontinue, or otherwise modify the Services at any time or for any reason without notice to you. You agree that we have no liability whatsoever for any loss, damage, or inconvenience caused by your inability to access or use the Services during any downtime or discontinuance of the Services. Nothing in these Legal Terms will be construed to obligate us to maintain and support the Services or to supply any corrections, updates, or releases in connection therewith.
             </div>
           </section>
-          
+
           {/* Governing Law */}
           <section>
             <h3 className="font-semibold text-lg mb-2">16. Governing Law</h3>
@@ -445,53 +453,46 @@ export default function TermsPage() {
           </section>
         </div>
 
-        <div className="flex gap-4">
+        <div className="flex gap-5 mt-6 h-12 w-full">
           {/* Decline Button */}
-          <div className="flex-1">
-            <Button
-              variant="secondary"
-              onClick={() => {
-                localStorage.removeItem("termsAccepted");
-                localStorage.removeItem("registrationDraft");
-                router.push("/auth/signup");
-              }}
-              className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-sm font-medium
-                        border border-neutral-300/70 dark:border-neutral-600/60 
-                        bg-white/60 dark:bg-neutral-800/50
-                        text-neutral-700 dark:text-neutral-200
-                        shadow-sm backdrop-blur
-                        hover:bg-white/80 dark:hover:bg-neutral-800/70
-                        hover:border-neutral-400 dark:hover:border-neutral-500
-                        transition-colors
-                        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ED5E20]/60
-                        focus:ring-offset-white dark:focus:ring- cursor-pointer"
-            >
-              Decline
-            </Button>
-          </div>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              localStorage.removeItem("termsAccepted");
+              localStorage.removeItem("registrationDraft");
+              router.push("/auth/signup");
+            }}
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl text-sm font-medium
+                      border border-neutral-300/70 dark:border-neutral-600/60 cursor-pointer
+                      bg-white/60 dark:bg-neutral-800/50 h-full
+                      text-neutral-700 dark:text-neutral-200
+                      shadow-sm backdrop-blur
+                      hover:bg-white/80 dark:hover:bg-neutral-800/70
+                      hover:border-neutral-400 dark:hover:border-neutral-500
+                      transition-colors
+                      focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ED5E20]/60
+                      focus:ring-offset-white dark:focus:ring-offset-[#1A1A1A]"
+          >
+            Decline
+          </Button>
 
           {/* Accept Button */}
-          <div className="flex-1">
-            <Button
-              type="submit"
-              onClick={handleAccept}
-              className="group relative inline-flex items-center justify-center
-                        w-full h-11 sm:h-12 rounded-xl text-base tracking-wide
-                        transition-all duration-300 cursor-pointer
-                        text-white shadow-[0_4px_18px_-4px_rgba(237,94,32,0.55)]
-                        hover:shadow-[0_6px_26px_-6px_rgba(237,94,32,0.65)]
-                        active:scale-[.97] focus:outline-none
-                        focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40"
-            >
-              <span aria-hidden className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b]" />
-              <span aria-hidden className="absolute inset-[2px] rounded-[10px] bg-[linear-gradient(145deg,rgba(255,255,255,0.28),rgba(255,255,255,0.07))] backdrop-blur-[2px]" />
-              <span aria-hidden className="absolute -left-1 -right-1 top-0 h-full overflow-hidden rounded-xl">
-                <span className="absolute inset-y-0 -left-full w-1/2 bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70" />
-              </span>
-              <span aria-hidden className="absolute inset-0 rounded-xl ring-1 ring-white/30 group-hover:ring-white/50" />
-              <span className="relative z-10">Accept</span>
-            </Button>
-          </div>
+          <Button
+            type="submit"
+            onClick={handleAccept}
+            className="group relative flex-1 inline-flex items-center justify-center
+                      rounded-xl text-sm text-white font-semibold tracking-wide
+                      transition-all duration-300 h-full overflow-hidden
+                      focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40 cursor-pointer"
+          >
+            <span aria-hidden className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b]" />
+            <span aria-hidden className="absolute inset-[2px] rounded-[10px] bg-[linear-gradient(145deg,rgba(255,255,255,0.28),rgba(255,255,255,0.07))] backdrop-blur-[2px]" />
+            <span aria-hidden className="absolute -left-1 -right-1 top-0 h-full overflow-hidden rounded-xl">
+              <span className="absolute inset-y-0 -left-full w-1/2 bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70" />
+            </span>
+            <span aria-hidden className="absolute inset-0 rounded-xl ring-1 ring-white/30 group-hover:ring-white/50" />
+            <span className="relative z-10">Accept</span>
+          </Button>
         </div>
       </div>
     </div>

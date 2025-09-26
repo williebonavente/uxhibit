@@ -108,8 +108,16 @@ export default function RegistrationForm() {
     }
   }
 
+  const whiteCursor: React.CSSProperties = {
+    cursor:
+      "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' stroke='%23ffffff' fill='none' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 3l7 17 2-7 7-2-16-8Z'/></svg>\") 2 2, pointer",
+  };
+
   return (
-    <div className="relative min-h-screen flex items-center justify-center w-full overflow-hidden p-5">
+    <div 
+      style={whiteCursor}
+      className="relative min-h-screen flex items-center justify-center w-full overflow-hidden p-5"
+    >
       <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover">
         <source src="/images/uxhibit-gif-3(webm).webm" type="video/webm" />
       </video>
@@ -129,7 +137,7 @@ export default function RegistrationForm() {
           />
         </div>
 
-        <p className="text-sm sm:text-base md:text-lg text-center mb-8 text-gray-500 dark:text-[#F5F5F5]/70">
+        <p className="text-sm sm:text-base md:text-lg text-center mb-8 text-white dark:text-[#F5F5F5]/70">
           Create your account and start designing with UXhibit
         </p>
 
@@ -145,7 +153,7 @@ export default function RegistrationForm() {
                     <Input
                       id="username"
                       placeholder="Username"
-                      className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-accent"
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
                       {...field}
                     />
                   </FormControl>
@@ -164,7 +172,7 @@ export default function RegistrationForm() {
                     <Input
                       id="full_name"
                       placeholder="Full Name"
-                      className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-accent"
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
                       {...field}
                     />
                   </FormControl>
@@ -184,7 +192,7 @@ export default function RegistrationForm() {
                       id="email"
                       placeholder="Email"
                       type="email"
-                      className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-accent"
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
                       {...field}
                     />
                   </FormControl>
@@ -206,7 +214,7 @@ export default function RegistrationForm() {
                           id="age"
                           placeholder="Age"
                           type="number"
-                          className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-accent"
+                          className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
                           {...field}
                         />
                       </FormControl>
@@ -225,7 +233,7 @@ export default function RegistrationForm() {
                         <Input
                           id="gender"
                           placeholder="Gender"
-                          className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-accent"
+                          className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
                           {...field}
                         />
                       </FormControl>
@@ -247,7 +255,7 @@ export default function RegistrationForm() {
                       id="password"
                       placeholder="Password"
                       type="password"
-                      className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-accent"
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
                       {...field}
                     />
                   </FormControl>
@@ -267,7 +275,7 @@ export default function RegistrationForm() {
                       id="confirmPassword"
                       placeholder="Confirm Password"
                       type="password"
-                      className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-accent"
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
                       {...field}
                     />
                   </FormControl>
@@ -276,7 +284,7 @@ export default function RegistrationForm() {
               )}
             />
 
-            {/* Terms and Conditions Checkbox */} <div className="flex items-center space-x-2 mb-5"> <Checkbox id="terms" checked={termsAccepted} onCheckedChange={handleCheckboxChange} className="cursor-pointer" /> <label htmlFor="terms" className="text-sm text-gray-500 dark:text-[#F5F5F5]/70" > I accept the{" "} <Link href="/auth/terms" onClick={() => { const values = form.getValues(); localStorage.setItem("registrationDraft", JSON.stringify(values)); router.push("/terms"); }} className="text-[#ff7f3f] hover:text-[#ED5E20] transition-colors duration-200 hover:underline font-medium" > Terms and Conditions</Link> </label> </div>
+            {/* Terms and Conditions Checkbox */} <div className="flex items-center space-x-2 mb-5"> <Checkbox id="terms" checked={termsAccepted} onCheckedChange={handleCheckboxChange} className="cursor-pointer" /> <label htmlFor="terms" className="text-sm text-white font-light" > I accept the{" "} <Link href="/auth/terms" onClick={() => { const values = form.getValues(); localStorage.setItem("registrationDraft", JSON.stringify(values)); router.push("/terms"); }} className="text-[#ff7f3f] hover:text-[#ED5E20] transition-colors duration-200 hover:underline font-medium" > Terms and Conditions</Link> </label> </div>
 
             {/* Submit Button */}
             <Button
@@ -300,7 +308,7 @@ export default function RegistrationForm() {
           </form>
         </Form>
 
-        <div className="mt-6 text-center text-xs sm:text-sm text-gray-500 dark:text-[#F5F5F5]/40">
+        <div className="mt-6 text-center text-xs sm:text-sm text-white font-light">
           Already have an account?{" "}
           <Link
             href="/auth/login"

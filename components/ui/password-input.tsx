@@ -16,7 +16,7 @@ export const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputPro
                 />
                 <button
                     type="button"
-                    className={`absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer text-sx ${show ? 'text-accent dark:text-white' : 'border-white/20 text-accent dark:text-gray-500'}`}
+                    className={`absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer text-sx ${show ? 'text-gray-500 dark:text-gray-300' : 'border-white/20 text-gray-500 dark:text-gray-300'}`}
                     onClick={() => setShow((s) => !s)}
                 >
                     {show ? <IconEyeOff size={18} /> : <IconEye size={18} />}

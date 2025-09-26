@@ -32,10 +32,19 @@ export function ForgotPasswordForm() {
             setIsLoading(false);
         }
     };
+
+    const whiteCursor: React.CSSProperties = {
+        cursor:
+            "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' stroke='%23ffffff' fill='none' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 3l7 17 2-7 7-2-16-8Z'/></svg>\") 2 2, pointer",
+    };
+
     return (
-        <div className="relative z-10 flex flex-col w-full max-w-sm sm:max-w-md md:max-w-lg 
+        <div 
+            style={whiteCursor}
+            className="relative z-10 flex flex-col w-full max-w-sm sm:max-w-md md:max-w-lg 
                     p-6 sm:p-8 md:p-10 bg-[#1E1E1E]/40 
-                    backdrop-blur-xl rounded-2xl shadow-xl border border-white/20">
+                    backdrop-blur-xl rounded-2xl shadow-xl border border-white/20"
+            >
             {success ? (
                 <div className="flex flex-col items-center gap-4">
                     {/* Email sent illustration */}
@@ -49,7 +58,7 @@ export function ForgotPasswordForm() {
                     <h2 className="text-2xl sm:text-3xl font-bold text-center text-[#ED5E20] mb-4">
                         Email Sent
                     </h2>
-                    <p className="mb-8 text-sm sm:text-base md:text-lg text-center text-[#1E1E1E]/70 dark:text-[#F5F5F5]/70">
+                    <p className="mb-8 text-sm sm:text-base md:text-lg text-center text-white">
                         We&rsquo;ve sent you a link to reset your password. Please check your email.
                     </p>
                     <Link
@@ -76,7 +85,7 @@ export function ForgotPasswordForm() {
                         Forgot Password
                     </h2>
                     {/* Subtitle */}
-                    <p className="mb-8 text-sm sm:text-base md:text-lg text-center text-gray-500 dark:text-[#F5F5F5]/70">
+                    <p className="mb-8 text-sm sm:text-base md:text-lg text-center text-white">
                         Enter your email to get a reset link.
                     </p>
                     <form onSubmit={handleForgotPassword} className="space-y-5">
@@ -88,7 +97,7 @@ export function ForgotPasswordForm() {
                                 required
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="w-full h-11 sm:h-12 text-sm sm:text-base text-accent border-white/20 text-accent"
+                                className="w-full h-11 sm:h-12 text-sm sm:text-base text-accent border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
                             />
                             {error && <p className="text-sm text-red-500">{error}</p>}
                         </div>
