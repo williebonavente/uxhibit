@@ -146,9 +146,14 @@ async function critiqueWithMistral(
 export async function POST(req: Request) {
     const { url, designId, nodeId, thumbnailUrl, fallbackImageUrl, snapshot } = await req.json();
 
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
     if (!url) {
         return NextResponse.json({ error: "Missing Figma URL" }, { status: 400 });
     }
+
+
 
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
     const parseRes = await fetch(`${baseUrl}/api/figma/parse`, {
@@ -170,6 +175,7 @@ export async function POST(req: Request) {
     const frameImages = parseData.frameImages || {};
     const frameIds = Object.keys(frameImages);
 
+
     if (frameIds.length === 0) {
         return NextResponse.json({
             error: "No frames found in Figma file",
@@ -187,16 +193,61 @@ export async function POST(req: Request) {
         }, { status: 400 });
     }
 
+    const frameSupabaseUrls: Record<string, string> = {};
+
+    // --- Download and upload each frame image to Supabase Storage ---
+    for (const [frameId, figmaUrl] of Object.entries(frameImages) as [string, string][]) {
+        let supabaseUrl: string | null = null;
+        try {
+            console.log(`Server: Downloading image for frame ${frameId} from Figma: ${figmaUrl}`);
+            const imgRes = await fetch(figmaUrl);
+            if (!imgRes.ok) {
+                console.error(`Server: Failed to download image for frame ${frameId}: HTTP ${imgRes.status}`);
+                frameSupabaseUrls[frameId] = figmaUrl;
+                continue;
+            }
+            const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
+            const filePath = `${user?.id}/${designId}/${frameId}.png`;
+            console.log(`Server: Uploading to Supabase Storage at path: ${filePath}`);
+
+            const { data, error } = await supabase.storage
+                .from('figma-frames')
+                .upload(filePath, imgBuffer, {
+                    contentType: 'image/png',
+                    upsert: true,
+                });
+
+            if (error) {
+                console.error(`Server: Supabase upload error for frame ${frameId}:`, error);
+            } else {
+                console.log(`Server: Supabase upload success for frame ${frameId}:`, data);
+                // Generate a signed URL (valid for 1 year)
+                const { data: signedData, error: signedError } = await supabase.storage
+                    .from('figma-frames')
+                    .createSignedUrl(filePath, 60 * 60 * 24 * 365);
+                if (signedError) {
+                    console.error(`Server: Error generating signed URL for frame ${frameId}: `, signedError);
+                } else if (signedData?.signedUrl) {
+                    supabaseUrl = signedData.signedUrl;
+                    console.log(`Server: Signed URL from frame ${frameId}: `, supabaseUrl);
+                }
+            }
+        } catch (err) {
+            console.error(`Server: Error downloading or uploading Figma image for frame ${frameId}:`, err);
+        }
+        // Always set a value for this frameId
+        frameSupabaseUrls[frameId] = supabaseUrl || figmaUrl;
+    }
+
     const heuristics = {};
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
         return NextResponse.json({ error: 'Unauthorized - user not found' }, { status: 401 });
     }
 
     const frameResults = [];
     for (const [index, nodeId] of frameIds.entries()) {
-        const imageUrl = frameImages[nodeId];
+        // TODO: Watchout for this code right??!! 
+        const imageUrl = frameSupabaseUrls[nodeId] || frameImages[nodeId];
         console.log(`Evaluating frame ${index + 1} of ${frameIds.length} (nodeId: ${nodeId})`);
         let ai: AiCritique | null = null;
         let ai_error: string | undefined;
