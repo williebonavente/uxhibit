@@ -25,7 +25,9 @@ import ZoomControls from "./dialogs/ZoomControls";
 import { CommentsSection } from "./comments/page";
 import { Comment } from "@/components/comments-user";
 import EvaluationParamsModal from "@/components/evaluation-params-modal";
-
+import VisitorEngagement from "@/components/visitors/visitor-engagement";
+import DesignChats from "@/components/chat-system/design_chats";
+import DesignHeaderTitle from "@/components/arrow-back-button";
 
 interface FrameEvaluation {
   id: string;
@@ -97,6 +99,7 @@ export type Design = {
   published_version_id?: string;
   published_at?: string;
   figma_link?: string;
+  owner_id: string;
 };
 
 type EvaluateInput = {
@@ -915,11 +918,11 @@ export default function DesignDetailPage({
           published_version_id: publishedData?.published_version_id ?? "",
           published_at: publishedData?.published_at ?? "",
           figma_link: designData.figma_link || "",
+          owner_id: designData.owner_id,
         };
         setDesign(normalized);
         console.log("Design loaded: ", normalized);
         // TODO: HERE FETCHING THE LATEST VERSION HERE
-        // Fetch frames for the latest version
         const latestVersionId = latestVersion?.id;
         console.log("Latest Version Data: ", latestVersion);
         if (latestVersionId) {
@@ -996,81 +999,6 @@ export default function DesignDetailPage({
     loadDesign();
   }, [id]);
 
-  // useEffect(() => {
-  //   if (!design?.id) return;
-  //   const supabase = createClient();
-
-  //   async function fetchEvaluations() {
-  //     const { data: versionData, error: versionError } = await supabase
-  //       .from("design_versions")
-  //       .select(`
-  //       id, design_id, version, file_key, node_id, thumbnail_url, created_by,
-  //       ai_summary, ai_data, snapshot, created_at, updated_at, total_score
-  //     `)
-  //       .eq("design_id", design?.id)
-  //       .order("created_at", { ascending: false })
-  //       .limit(1)
-  //       .maybeSingle();
-
-  //     if (versionError) {
-  //       console.error("Failed to fetch overall evaluation:", versionError.message);
-  //       return;
-  //     }
-
-  //     let overall: FrameEvaluation | null = null;
-  //     if (versionData) {
-  //       let aiData = versionData.ai_data;
-  //       if (typeof aiData === "string") {
-  //         try {
-  //           aiData = JSON.parse(aiData);
-  //         } catch (e) {
-  //           aiData = {};
-  //         }
-  //       }
-  //       overall = {
-  //         id: "overallFrame",
-  //         design_id: versionData.design_id,
-  //         version_id: versionData.id,
-  //         file_key: versionData.file_key,
-  //         node_id: versionData.node_id,
-  //         thumbnail_url: versionData.thumbnail_url,
-  //         owner_id: versionData.created_by,
-  //         ai_summary: versionData.ai_summary,
-  //         ai_data: aiData,
-  //         snapshot: versionData.snapshot,
-  //         created_at: versionData.created_at,
-  //         updated_at: versionData.updated_at,
-  //         total_score: versionData.total_score,
-  //       };
-  //     }
-  //     // TODO: DOUBLE CHECK THE FOLLOWING THING AGAIN AND AGAIN AND AGAIN
-  //     const { data: frameData, error: frameError } = await supabase
-  //       .from("design_frame_evaluations")
-  //       .select(`
-  //       id, design_id, version_id, file_key, node_id, thumbnail_url, owner_id,
-  //       ai_summary, ai_data, snapshot, created_at, updated_at
-  //     `)
-  //       .eq("design_id", design?.id)
-  //       // TODO: 
-  //       .eq("version_id", selectedVersion?.id)
-  //       .order("created_at", { ascending: false });
-
-  //     if (frameError) {
-  //       console.error("Failed to fetch frame evaluations:", frameError.message);
-  //       return;
-  //     }
-
-  //     const frames = (frameData || []).map((frame: any) => ({
-  //       ...frame,
-  //       ai_data: typeof frame.ai_data === "string" ? JSON.parse(frame.ai_data) : frame.ai_data,
-  //     }));
-
-  //     const combined = overall ? [overall, ...frames] : frames;
-  //     setFrameEvaluations(combined);
-  //   }
-
-  //   fetchEvaluations();
-  // }, [design?.id]);
 
   useEffect(() => {
     if (!design?.id) {
@@ -1080,7 +1008,7 @@ export default function DesignDetailPage({
     const supabase = createClient();
 
     async function fetchEvaluations() {
-      console.log("[fetchEvaluations] Fetching latest version for design:", design.id);
+      console.log("[fetchEvaluations] Fetching latest version for design:", design?.id);
 
       // 1. Fetch the latest version for this design
       const { data: versionData, error: versionError } = await supabase
@@ -1089,7 +1017,7 @@ export default function DesignDetailPage({
         id, design_id, version, file_key, node_id, thumbnail_url, created_by,
         ai_summary, ai_data, snapshot, created_at, updated_at, total_score
       `)
-        .eq("design_id", design.id)
+        .eq("design_id", design?.id)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -1099,7 +1027,7 @@ export default function DesignDetailPage({
         return;
       }
       if (!versionData) {
-        console.warn("[fetchEvaluations] No version data found for design:", design.id);
+        console.warn("[fetchEvaluations] No version data found for design:", design?.id);
         setFrameEvaluations([]);
         return;
       }
@@ -1142,7 +1070,7 @@ export default function DesignDetailPage({
         id, design_id, version_id, file_key, node_id, thumbnail_url, owner_id,
         ai_summary, ai_data, snapshot, created_at, updated_at
       `)
-        .eq("design_id", design.id)
+        .eq("design_id", design?.id)
         .eq("version_id", versionData.id)
         .order("created_at", { ascending: true });
 
@@ -1377,7 +1305,7 @@ export default function DesignDetailPage({
       document.removeEventListener("mousemove", handlePanMove);
       document.removeEventListener("mouseup", handlePanEnd);
     };
-  }, [isPanning]);
+  }, [isPanning, handlePanMove]);
 
   useEffect(() => {
     if (zoom === 1) setPan({ x: 0, y: 0 });
@@ -1505,7 +1433,7 @@ export default function DesignDetailPage({
           priority
         />
         <p className="text-gray-500 text-sm mb-4">
-          Loading your designs...
+          Loading designs...
         </p>
       </div>
     );
@@ -1516,31 +1444,50 @@ export default function DesignDetailPage({
         <p>Design not found.</p>
       </div>
     );
+  // Validate the logic later 
+  const isOwner = currentUserId && design?.id && currentUserId === design?.owner_id;
+
   return (
     <div>
       <div className="mb-2">
-        <DesignHeaderActions
-          handleShowVersions={handleShowVersions}
-          handleOpenComments={handleOpenComments}
-          showComments={showComments}
-          setShowComments={setShowComments}
-          comments={comments}
-          loadingComments={loadingComments}
-          showSearch={showSearch}
-          setShowSearch={setShowSearch}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          showSortOptions={showSortOptions}
-          setShowSortOptions={setShowSortOptions}
-          sortOrder={sortOrder}
-          setSortOrder={setSortOrder}
-          sortRef={sortRef}
-          design={design}
-          selectedVersion={selectedVersion}
-          publishProject={publishProject}
-          unpublishProject={unpublishProject}
-          syncPublishedState={syncPublishedState}
-        />
+        <div className="flex gap-2 items-center justify-between w-full">
+          <DesignHeaderTitle
+            title={design.project_name}
+            version={selectedVersion?.version?.toString() ?? ""}
+            showVersion={!!selectedVersion}
+            currentVersionId={design.current_version_id}
+            selectedVersionId={selectedVersion?.id ?? null}
+          />
+          {isOwner && (
+            <DesignHeaderActions
+              handleShowVersions={handleShowVersions}
+              handleOpenComments={handleOpenComments}
+              showComments={showComments}
+              setShowComments={setShowComments}
+              comments={comments}
+              loadingComments={loadingComments}
+              showSearch={showSearch}
+              setShowSearch={setShowSearch}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              showSortOptions={showSortOptions}
+              setShowSortOptions={setShowSortOptions}
+              sortOrder={sortOrder}
+              setSortOrder={setSortOrder}
+              sortRef={sortRef}
+              design={design}
+              selectedVersion={selectedVersion}
+              publishProject={publishProject}
+              unpublishProject={unpublishProject}
+              syncPublishedState={syncPublishedState}
+            />
+          )}
+
+        </div>
+      </div>
+      <div className="mt-8">
+        {/* TODO: Ongoing  */}
+        {/* <DesignChats designId={design.id} currentUserId={currentUserId} /> */}
       </div>
       <div className="flex h-screen">
         <div className="flex-2 h-full border rounded-md bg-accent overflow-y-auto flex items-center justify-center relative">
@@ -1592,6 +1539,7 @@ export default function DesignDetailPage({
             onMouseDown={handlePanStart}
           />
         </div>
+        {/* {!isOwner && <VisitorEngagement designId={design.id} />} */}
         <div>
           <button
             onClick={() => setShowEval((prev) => !prev)}
@@ -1672,15 +1620,6 @@ export default function DesignDetailPage({
                   )}
                 </div>
 
-                {/* <div className="mt-auto pt-4">
-                  <button
-                    onClick={handleEvaluate}
-                    disabled={loadingEval}
-                    className="w-full px-4 py-2 text-sm rounded-md bg-[#ED5E20] text-white hover:bg-orange-600 disabled:opacity-50 cursor-pointer"
-                  >
-                    {loadingEval ? "Evaluating..." : "Re-Evaluate"}
-                  </button>
-                </div> */}
                 <div className="mt-auto pt-4">
                   <button
                     onClick={handleOpenEvalParams}

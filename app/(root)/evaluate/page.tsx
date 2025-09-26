@@ -111,6 +111,7 @@ export default function Evaluate() {
       setParsing(false);
     }
   }
+
   async function handleSubmit() {
     if (!parsed) {
       toast.error("No parsed design");
@@ -136,7 +137,6 @@ export default function Evaluate() {
     }
 
     setSubmitting(true);
-    // const loadingToast = toast.loading("Running AI evaluation...");
     try {
       // Save the design and let the backend handle evaluation
       const saveRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/designs`, {
@@ -156,13 +156,18 @@ export default function Evaluate() {
         }),
       });
       const saved = await saveRes.json();
-      console.log(saved);
-      // toast.dismiss(loadingToast);
+      console.log("Design save response:", saved);
 
       if (!saveRes.ok || !saved?.design?.id) {
         toast.error(saved?.error || "Save failed");
         return;
       }
+
+      console.log("handleSubmit called");
+      console.log("parsed.frameImages:", parsed.frameImages);
+      console.log("frameEntries:", frameEntries);
+      console.log("Starting download/upload for frames:", frameEntries.length);
+
       // Check backend evaluation result
       if (saved.ai_evaluation && saved.ai_evaluation.frameCount > 0) {
         toast.success("Design and AI evaluation completed for all frames");
@@ -174,7 +179,6 @@ export default function Evaluate() {
     } catch (error) {
       console.error("Submit failed:", error);
       toast.error("Submit failed");
-      // toast.dismiss(loadingToast);
     } finally {
       setSubmitting(false);
     }
@@ -219,8 +223,8 @@ export default function Evaluate() {
               {/* Step Label */}
               <span
                 className={`hidden sm:inline text-sm ${step >= n
-                    ? "text-neutral-900 dark:text-neutral-100"
-                    : "text-neutral-500 dark:text-neutral-600"
+                  ? "text-neutral-900 dark:text-neutral-100"
+                  : "text-neutral-500 dark:text-neutral-600"
                   }`}
               >
                 {n === 1 && "Parameters"}
@@ -248,7 +252,7 @@ export default function Evaluate() {
           <div className="space-y-5">
             <div className="text-center space-y-2">
               <p className="text-lg font-bold uppercase text-[#ED5E20]">
-                Select Target Audience's Generation & Occupation
+                Select Target Audience&apos;s Generation & Occupation
               </p>
               <p className="text-sm text-neutral-600 dark:text-neutral-400">
                 These guide how the evaluation is framed.

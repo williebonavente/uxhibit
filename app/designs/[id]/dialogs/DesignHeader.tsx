@@ -86,31 +86,12 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
         // TODO: refresh comments here
     }
 
-    const router = useRouter();
+    // const router = useRouter();
 
     return (
-        <div className="flex gap-2 items-center justify-between w-full">
-            <div className="flex items-center mr-4">
-                <button
-                    onClick={() => {
-                        if (window.history.length > 1) {
-                            router.back();
-                        } else {
-                            router.push("/dashboard");
-                        }
-                    }}
-                    aria-label="Go Back"
-                    className="p-1"
-                >
-                    <IconArrowLeft size={24} className="cursor-pointer hover:text-orange-600 mr-2" />
-                </button>
-                <h1 className="text-xl font-medium">
-                    {design.project_name}
-                    {selectedVersion && selectedVersion.id !== design.current_version_id
-                        ? ` (v${selectedVersion.version})`
-                        : ""}
-                </h1>
-            </div>
+        <div className="flex gap-2 items-center justify-between">
+          
+
             {/* Wrapper */}
             <div className="relative flex gap-2 items-center mr-18">
                 <div className="relative group mr-2 mt-1">
@@ -293,10 +274,9 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
                             <button
                                 onClick={() => { setSortOrder("asc"); setShowSortOptions(false); }}
                                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base cursor-pointer font-medium transition
-              ${sortOrder === "asc"
+                                    ${sortOrder === "asc"
                                         ? "bg-gradient-to-r from-[#ED5E20]/20 to-orange-400/20 text-[#ED5E20] shadow-md scale-105"
-                                        : "bg-gray-100 dark:bg-[#232323] text-gray-700 dark:text-gray-200 hover:bg-[#ED5E20]/10 hover:text-[#ED5E20]"}
-                group`}
+                                        : "bg-gray-100 dark:bg-[#232323] text-gray-700 dark:text-gray-200 hover:bg-[#ED5E20]/10 hover:text-[#ED5E20]"}group`}
                                 aria-label="Sort by Lowest Score"
                             >
                                 <span className="transition-transform group-hover:-translate-y-1 group-hover:scale-110">
@@ -308,7 +288,7 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
                             <button
                                 onClick={() => { setSortOrder("desc"); setShowSortOptions(false); }}
                                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition cursor-pointer
-              ${sortOrder === "desc"
+                                    ${sortOrder === "desc"
                                         ? "bg-gradient-to-r from-[#ED5E20]/20 to-orange-400/20 text-[#ED5E20] shadow-md scale-105"
                                         : "bg-gray-100 dark:bg-[#232323] text-gray-700 dark:text-gray-200 hover:bg-[#ED5E20]/10 hover:text-[#ED5E20]"} group`}
                                 aria-label="Sort by Highest Score"
@@ -322,7 +302,7 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
                             <button
                                 onClick={() => { setSortOrder("default"); setShowSortOptions(false); }}
                                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition cursor-pointer
-            ${sortOrder === "default"
+                                    ${sortOrder === "default"
                                         ? "bg-gradient-to-r from-[#ED5E20]/20 to-orange-400/20 text-[#ED5E20] shadow-md scale-105"
                                         : "bg-gray-100 dark:bg-[#232323] text-gray-700 dark:text-gray-200 hover:bg-[#ED5E20]/10 hover:text-[#ED5E20]"} group`}
                                 aria-label="Default Order"
