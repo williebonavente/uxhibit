@@ -50,10 +50,10 @@ export default function LoginForm() {
           result.error === "Invalid login credentials"
             ? "Incorrect email or password. Please try again."
             : result.error === "User not found"
-            ? "No account found with this email."
-            : result.error === "Email not confirmed"
-            ? "Please Confirm Your Email!"
-            : result.error
+              ? "No account found with this email."
+              : result.error === "Email not confirmed"
+                ? "Please Confirm Your Email!"
+                : result.error
         );
         return;
       }
@@ -127,10 +127,12 @@ export default function LoginForm() {
                         placeholder="Email"
                         type="email"
                         autoComplete="email"
-                        className="w-full h-12 
+                        className="
+                                  w-full h-12 
                                   sm:h-[45px] sm:text-sm 
                                   lg:h-[55px] lg:text-md 
-                                  xl:h-[55px] xl:text-lg"
+                                  xl:h-[55px] xl:text-lg
+                                  "
                         {...field}
                       />
                     </FormControl>
@@ -153,7 +155,9 @@ export default function LoginForm() {
                         className="w-full h-12 
                                   sm:h-[45px] sm:text-sm 
                                   lg:h-[55px] lg:text-md 
-                                  xl:h-[55px] xl:text-lg"
+                                  xl:h-[55px] xl:text-lg
+                                  input-colored 
+                                  "
                         {...field}
                       />
                     </FormControl>
