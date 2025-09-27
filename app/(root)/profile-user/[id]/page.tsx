@@ -21,8 +21,13 @@ import ProfileCareerHighlightsClient from "@/components/profile_management/caree
 export const dynamicMode = "force-dynamic";
 export const revalidate = 0;
 
+type ProfilePages = {
+  params: { id: string };
+}
 
-export default async function ProfilePage({ params }: { params: { id: string } }) {
+export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
+
+  const { params } = await propsPromise;
 
   const supabase = createClient();
   const { data: profile, error } = await supabase
@@ -202,22 +207,22 @@ export default async function ProfilePage({ params }: { params: { id: string } }
 
         {/* Design Philosophy & Career Highlights */}
         <div className="flex flex-col sm:flex-row gap-4">
-  {/* Design Philosophy Card */}
-  <div className="flex-1 relative">
-    <ProfileDesignPhiloClient designPhilo={designPhilo} profileId={profile.id} />
-    {/* If you want an add/edit button absolutely positioned, do it here */}
-    {/* Example: */}
-    {/* <button className="absolute top-5 right-5 ...">...</button> */}
-  </div>
-  {/* Career Highlights Card */}
-  <div className="flex-1 relative">
-    <ProfileCareerHighlightsClient
-      initialHighlights={careerHighlights}
-      profileId={profile.id}
-    />
-    {/* The add button/modal trigger should also be here, not inside the card */}
-  </div>
-</div>
+          {/* Design Philosophy Card */}
+          <div className="flex-1 relative">
+            <ProfileDesignPhiloClient designPhilo={designPhilo} profileId={profile.id} />
+            {/* If you want an add/edit button absolutely positioned, do it here */}
+            {/* Example: */}
+            {/* <button className="absolute top-5 right-5 ...">...</button> */}
+          </div>
+          {/* Career Highlights Card */}
+          <div className="flex-1 relative">
+            <ProfileCareerHighlightsClient
+              initialHighlights={careerHighlights}
+              profileId={profile.id}
+            />
+            {/* The add button/modal trigger should also be here, not inside the card */}
+          </div>
+        </div>
         {/* UXhibit Evaluations */}
         <div className="bg-white/50 dark:bg-[#1A1A1A]/25 rounded-xl p-5 shadow-md">
           <h2 className="text-lg font-semibold mb-2 text-[#1A1A1A] dark:text-white mb-5">UXhibit Evaluations</h2>
