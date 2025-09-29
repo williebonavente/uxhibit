@@ -21,7 +21,7 @@ const ProfileAboutSection: React.FC<ProfileAboutSectionProps> = ({
       {editable && (
         <button
           onClick={onEditClick}
-          className="ml-2 p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          className="ml-2 p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer"
           title={isEmpty ? "Add About" : "Edit About"}
           aria-label={isEmpty ? "Add About" : "Edit About"}
         >
@@ -33,7 +33,10 @@ const ProfileAboutSection: React.FC<ProfileAboutSectionProps> = ({
         </button>
       )}
     </h2>
-    <p className="text-sm text-gray-500 dark:text-gray-300">{bio}</p>
+    <div
+      className="prose prose-lg dark:prose-invert mb-2 break-words"
+      dangerouslySetInnerHTML={{ __html: bio }}
+    />
   </div>
 );
 

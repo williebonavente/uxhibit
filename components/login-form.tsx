@@ -19,13 +19,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { loginFormSchema } from "@/lib/validation-schemas";
-import MiddleHeaderIcon from "./middle-header-icon";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { getFigmaAuthUrl } from "@/lib/figma-auth";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { avatarStyles } from "@/constants/randomAvatars";
 import { createClient } from "@/utils/supabase/client";
+import { Loader2 } from "lucide-react";
 
 
 const formSchema = loginFormSchema;
@@ -38,6 +38,11 @@ function getRandomAvatar(userId: string) {
 
 
 export default function LoginForm() {
+
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
+
+
   const router = useRouter();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -82,6 +87,7 @@ export default function LoginForm() {
     }
   }, [])
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    setLoginLoading(true);
 
     try {
       // Convert values to FormData for the Supabase action
@@ -136,10 +142,16 @@ export default function LoginForm() {
         }
       }
       toast.success("Logged in successfully!");
-      router.push("/dashboard");
+      setLoginLoading(false);
+      setRedirecting(true);
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 1200);
     } catch (error) {
       console.error("Form submission error", error);
       // toast.error('Failed to submit the form. Please try again.')
+    } finally {
+      setLoginLoading(false);
     }
   }
 
@@ -151,7 +163,7 @@ export default function LoginForm() {
   return (
     <>
       {/* Page Container with background video */}
-      <div 
+      <div
         style={whiteCursor}
         className="relative min-h-screen flex items-center justify-center w-full overflow-hidden p-5"
       >
@@ -237,14 +249,17 @@ export default function LoginForm() {
               {/* Login Button */}
               <Button
                 type="submit"
+                disabled={loginLoading || redirecting}
                 className={`group relative inline-flex items-center justify-center
                   w-full h-11 sm:h-12 mt-5
                   rounded-xl text-base tracking-wide
-                  transition-all duration-300 cursor-pointer
+                  transition-all duration-300
                   text-white shadow-[0_4px_18px_-4px_rgba(237,94,32,0.55)]
                   hover:shadow-[0_6px_26px_-6px_rgba(237,94,32,0.65)]
                   active:scale-[.97]
-                  focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/4`}
+                  focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/4
+                  ${loginLoading || redirecting ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
+                  `}
               >
                 {/* Glow / gradient base */}
                 <span
@@ -281,7 +296,19 @@ export default function LoginForm() {
 
                 {/* Label */}
                 <span className="relative z-10 flex items-center gap-2">
-                  Log In
+                  {loginLoading ? (
+                    <>
+                      <Loader2 size={20} className="animate-spin" />
+                      Logging in...
+                    </>
+                  ) : redirecting ? (
+                    <>
+                      <Loader2 size={20} className="animate-spin cursor-not-allowed" />
+                      Redirecting...
+                    </>
+                  ) : (
+                    "Log In"
+                  )}
                 </span>
               </Button>
             </form>

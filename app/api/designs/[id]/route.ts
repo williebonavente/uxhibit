@@ -1,9 +1,10 @@
 import { createClient } from "@/utils/supabase/client";
 import { NextResponse } from "next/server";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
-export async function GET(_req: Request, { params }: Params) {
+export async function GET(_req: Request, props: Params) {
+    const params = await props.params;
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     const { id } = params;
@@ -16,7 +17,8 @@ export async function GET(_req: Request, { params }: Params) {
     return NextResponse.json({ versions: data });
 }
 
-export async function POST(req: Request, { params }: Params) {
+export async function POST(req: Request, props: Params) {
+    const params = await props.params;
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     try {

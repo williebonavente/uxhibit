@@ -7,7 +7,7 @@ import Link from "next/link";
 import DesignsGallery from "@/components/designs-gallery";
 import Image from "next/image";
 import {
-  Book, Trophy, Rocket, ArrowUpRight, Mail, Globe,
+  ArrowUpRight, Mail, Globe,
   Users, Heart, Eye, LayoutGrid, Accessibility, Star, FileText, Check
 } from "lucide-react";
 import { getInitials } from "../../dashboard/page";
@@ -16,6 +16,7 @@ import ProfileSkillsSection from "@/components/profile_management/skills/profile
 import ProfileAboutSectionClient from "@/components/profile_management/about/profile-about-client";
 import ProfileDesignPhiloClient from "@/components/profile_management/design-philo/profile-design-philo-client";
 import ProfileCareerHighlightsClient from "@/components/profile_management/career-highlights/profile-career-high-client";
+import ProfileContactClient from "@/components/profile_management/contacts/profile-contact-cilent";
 // import dynamicImport from "next/dynamic";
 
 export const dynamicMode = "force-dynamic";
@@ -27,7 +28,10 @@ type ProfilePages = {
 
 export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
 
-  const { params } = await propsPromise;
+  const props = await propsPromise;
+  const params = await props.params;
+  console.log("Resolved route params:", params);
+
 
   const supabase = createClient();
   const { data: profile, error } = await supabase
@@ -36,28 +40,41 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
     .eq("id", params.id)
     .single();
 
+  if (error) console.error("Profile error:", error);
+
   if (error || !profile) {
     notFound();
   }
 
-  const { data: skillsData } = await supabase
+  const { data: skillsData, error: skillsError } = await supabase
     .from("profile_skills")
     .select("skills(name)")
-    .eq("profile_id", params.id)
+    .eq("profile_id", params.id);
 
+  if (skillsError) console.error("Skills error:", skillsError);
 
-  const { data: details } = await supabase
+  const { data: details, error: detailsError } = await supabase
     .from("profile_details")
-    .select("about, design_philo, career_highlights")
+    .select("id, about, design_philo, career_highlights")
     .eq("profile_id", params.id)
     .single();
+    
 
+  if (detailsError) console.error("Details error:", detailsError);
   const fullName = profile.full_name || "John Doe";
   const avatarUrl = profile.avatar_url || undefined;
 
   const bio = details?.about || "UI/UX Designer passionate about building human-centered digital products.";
   const designPhilo = details?.design_philo || "";
   const careerHighlights = details?.career_highlights || [];
+
+  const profileDetailsId = details?.id;
+
+  const { data: contact, error: contactError } = await supabase
+  .from("profile_contacts")
+  .select("id, email, website, open_to")
+  .eq("profile_details_id", profileDetailsId)
+  .single();
 
   // TODO:
   const role = "UI/UX Designer";
@@ -67,13 +84,6 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
     .filter((name): name is string => !!name) || [];
 
   const portfolioLink = "https://yourportfolio.com";
-
-  // Creating a separate table for this one
-  const contact = {
-    email: "designer@example.com",
-    website: "https://yourwebsite.com",
-    openTo: "Collaboration, Freelance, Full-time",
-  };
 
   const featuredWorks = [
     {
@@ -133,12 +143,12 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
     },
   ];
   // TODO: TO BE IMPLEMENTED LATER
-  const metrics = [
-    { label: "Avg. Accessibility Score", value: "98/100" },
-    { label: "User Satisfaction", value: "4.8/5" },
-    { label: "Designs Published", value: 27 },
-    { label: "WCAG Success Criteria Met", value: "100%" },
-  ];
+  // const metrics = [
+  //   { label: "Avg. Accessibility Score", value: "98/100" },
+  //   { label: "User Satisfaction", value: "4.8/5" },
+  //   { label: "Designs Published", value: 27 },
+  //   { label: "WCAG Success Criteria Met", value: "100%" },
+  // ];
 
   return (
     <div className="bg-accent/25 dark:bg-[#120F12]">
@@ -199,20 +209,14 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
 
         {/* About & Skills */}
         <div className="flex flex-col sm:flex-row gap-4">
-
           <ProfileAboutSectionClient bio={bio} profileId={profile.id} />
           <ProfileSkillsSection initialSkills={skills} profileId={profile.id} />
-
         </div>
 
         {/* Design Philosophy & Career Highlights */}
         <div className="flex flex-col sm:flex-row gap-4">
-          {/* Design Philosophy Card */}
           <div className="flex-1 relative">
             <ProfileDesignPhiloClient designPhilo={designPhilo} profileId={profile.id} />
-            {/* If you want an add/edit button absolutely positioned, do it here */}
-            {/* Example: */}
-            {/* <button className="absolute top-5 right-5 ...">...</button> */}
           </div>
           {/* Career Highlights Card */}
           <div className="flex-1 relative">
@@ -220,12 +224,12 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
               initialHighlights={careerHighlights}
               profileId={profile.id}
             />
-            {/* The add button/modal trigger should also be here, not inside the card */}
+
           </div>
         </div>
         {/* UXhibit Evaluations */}
         <div className="bg-white/50 dark:bg-[#1A1A1A]/25 rounded-xl p-5 shadow-md">
-          <h2 className="text-lg font-semibold mb-2 text-[#1A1A1A] dark:text-white mb-5">UXhibit Evaluations</h2>
+          <h2 className="text-lg font-semibold mb-2 text-[#1A1A1A] dark:text-white">UXhibit Evaluations</h2>
           <DesignsGallery />
         </div>
 
@@ -302,41 +306,8 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
               </blockquote>
             </div>
           </div>
-
-          <div className="flex-1 bg-white dark:bg-[#1A1A1A]/25 rounded-xl p-5 justify-center shadow-md">
-            <h2 className="text-lg font-semibold mb-3 text-[#1A1A1A] dark:text-white">Contact</h2>
-            <div className="flex flex-col flex-wrap gap-4">
-              <div className="flex items-center gap-3 w-full sm:w-[calc(50%-0.5rem)]">
-                <div className="bg-white/10 p-3 rounded-full shrink-0">
-                  <Mail size={24} className="text-orange-400" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Email</p>
-                  <p className="text-sm text-orange-300 hover:text-[#ED5E20] hover:underline truncate cursor-pointer">{contact.email}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 w-full sm:w-[calc(50%-0.5rem)]">
-                <div className="bg-white/10 p-3 rounded-full shrink-0">
-                  <Globe size={24} className="text-blue-400" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Website</p>
-                  <p className="text-sm text-orange-300 hover:text-[#ED5E20] hover:underline truncate cursor-pointer">{contact.website}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 w-full">
-                <div className="bg-white/10 p-3 rounded-full shrink-0">
-                  <Users size={24} className="text-green-400" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Open to</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-300 break-words whitespace-normal">{contact.openTo}</p>
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* Contact Testimonials here */}
+          <ProfileContactClient profileDetailsId={profileDetailsId} />
         </div>
       </div>
     </div>
