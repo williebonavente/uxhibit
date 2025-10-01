@@ -298,7 +298,7 @@ export default function ProfileContactForm({
                     <div className="flex justify-between items-center gap-2 mt-6 w-full">
                         {/* Left side: Add Field */}
                         <div className="flex-1 flex">
-                            <button
+                            <button 
                                 type="button"
                                 className="bg-orange-100 text-orange-700 rounded p-2 font-semibold shadow hover:bg-orange-200 transition cursor-pointer flex items-center justify-center"
                                 onClick={handleAddField}
