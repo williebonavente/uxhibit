@@ -54,8 +54,7 @@ export default function ProfileContactForm({
 
     const ITEMS_PER_PAGE = 5;
 
-
-    const totalPages = Math.ceil(extraFields.length / ITEMS_PER_PAGE);
+    const totalPages = Math.max(1, Math.ceil(extraFields.length / ITEMS_PER_PAGE));
 
     const paginatedFields = extraFields.slice(
         (page - 1) * ITEMS_PER_PAGE,
@@ -275,7 +274,7 @@ export default function ProfileContactForm({
                     <div className="flex justify-center items-center gap-2 mt-2">
                         <button
                             type="button"
-                            onClick={() => setPage(page - 1)}
+                            onClick={() => setPage(Math.max(1, page - 1))}
                             disabled={page === 1}
                             className="p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition disabled:opacity-50"
                             aria-label="Previous page"

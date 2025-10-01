@@ -1,20 +1,22 @@
 import React, { useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
-import { Pencil, Trash2, Plus, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Pencil, Trash2, Plus, ChevronLeft, ChevronRight, Loader2, X, Check } from "lucide-react";
+
 
 type ProfileSkillFormProps = {
     skills: string[];
     profileId: string;
     onSave?: (skills: string[]) => void;
     onCancel?: () => void;
+    onSkillsChange?: (skills: string[]) => void;
 };
 
 const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
     skills: initialSkills,
     profileId,
-    onSave,
     onCancel,
+    onSkillsChange
 }) => {
     const [page, setPage] = useState(1);
     const [skills, setSkills] = useState<string[]>(initialSkills);
@@ -28,7 +30,7 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
 
     const ITEMS_PER_PAGE = 5;
 
-    const totalPages = Math.ceil(skills.length / ITEMS_PER_PAGE);
+    const totalPages = Math.max(1, Math.ceil(skills.length / ITEMS_PER_PAGE));
 
     const paginatedSkills = skills.slice(
         (page - 1) * ITEMS_PER_PAGE,
@@ -39,6 +41,15 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
     // Add Skill
     const handleAddSkill = async () => {
         if (!newSkill.trim()) return;
+
+        const normalizedNewSkill = newSkill.trim().toLowerCase();
+        const skillExists = skills.some(s => s.trim().toLowerCase() === normalizedNewSkill);
+        if (skillExists) {
+            toast.error("This skill is already in place. Would you mind adding another skill?");
+            setAddLoading(false);
+            return;
+        }
+
         setAddLoading(true);
         setError(null);
 
@@ -68,7 +79,7 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
 
             const { error: profileSkillError } = await supabase
                 .from("profile_skills")
-                .insert({ profile_id: profileId, skill_id: skillId });
+                .insert({ profile_id: profileId, skills_id: skillId });
 
             if (profileSkillError) {
                 if (
@@ -81,7 +92,19 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
                 throw profileSkillError;
             }
 
-            setSkills([...skills, newSkill.trim()]);
+            // HOTFIX: Re-fetch the user's skills from the DB
+            const { data: updatedSkills, error: fetchError } = await supabase
+                .from("profile_skills")
+                .select("skills(name)")
+                .eq("profile_id", profileId);
+
+            if (fetchError) {
+                throw fetchError;
+            }
+
+            // updatedSkills is an array of objects like { skills: { name: "SkillName" } }
+            setSkills(updatedSkills.map((row: any) => row.skills.name));
+            if (onSkillsChange) onSkillsChange(updatedSkills.map((row: any) => row.skills.name));
             setNewSkill("");
         } catch (err: unknown) {
             if (err instanceof Error) {
@@ -111,20 +134,46 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
                 .from("profile_skills")
                 .delete()
                 .eq("profile_id", profileId)
-                .eq("skill_id", skillRow.id);
+                .eq("skills_id", skillRow.id);
 
             if (deleteError) throw deleteError;
 
-            setSkills(skills.filter((_, i) => i !== index));
+            // HOTFIX: Re-fetch the user's skills from the DB
+            const { data: updatedSkills, error: fetchError } = await supabase
+                .from("profile_skills")
+                .select("skills(name)")
+                .eq("profile_id", profileId);
+
+            if (fetchError) {
+                throw fetchError;
+            }
+
+            setSkills(updatedSkills.map((row: any) => row.skills.name));
+            if (onSkillsChange) onSkillsChange(updatedSkills.map((row: any) => row.skills.name));
+
+            // After setSkills(...) and onSkillsChange(...)
+            const newTotalPages = Math.max(1, Math.ceil(updatedSkills.length / ITEMS_PER_PAGE));
+            if (page > newTotalPages) setPage(newTotalPages);
+
         } catch (err: any) {
             setError(err.message || "Error deleting skill");
         }
     };
 
-    // Edit Skill
     const handleEditSkill = async (oldSkillName: string, newSkillName: string, index: number) => {
         setEditLoading(true);
         setError(null);
+
+        // Case-insensitive duplicate check (excluding the current skill)
+        const normalizedEditValue = newSkillName.trim().toLowerCase();
+        const skillExists = skills.some(
+            (s, idx) => idx !== index && s.trim().toLowerCase() === normalizedEditValue
+        );
+        if (skillExists) {
+            toast.error("A skill with this name already exists. Please choose a different name.");
+            setEditLoading(false);
+            return;
+        }
 
         try {
             const { data: oldSkillRow } = await supabase
@@ -140,13 +189,24 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
                 .update({ name: newSkillName })
                 .eq("id", oldSkillRow.id);
 
-            if (updateError) throw updateError;
+            if (updateError) {
+                if (
+                    updateError.message.includes("duplicate key") ||
+                    updateError.message.includes("unique constraint")
+                ) {
+                    toast.error("A skill with this name already exists. Please choose a different name.");
+                    return;
+                }
+                throw updateError;
+            }
 
             const updatedSkills = [...skills];
             updatedSkills[index] = newSkillName;
             setSkills(updatedSkills);
+            if (onSkillsChange) onSkillsChange(updatedSkills);
         } catch (err: any) {
-            setError(err.message || "Error updating skill");
+            const message = err?.message || "Error updating skill";
+            toast.error(message);
         } finally {
             setEditLoading(false);
             setEditingIndex(null);
@@ -156,10 +216,30 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            <div className="bg-white dark:bg-[#1A1A1A] rounded-xl shadow-xl p-8 w-full max-w-lg mx-4">
-                <h2 className="text-xl font-semibold mb-6 text-[#ED5E20] dark:text-orange-300 text-center">
-                    Manage Skills & Tools
-                </h2>
+            <div className="bg-white dark:bg-[#1A1A1A] rounded-xl shadow-xl p-8 w-full max-w-xl mx-4 relative">
+                {/* X icon button at top right */}
+                <div className="absolute top-4 right-4 z-10 flex items-center">
+                    <button
+                        type="button"
+                        className="cursor-pointer p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 transition"
+                        onClick={onCancel}
+                        aria-label="Close"
+                        disabled={addLoading || editLoading}
+                    >
+                        <X size={22} className="text-gray-500 dark:text-gray-300" />
+                    </button>
+                </div>
+                {/* Header row: Title only, no Add button */}
+                <div className="flex items-center justify-between mb-6">
+                    <h2
+                        className="flex-1 text-xl font-semibold text-[#ED5E20] dark:text-orange-300 text-center"
+                        id="skills-modal-title"
+                        tabIndex={-1}
+                    >
+                        Manage Skills &amp; Tools
+                    </h2>
+                </div>
+
                 <table className="w-full mb-4 border-separate border-spacing-y-2">
                     <thead>
                         <tr className="text-left text-sm text-gray-700 dark:text-gray-200">
@@ -188,19 +268,21 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
                                         <>
                                             <button
                                                 onClick={() => handleEditSkill(skill, editValue, i)}
-                                                className="px-3 py-1 bg-green-500 text-white rounded mr-2"
+                                                className="cursor-pointer p-2 rounded-full bg-green-500 hover:bg-green-600 text-white mr-2"
                                                 disabled={editLoading || !editValue.trim()}
                                                 title="Save"
+                                                aria-label="Save"
                                             >
-                                                Save
+                                                <Check size={18} />
                                             </button>
                                             <button
                                                 onClick={() => { setEditingIndex(null); setEditValue(""); }}
-                                                className="px-3 py-1 bg-gray-300 text-gray-800 rounded"
+                                                className="cursor-pointer p-2 rounded-full bg-gray-300 hover:bg-gray-400 text-gray-800"
                                                 disabled={editLoading}
                                                 title="Cancel"
+                                                aria-label="Cancel"
                                             >
-                                                Cancel
+                                                <X size={18} />
                                             </button>
                                         </>
                                     ) : (
@@ -233,7 +315,7 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
                 <div className="flex items-center justify-center gap-4 my-2">
                     <button
                         className={`cursor-pointer p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition ${page === 1 ? "cursor-not-allowed opacity-50" : ""}`}
-                        onClick={() => setPage(page - 1)}
+                        onClick={() => setPage(Math.max(1, page - 1))}
                         disabled={page === 1}
                         aria-label="Previous page"
                     >
@@ -252,38 +334,19 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
                     </button>
                 </div>
 
-
-                <div className="flex justify-between items-center mt-6">
-                    {/* Add button or input flush left */}
-                    <div>
+                {editingIndex === null && !showAddInput && (
+                    <div className="absolute bottom-6 right-6 z-20">
                         <button
                             type="button"
-                            className="flex items-center gap-1 px-4 py-2 rounded bg-[#ED5E20] text-white font-semibold hover:bg-[#d94e13] transition cursor-pointer"
+                            className="flex items-center gap-1 px-4 py-2 rounded-full bg-[#ED5E20] text-white font-semibold shadow-lg hover:bg-[#d94e13] transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-400"
                             onClick={() => setShowAddInput(true)}
+                            disabled={addLoading}
+                            aria-label="Add skill"
                         >
-                            <Plus size={18} />
-                            Add
+                            <Plus size={22} />
                         </button>
                     </div>
-                    {/* Cancel and Save flush right */}
-                    <div className="flex gap-2">
-                        <button
-                            type="button"
-                            className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition cursor-pointer"
-                            onClick={onCancel}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="button"
-                            className="px-4 py-2 rounded bg-orange-400 text-white font-semibold hover:bg-orange-500 transition cursor-pointer"
-                            onClick={() => onSave && onSave(skills)}
-                        >
-                            Save
-                        </button>
-                    </div>
-                </div>
-
+                )}
                 {showAddInput && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
                         <div className="bg-white dark:bg-[#1A1A1A] rounded-xl shadow-xl p-6 w-full max-w-xs mx-4 flex flex-col gap-4">
@@ -298,6 +361,12 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
                                 className="border rounded px-2 py-2 text-base"
                                 disabled={addLoading}
                                 autoFocus
+                                onKeyDown={async (e) => {
+                                    if (e.key === "Enter" && newSkill.trim()) {
+                                        await handleAddSkill();
+                                        setShowAddInput(false);
+                                    }
+                                }}
                             />
                             <div className="flex gap-2 justify-end">
                                 {!addLoading && (
@@ -330,12 +399,10 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
                                         Cancel
                                     </button>
                                 )}
-
                             </div>
                         </div>
                     </div>
                 )}
-                {error && <p className="text-red-500 mt-4 text-center">{error}</p>}
             </div>
         </div>
     );

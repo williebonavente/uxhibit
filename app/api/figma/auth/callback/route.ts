@@ -64,7 +64,22 @@ export async function GET(request: NextRequest) {
           }
         ]);
       }
+      // Ensure profile_details exits for this user
+      const { data: details } = await supabase
+        .from("profile_details")
+        .select("id")
+        .eq("profile_id", user.id)
+        .maybeSingle();
+
+      if (!details) {
+        await supabase.from("profile_details").insert([
+          { profile_id: user.id }
+        ]);
+        
+      }
     }
+
+
     return NextResponse.redirect(new URL('/auth/processing', requestUrl.origin));
   } catch (error) {
     console.error('Auth callback error:', error);

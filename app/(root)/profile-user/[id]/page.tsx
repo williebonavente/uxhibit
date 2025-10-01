@@ -51,16 +51,20 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
     .select("skills(name)")
     .eq("profile_id", params.id);
 
+  // console.error(skillsData);
+
   if (skillsError) console.error("Skills error:", skillsError);
 
   const { data: details, error: detailsError } = await supabase
     .from("profile_details")
     .select("id, about, design_philo, career_highlights")
     .eq("profile_id", params.id)
-    .single();
-    
+    .maybeSingle();
 
-  if (detailsError) console.error("Details error:", detailsError);
+  // console.error(details);
+
+  if (detailsError) console.error("Details error:", detailsError.message);
+
   const fullName = profile.full_name || "John Doe";
   const avatarUrl = profile.avatar_url || undefined;
 
@@ -70,13 +74,6 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
 
   const profileDetailsId = details?.id;
 
-  const { data: contact, error: contactError } = await supabase
-  .from("profile_contacts")
-  .select("id, email, website, open_to")
-  .eq("profile_details_id", profileDetailsId)
-  .single();
-
-  // TODO:
   const role = "UI/UX Designer";
 
   const skills = (skillsData as ProfileSkillRow[] | null)

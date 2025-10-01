@@ -21,12 +21,6 @@ export default function ProfileSkills({
     const [showManage, setShowManage] = useState(false);
     const [localSkills, setLocalSkills] = useState<string[]>(skills);
 
-    // Handler for saving skills from the modal
-    const handleSaveSkills = (updatedSkills: string[]) => {
-        setLocalSkills(updatedSkills);
-        setShowManage(false);
-    };
-
     return (
         <div className="flex-1 bg-white dark:bg-[#1A1A1A]/25 rounded-xl p-5 shadow-md">
             <div className="flex items-center justify-between mb-3">
@@ -57,7 +51,7 @@ export default function ProfileSkills({
                 <ProfileSkillForm
                     skills={localSkills}
                     profileId={profileId}
-                    onSave={handleSaveSkills}
+                    onSkillsChange={setLocalSkills}
                     onCancel={() => setShowManage(false)}
                 />
             )}

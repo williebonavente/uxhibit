@@ -23,7 +23,6 @@ export default function ProfileCareerHighlightsClient({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [highlights, setHighlights] = useState<Highlight[]>(parseHighlights(initialHighlights));
-
     const editorRef = useRef<{ commands: { focus: () => void } } | null>(null);
 
     // Focus editor when modal opens

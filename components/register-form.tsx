@@ -99,6 +99,13 @@ export default function RegistrationForm() {
         return;
       }
 
+      if (!error && signUpData?.user?.id) {
+        // Upsert profile_details for the new user
+        await supabase.from("profile_details").upsert([
+          { profile_id: signUpData.user.id }
+        ]);
+      }
+
       toast.success("Check your email to confirm your account");
       localStorage.removeItem("registrationDraft");
       router.push("/auth/login");
@@ -114,7 +121,7 @@ export default function RegistrationForm() {
   };
 
   return (
-    <div 
+    <div
       style={whiteCursor}
       className="relative min-h-screen flex items-center justify-center w-full overflow-hidden p-5"
     >
