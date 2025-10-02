@@ -36,7 +36,7 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
   const supabase = createClient();
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("id, full_name, avatar_url, bio")
+    .select("id, first_name, middle_name, last_name, avatar_url")
     .eq("id", params.id)
     .single();
 
@@ -64,8 +64,11 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
   // console.error(details);
 
   if (detailsError) console.error("Details error:", detailsError.message);
+  const fullName = [profile.first_name, profile.middle_name, profile.last_name]
+    .filter(Boolean)
+    .join(" ") || "John D Doe";
 
-  const fullName = profile.full_name || "John Doe";
+
   const avatarUrl = profile.avatar_url || undefined;
 
   const bio = details?.about || "UI/UX Designer passionate about building human-centered digital products.";

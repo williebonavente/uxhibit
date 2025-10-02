@@ -38,7 +38,7 @@ import { useDesignNotifications } from "../lib/notification"
 import { IconBell, IconX } from "@tabler/icons-react";
 import { ReportBugModal } from "./report-bug-modal";
 import { AccountInfoModal } from "./account-info-modal";
-import  DeleteAccountPage  from "./delete-account-dialog";
+import DeleteAccountPage from "./delete-account-dialog";
 import { NotificationsModal } from "./notifcation-modal";
 
 
@@ -68,11 +68,9 @@ export function NavUser({ user }: { user: User | null }) {
     username: string,
     fullname: string;
     avatar_url?: string;
-    age: number | string;
     gender: string;
     bio: string;
   } | null>(null);
-
   const notifPerpage = 5;
 
   const paginatedNotifcations = notifications.slice(
@@ -106,10 +104,9 @@ export function NavUser({ user }: { user: User | null }) {
       const supabase = createClient()
       const { data, error, status } = await supabase
         .from('profiles')
-        .select(`id, username, full_name, website, avatar_url, age, gender, bio`)
+        .select(`id, username, first_name, middle_name, last_name, website, avatar_url, gender, bio`)
         .eq('id', user?.id)
         .single()
-
 
       if (error && status !== 406 && Object.keys(error).length > 0) {
         console.log(error);
@@ -117,23 +114,22 @@ export function NavUser({ user }: { user: User | null }) {
       }
 
       if (data) {
+        const fullname = [data.first_name, data.middle_name, data.last_name].filter(Boolean).join(" ");
         setProfile({
           id: data.id,
           username: data.username,
-          fullname: data.full_name,
+          fullname,
           avatar_url: data.avatar_url,
-          age: data.age,
           gender: data.gender,
           bio: data.bio,
         });
-        setFullName(data.full_name);
+        setFullName(fullname);
       }
     } catch (error) {
       console.log(error);
     } finally {
       setLoading(false);
     }
-
   }, [user])
 
   const getNotifications = useCallback(async () => {
@@ -141,10 +137,12 @@ export function NavUser({ user }: { user: User | null }) {
     const { data: notifications } = await supabase
       .from("notifications")
       .select(`
-      *,
-      designs(title),
-      from_user:profiles!notifications_from_user_id_fkey(full_name)
-    `)
+        *,
+        designs(title),
+        from_user:profiles!notifications_from_user_id_fkey(
+          first_name, middle_name, last_name, avatar_url
+        )
+      `)
       .eq("to_user_id", user?.id)
       .order("created_at", { ascending: false });
     setNotifications(notifications ?? []);
@@ -164,16 +162,16 @@ export function NavUser({ user }: { user: User | null }) {
     if (authData?.user?.id) {
       const { data } = await supabase
         .from("profiles")
-        .select("id, username, full_name, website, avatar_url, age, gender, bio")
+        .select("id, username, first_name, middle_name, last_name, website, avatar_url, gender, bio")
         .eq("id", authData.user.id)
         .single();
       if (data) {
+        const fullname = [data.first_name, data.middle_name, data.last_name].filter(Boolean).join(" ");
         setProfile({
           id: data.id,
           username: data.username,
-          fullname: data.full_name,
+          fullname,
           avatar_url: data.avatar_url,
-          age: data.age,
           gender: data.gender,
           bio: data.bio,
         });
@@ -232,7 +230,7 @@ export function NavUser({ user }: { user: User | null }) {
           // Fetch sender name and design title
           const { data: sender } = await supabase
             .from("profiles")
-            .select("full_name")
+            .select("first_name, middle_name, last_name")
             .eq("id", notif.from_user_id)
             .single();
           const { data: design } = await supabase
@@ -240,10 +238,13 @@ export function NavUser({ user }: { user: User | null }) {
             .select("title")
             .eq("id", notif.design_id)
             .single();
+          const senderName = [sender?.first_name, sender?.middle_name, sender?.last_name]
+            .filter(Boolean)
+            .join(" ") || "Someone";
           toast(
             <span className="flex items-center gap-2">
               <IconBell className="text-yellow-500" size={20} />
-              <span>{sender?.full_name ?? "Someone"} loved your design!</span>
+              <span>{senderName} loved your design!</span>
             </span>,
             {
               description: design?.title
@@ -375,7 +376,7 @@ export function NavUser({ user }: { user: User | null }) {
                     <span className="ml-2 inline-block w-2 h-2 bg-red-500 rounded-full"></span>
                   )}
                 </DropdownMenuItem>
-                
+
                 <DropdownMenuItem>
                   <UserRound />
                   About Us

@@ -2,8 +2,10 @@ import { z } from 'zod';
 
 export const registerFormSchema = z.object({
     username: z.string().min(3, 'User name is required'),
-    full_name: z.string().min(5, "User must have a full name"),
-    age: z.string().min(1, 'Age is required'),
+    first_name: z.string().min(2, "First name is required"),
+    middle_name: z.string().optional(),
+    last_name: z.string().min(2, "Last name is required"),
+    birthday: z.string().min(1, 'Birthday is required'),
     email: z.email('Invalid email'),
     gender: z.string().min(3, "Gender Must have a value"),
     // website_url: z.string(),

@@ -8,8 +8,12 @@ export type Notification = {
     from_user_id: string;
     created_at: string;
     designs?: { title?: string };
-    from_user?: {full_name?: string};
-    // Add more fields as needed
+    from_user?: {
+        first_name?: string;
+        middle_name?: string;
+        last_name?: string;
+        avatar_url?: string;
+    };
 };
 
 export function useDesignNotifications(currentUserId: string | null) {
@@ -38,6 +42,13 @@ export function useDesignNotifications(currentUserId: string | null) {
                         .single();
 
                     if (design?.owner_id === currentUserId && payload.new.user_id !== currentUserId) {
+                        // Fetch sender profile
+                        const { data: fromUser } = await supabase
+                            .from("profiles")
+                            .select("first_name, middle_name, last_name, avatar_url")
+                            .eq("id", payload.new.user_id)
+                            .single();
+
                         setNotifications((prev) => [
                             {
                                 id: payload.new.id,
@@ -45,6 +56,7 @@ export function useDesignNotifications(currentUserId: string | null) {
                                 design_id: payload.new.design_id,
                                 from_user_id: payload.new.user_id,
                                 created_at: payload.new.created_at,
+                                from_user: fromUser ?? undefined,
                             },
                             ...prev,
                         ]);
@@ -71,6 +83,13 @@ export function useDesignNotifications(currentUserId: string | null) {
                         .single();
 
                     if (design?.owner_id === currentUserId && payload.new.user_id !== currentUserId) {
+                        // Fetch sender profile
+                        const { data: fromUser } = await supabase
+                            .from("profiles")
+                            .select("first_name, middle_name, last_name, avatar_url")
+                            .eq("id", payload.new.user_id)
+                            .single();
+
                         setNotifications((prev) => [
                             {
                                 id: payload.new.id,
@@ -78,6 +97,7 @@ export function useDesignNotifications(currentUserId: string | null) {
                                 design_id: payload.new.design_id,
                                 from_user_id: payload.new.user_id,
                                 created_at: payload.new.created_at,
+                                from_user: fromUser ?? undefined,
                             },
                             ...prev,
                         ]);

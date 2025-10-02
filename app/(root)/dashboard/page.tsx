@@ -2,7 +2,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import DesignsGallery from "@/components/designs-gallery";
-import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -19,20 +18,23 @@ export default async function Dashboard() {
   const supabase = await createClient();
 
   const { data: auth, error: authError } = await supabase.auth.getUser();
-  if (authError || !auth?.user) redirect("/auth/login"); 
+  if (authError || !auth?.user) redirect("/auth/login");
 
   const userId = auth.user.id;
 
   // Fetch the profile row for this user only
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, full_name, avatar_url, bio")
+    .select("id, first_name, middle_name, last_name, avatar_url, bio")
     .eq("id", userId)
     .single();
 
-  // Fallbacks from auth.user.user_metadata if row missing
+
+  // Compose fullName from new columns, fallback to user_metadata if needed
   const fullName =
-    profile?.full_name ||
+    (profile
+      ? [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(" ")
+      : undefined) ||
     (auth.user.user_metadata.full_name as string | undefined) ||
     (auth.user.user_metadata.username as string | undefined) ||
     "User";

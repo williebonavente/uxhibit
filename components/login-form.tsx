@@ -117,20 +117,27 @@ export default function LoginForm() {
         // Fetch the user's profile
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("id, avatar_url, full_name, username, age, gender")
+          .select("id, avatar_url, first_name, middle_name, last_name, username, gender")
           .eq("id", user.id)
           .single();
 
         if (profileError) {
-          console.error(`Profile Error: ${profileError}`);
+          console.error(`Profile Error: ${profileError.message}`);
         } else if (profile && (!profile.avatar_url || profile.avatar_url.trim() === "")) {
           // If avatar_url is missing or empty, generate and set a default avatar
           const avatarUrl = getRandomAvatar(user.id);
+
+          // Compose names from user_metadata if missing
+          const first_name = profile.first_name ?? user.user_metadata?.first_name ?? "";
+          const middle_name = profile.middle_name ?? user.user_metadata?.middle_name ?? "";
+          const last_name = profile.last_name ?? user.user_metadata?.last_name ?? "";
+
           const { error: upsertError } = await supabase.from("profiles").upsert({
             id: user.id,
-            full_name: profile.full_name ?? user.user_metadata?.full_name ?? "",
+            first_name,
+            middle_name,
+            last_name,
             username: profile.username ?? user.user_metadata?.username ?? "",
-            age: profile.age ?? user.user_metadata?.age ?? "",
             gender: profile.gender ?? user.user_metadata?.gender ?? "",
             avatar_url: avatarUrl,
             updated_at: new Date().toISOString(),
@@ -141,6 +148,7 @@ export default function LoginForm() {
           }
         }
       }
+
       toast.success("Logged in successfully!");
       setLoginLoading(false);
       setRedirecting(true);

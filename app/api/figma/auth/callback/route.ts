@@ -34,48 +34,54 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: { user } } = await supabase.auth.getUser();
-
-    if (user) {
-      // try to get the profile
+    
+        if (user) {
+      // Try to get the profile
       const { data: profile } = await supabase
         .from("profiles")
-        .select("id, username, full_name")
+        .select("id, username, first_name, middle_name, last_name")
         .eq("id", user.id)
         .single();
-
-      // If profile does not exist ur username is empty, create/set it
+    
+      // If profile does not exist or username is empty, create/set it
       if (!profile || !profile.username) {
-        // Get the full name from user metadata 
-        // (Figma returns it as "user_metadata.name" 
-        // or  "user_metadata.full_name" )
+        // Get the full name from user metadata
         const fullname =
           user.user_metadata?.full_name ||
           user.user_metadata?.name ||
           user.user_metadata?.name_full ||
           "";
-
+    
+        // Split fullname into first, middle, last name
+        const [first_name = "", middle_name = "", ...rest] = fullname.split(" ");
+        const last_name = rest.length ? rest.join(" ") : middle_name;
+        const middle = rest.length ? middle_name : "";
+    
         const username = generaterUsername(fullname);
-        // Upsert the profile with the generated username
+    
+        // Upsert the profile with the generated username and split names
         await supabase.from("profiles").upsert([
           {
             id: user.id,
             username,
-            full_name: fullname,
+            first_name,
+            middle_name: middle,
+            last_name,
           }
         ]);
       }
-      // Ensure profile_details exits for this user
+    
+      // Ensure profile_details exists for this user
       const { data: details } = await supabase
         .from("profile_details")
         .select("id")
         .eq("profile_id", user.id)
         .maybeSingle();
-
+    
       if (!details) {
         await supabase.from("profile_details").insert([
           { profile_id: user.id }
         ]);
-        
       }
     }
 

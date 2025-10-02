@@ -10,13 +10,15 @@ export default async function ProfilePage(props: { params: Promise<{ userId: str
   const supabase = createClient();
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, avatar_url, bio")
+    .select("first_name, middle_name, last_name, avatar_url, bio")
     .eq("id", userId)
     .single();
 
   if (!profile) return <div>Profile not found.</div>;
 
-  const fullName = profile.full_name;
+  const fullName = [profile.first_name, profile.middle_name, profile.last_name]
+    .filter(Boolean)
+    .join(" ") || "User";
   const avatarUrl = profile.avatar_url;
   const bio = profile.bio;
 

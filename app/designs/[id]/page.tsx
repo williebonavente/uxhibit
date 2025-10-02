@@ -338,12 +338,12 @@ export default function DesignDetailPage({
 
   const currentFrame = sortedFrameEvaluations[selectedFrameIndex];
 
-  async function handleOpenComments() {
+    async function handleOpenComments() {
     setShowComments(true);
     setLoadingComments(true);
-
+  
     const supabase = createClient();
-
+  
     if (currentUserId && design?.id) {
       await supabase
         .from("comments")
@@ -352,26 +352,28 @@ export default function DesignDetailPage({
         .eq("user_id", currentUserId)
         .eq("is_read", false);
     }
-
+  
     const { data, error } = await supabase
       .from("comments")
       .select(`
-      id, text, user_id, created_at, local_time, 
-      is_read, parent_id, updated_at, design_id,
-      profiles:profiles!comments_user_id_fkey (
-        full_name, avatar_url
-      )
-    `)
+        id, text, user_id, created_at, local_time, 
+        is_read, parent_id, updated_at, design_id,
+        profiles:profiles!comments_user_id_fkey (
+          first_name, middle_name, last_name, avatar_url
+        )
+      `)
       .eq("design_id", design?.id)
       .order("created_at", { ascending: false });
-
+  
     if (!error && data) {
       const mappedComments = (data || []).map((comment: any) => ({
         id: comment.id,
         text: comment.text,
         user: {
           id: comment.user_id,
-          fullName: comment.profiles?.full_name || "",
+          fullName: [comment.profiles?.first_name, comment.profiles?.middle_name, comment.profiles?.last_name]
+            .filter(Boolean)
+            .join(" ") || "",
           avatarUrl: comment.profiles?.avatar_url || "",
         },
         replies: [],
@@ -382,7 +384,7 @@ export default function DesignDetailPage({
         design_id: comment.design_id,
         is_read: comment.is_read,
       }));
-
+  
       const commentMap: { [id: string]: any } = {};
       mappedComments.forEach(comment => {
         commentMap[comment.id] = { ...comment, replies: [] };
@@ -397,7 +399,7 @@ export default function DesignDetailPage({
           rootComments.push(commentMap[comment.id]);
         }
       });
-
+  
       setComments(rootComments);
     }
     setLoadingComments(false);
@@ -598,29 +600,31 @@ export default function DesignDetailPage({
     }
   }
 
-  async function fetchCommentWithProfile(commentId: string) {
+    async function fetchCommentWithProfile(commentId: string) {
     const supabase = createClient();
     const { data, error } = await supabase
       .from("comments")
       .select(`
-      id, text, user_id, created_at, local_time, parent_id, updated_at, design_id, is_read,
-      profiles:profiles!comments_user_id_fkey (
-        full_name, avatar_url
-      )
-    `)
+        id, text, user_id, created_at, local_time, parent_id, updated_at, design_id, is_read,
+        profiles:profiles!comments_user_id_fkey (
+          first_name, middle_name, last_name, avatar_url
+        )
+      `)
       .eq("id", commentId)
       .single();
     if (error) {
       console.error("Failed to fetch comment with profile:", error);
       return null;
     }
-
+  
     return {
       id: data.id,
       text: data.text,
       user: {
         id: data.user_id,
-        fullName: data.profiles?.full_name || "",
+        fullName: [data.profiles?.first_name, data.profiles?.middle_name, data.profiles?.last_name]
+          .filter(Boolean)
+          .join(" ") || "",
         avatarUrl: data.profiles?.avatar_url || "",
       },
       replies: [],
@@ -721,11 +725,9 @@ export default function DesignDetailPage({
 
   };
 
-  const fetchComments = useCallback(async () => {
-
-
+    const fetchComments = useCallback(async () => {
     const supabase = createClient();
-
+  
     if (!design?.id) {
       return;
     }
@@ -735,13 +737,13 @@ export default function DesignDetailPage({
       .select(`
         id, text, user_id, created_at, local_time, parent_id, updated_at, design_id,
         profiles:profiles!comments_user_id_fkey (
-          full_name, avatar_url
+          first_name, middle_name, last_name, avatar_url
         )
       `)
       .eq("design_id", design?.id)
       .order("created_at", { ascending: false });
     // .range(0, 19);
-
+  
     if (error) {
       console.log("Supabase error:", error);
       toast.error(`Failed to fetch comments! ${error.message}`);
@@ -753,7 +755,9 @@ export default function DesignDetailPage({
       text: comment.text,
       user: {
         id: comment.user_id,
-        fullName: comment.profiles?.full_name || "",
+        fullName: [comment.profiles?.first_name, comment.profiles?.middle_name, comment.profiles?.last_name]
+          .filter(Boolean)
+          .join(" ") || "",
         avatarUrl: comment.profiles?.avatar_url || "",
       },
       replies: [],
@@ -763,15 +767,14 @@ export default function DesignDetailPage({
       localTime: comment.local_time,
       design_id: comment.design_id,
     }));
-
+  
     console.log("commentsWithUser", commentsWithUser);
-
+  
     const commentMap: { [id: string]: any } = {};
     commentsWithUser.forEach(comment => {
       commentMap[comment.id] = { ...comment, replies: [] };
     });
-
-
+  
     const rootComments: any[] = [];
     commentsWithUser.forEach(comment => {
       if (comment.parentId) {
@@ -815,20 +818,22 @@ export default function DesignDetailPage({
       }));
   }, []);
 
-  useEffect(() => {
+    useEffect(() => {
     const supabase = createClient();
     async function fetchUserProfile() {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUserId(user?.id ?? null);
-
+  
       if (user?.id) {
         const { data: profile } = await supabase
           .from("profiles")
-          .select("full_name, avatar_url")
+          .select("first_name, middle_name, last_name, avatar_url")
           .eq("id", user.id)
           .single();
         setCurrentUserProfile({
-          fullName: profile?.full_name ?? "Unknown",
+          fullName: [profile?.first_name, profile?.middle_name, profile?.last_name]
+            .filter(Boolean)
+            .join(" ") || "Unknown",
           avatarUrl: profile?.avatar_url ?? "",
         });
       }

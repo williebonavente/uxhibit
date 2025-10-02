@@ -107,7 +107,7 @@ export default function ExplorePage() {
       // Fetch users
       const { data: usersData, error: usersError } = await supabase
         .from("profiles")
-        .select("id, full_name, avatar_url");
+        .select("id, first_name, middle_name, last_name, avatar_url");
 
       console.log("Fetched usersData:", usersData);
       if (usersError) {
@@ -131,7 +131,7 @@ export default function ExplorePage() {
         .from("published_designs")
         .select(` design_id, user_id, num_of_hearts, num_of_views,
                 designs (id, owner_id, title, figma_link, thumbnail_url),
-                profiles (id, full_name, avatar_url)`)
+                profiles (id, first_name, middle_name, last_name, avatar_url)`)
         .eq("is_active", true);
 
       if (publishedError) {
@@ -156,7 +156,7 @@ export default function ExplorePage() {
 
       const usersWithDesigns = usersData.map((user) => ({
         user_id: user.id,
-        name: user.full_name,
+        name: [user.first_name, user.middle_name, user.last_name].filter(Boolean).join(" "),
         user_avatar: user.avatar_url,
         designs: (designsData || [])
           .filter((d) =>
@@ -288,12 +288,12 @@ export default function ExplorePage() {
       const supabase = createClient();
       const { data } = await supabase
         .from("profiles")
-        .select("full_name, avatar_url")
+        .select("first_name, middle_name, last_name, avatar_url")
         .eq("id", currentUserId)
         .single();
       if (data) {
         setCurrentUserProfile({
-          fullName: data.full_name,
+          fullName: [data.first_name, data.middle_name, data.last_name].filter(Boolean).join(" "),
           avatarUrl: data.avatar_url,
         });
       }
@@ -320,7 +320,7 @@ export default function ExplorePage() {
         (data || []).map(async (comment) => {
           const { data: userData } = await supabase
             .from("profiles")
-            .select("full_name, avatar_url")
+            .select("first_name, middle_name, last_name, avatar_url")
             .eq("id", comment.user_id)
             .single();
           return {
@@ -328,7 +328,9 @@ export default function ExplorePage() {
             text: comment.text,
             user: {
               id: comment.user_id,
-              fullName: userData?.full_name || "",
+              fullName: [userData?.first_name, userData?.middle_name, userData?.last_name]
+                .filter(Boolean)
+                .join(" ") || "",
               avatarUrl: userData?.avatar_url || "",
             },
             replies: [],

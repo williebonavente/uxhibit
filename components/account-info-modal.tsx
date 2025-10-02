@@ -34,9 +34,9 @@ export function AccountInfoModal({
 
   const router = useRouter();
 
-  function generateUsername(fullname: string) {
-    if (!fullname) return "";
-    return fullname.split(" ").join("").toLowerCase();
+  function generateUsername(profile: any) {
+    const name = [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join("");
+    return name.toLowerCase();
   }
 
   useEffect(() => {
@@ -101,7 +101,7 @@ export function AccountInfoModal({
               //   }
               //   imageUrl = filePath;
               // }
-              
+
               // STORING SIGNED URL
               let imageUrl = profile.avatar_url;
 
@@ -133,14 +133,15 @@ export function AccountInfoModal({
                 .from("profiles")
                 .update({
                   username,
-                  full_name: profile.fullname,
+                  first_name: profile.first_name,
+                  middle_name: profile.middle_name,
+                  last_name: profile.last_name,
                   age: profile.age,
                   avatar_url: imageUrl,
                   bio: profile.bio,
                   gender: profile.gender,
                 })
                 .eq("id", profile.id);
-
               if (!error) {
                 toast.success("Profile Updated!");
                 setFullName(profile.fullname);
@@ -190,13 +191,11 @@ export function AccountInfoModal({
                         alt={profile?.fullname ?? email ?? "User"}
                       />
                       <AvatarFallback className="rounded-full text-3xl sm:text-4xl bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
-                        {profile?.fullname
-                          ? profile.fullname
-                            .split(" ")
-                            .map((n: string) => n[0])
-                            .join("")
-                            .toUpperCase()
-                          : "U"}
+                        {[profile.first_name, profile.middle_name, profile.last_name]
+                          .filter(Boolean)
+                          .map((n: string) => n[0])
+                          .join("")
+                          .toUpperCase() || "U"}
                       </AvatarFallback>
                     </Avatar>
                     <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition rounded-full">
@@ -233,10 +232,25 @@ export function AccountInfoModal({
               />
             </div>
             <div>
-              <label>Full Name</label>
+              <label>First Name</label>
               <Input
-                value={profile.fullname}
-                onChange={e => setProfile({ ...profile, fullname: e.target.value })}
+                value={profile.first_name || ""}
+                onChange={e => setProfile({ ...profile, first_name: e.target.value })}
+              />
+            </div>
+            <div>
+              <label>Middle Name</label>
+              <Input
+                value={profile.middle_name || ""}
+                onChange={e => setProfile({ ...profile, middle_name: e.target.value })}
+                placeholder="(optional)"
+              />
+            </div>
+            <div>
+              <label>Last Name</label>
+              <Input
+                value={profile.last_name || ""}
+                onChange={e => setProfile({ ...profile, last_name: e.target.value })}
               />
             </div>
             <div className="cursor-not-allowed">
@@ -246,39 +260,7 @@ export function AccountInfoModal({
                 disabled
               />
             </div>
-            <div>
-              <label>Age</label>
-              <Input
-                type="number"
-                min={10}
-                max={80}
-                value={profile?.age || ''}
-                onChange={e => {
-                  const raw = e.target.value;
-                  if (raw === '') {
-                    setProfile((prev: any) => prev ? { ...prev, age: '' } : prev);
-                    return;
-                  }
-                  const tempValue = parseInt(raw, 10);
-                  if (!isNaN(tempValue)) {
-                    if (raw.length > 3) {
-                      toast.error("Invalid age. Please enter a number between 10-80.");
-                    }
-                    setProfile((prev: any) => prev ? { ...prev, age: tempValue } : prev);
-                  }
-                }}
-                onBlur={e => {
-                  const value = parseInt(e.target.value, 10);
-                  if (!isNaN(value)) {
-                    if (value > 80 || value < 10) {
-                      toast.error("Age must be between 10-80 years");
-                      setProfile((prev: any) => prev ? { ...prev, age: '' } : prev);
-                    }
-                  }
-                }}
-                placeholder="Enter your age"
-              />
-            </div>
+            {/* TODO: Update their birthday??? */}
             <div>
               <label>Gender</label>
               <Input

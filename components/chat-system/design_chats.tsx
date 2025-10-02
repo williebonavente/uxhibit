@@ -43,8 +43,8 @@ export default function DesignChat({ designId, currentUserId }: DesignChatProps)
         if (seenMsgs.length === 0) return null;
         return seenMsgs[seenMsgs.length - 1].id;
     })();
-
-    useEffect(() => {
+    
+        useEffect(() => {
         const supabase = createClient();
         async function fetchMessagesAndProfiles() {
             // 1. Fetch messages
@@ -54,30 +54,33 @@ export default function DesignChat({ designId, currentUserId }: DesignChatProps)
                 .eq("design_id", designId)
                 .order("created_at", { ascending: true });
             setMessages(msgs || []);
-
+    
             // 2. Gather all unique user IDs from senders and seen_by
             const senderUserIds = (msgs || []).map(msg => msg.user_id);
             const seenUserIds = (msgs || []).flatMap(msg => (msg.seen_by || []));
             const allUserIds = Array.from(new Set([...senderUserIds, ...seenUserIds]));
-
+    
             // 3. Fetch user profiles for those IDs
             if (allUserIds.length > 0) {
                 const { data: profiles } = await supabase
                     .from("profiles")
-                    .select("id, avatar_url, full_name")
+                    .select("id, avatar_url, first_name, middle_name, last_name")
                     .in("id", allUserIds);
                 const map: Record<string, UserProfile> = {};
                 (profiles || []).forEach(p => {
-                    map[p.id] = { avatar_url: p.avatar_url, name: p.full_name };
+                    map[p.id] = {
+                        avatar_url: p.avatar_url,
+                        name: [p.first_name, p.middle_name, p.last_name].filter(Boolean).join(" ")
+                    };
                 });
                 setUserProfiles(map);
             } else {
                 setUserProfiles({});
             }
-
+    
             console.log("Fetching profiles for Ids: ", allUserIds);
         }
-
+    
         fetchMessagesAndProfiles();
         const channel = supabase
             .channel("design-chat")
@@ -104,7 +107,7 @@ export default function DesignChat({ designId, currentUserId }: DesignChatProps)
                 }
             )
             .subscribe();
-
+    
         return () => {
             supabase.removeChannel(channel);
         };

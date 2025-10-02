@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { IconEdit, IconRocket, IconArchive, IconFilter, IconHeart, IconLayoutGrid, IconList, IconTrash, IconEye } from "@tabler/icons-react";
 import { toast } from "sonner";
-import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { LoadingInspiration } from "./animation/loading-fetching";
 import Image from "next/image";
@@ -363,43 +362,74 @@ export default function DesignsGallery() {
   };
 
   // Unified publish/unpublish handler
-  const togglePublish = async (design: DesignRow) => {
-    try {
-      const newStatus = !design.is_published;
-
-      // Update the published_designs table
-      const { data, error } = await supabase
+    const togglePublish = async (design: DesignRow) => {
+    const supabase = createClient();
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData?.user?.id;
+  
+    if (!design?.id || !userId) {
+      toast.error("Missing design or user information.");
+      return;
+    }
+  
+    // Check if a published record already exists
+    const { data: existing, error: fetchError } = await supabase
+      .from("published_designs")
+      .select("*")
+      .eq("design_id", design.id)
+      .eq("user_id", userId)
+      .single();
+  
+    if (fetchError && fetchError.code !== "PGRST116") {
+      toast.error("Failed to check publish status.");
+      return;
+    }
+  
+    let error;
+    const newStatus = !design.is_published;
+  
+    if (existing) {
+      ({ error } = await supabase
         .from("published_designs")
-        .update({ is_active: newStatus })
-        .eq("design_id", design.id)
-        .select();
-
-      if (error) {
-        console.error("Supabase update error:", error);
-        toast.error(`Update failed: ${error.message}`);
-        return;
-      }
-
-      if (!data || data.length === 0) {
-        toast.error("Update failed: No rows updated (check permissions or RLS).");
-        return;
-      }
-
-      // Update local state
+        .update({
+          is_active: newStatus,
+          published_at: newStatus ? new Date().toISOString() : null,
+          published_version_id: newStatus ? design.current_version_id : null,
+        })
+        .eq("id", existing.id));
+    } else if (newStatus) {
+      ({ error } = await supabase
+        .from("published_designs")
+        .insert({
+          design_id: design.id,
+          user_id: userId,
+          published_version_id: design.current_version_id,
+          published_at: new Date().toISOString(),
+          is_active: true,
+        }));
+    }
+  
+    if (!error) {
       setDesigns((prev) =>
         prev.map((d) =>
-          d.id === design.id ? { ...d, is_published: newStatus } : d
+          d.id === design.id
+            ? { ...d, is_published: newStatus }
+            : d
         )
       );
-
       toast.success(
-        newStatus ? "Design published successfully" : "Design unpublished successfully"
+        newStatus
+          ? "Design published to the community!"
+          : "Design unpublished!"
       );
-    } catch (err: any) {
-      console.error("Unexpected error:", err);
-      toast.error(`Unexpected error: ${err.message || err}`);
+    } else {
+      toast.error(
+        `Failed to ${newStatus ? "publish" : "unpublish"} design: ${
+          error.message || "Unknown error"
+        }`
+      );
     }
-  };
+  }; 
 
   const [publishModalOpen, setPublishModalOpen] = useState(false);
   const [selectedDesign, setSelectedDesign] = useState<DesignRow | null>(null);

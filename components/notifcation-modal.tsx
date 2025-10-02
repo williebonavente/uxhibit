@@ -163,8 +163,8 @@ export function NotificationsModal({
                     )}
                     <span>
                       {notif.type === "heart"
-                        ? <><b>{notif.from_user?.full_name ?? "Someone"}</b> loved your design <b>{notif.designs?.title ?? notif.design_id}</b></>
-                        : <><b>{notif.from_user?.full_name ?? "Someone"}</b> commented on your design <b>{notif.designs?.title ?? notif.design_id}</b></>
+                        ? <><b>{[notif.from_user?.first_name, notif.from_user?.middle_name, notif.from_user?.last_name].filter(Boolean).join(" ") || "Someone"}</b> loved your design <b>{notif.designs?.title ?? notif.design_id}</b></>
+                        : <><b>{[notif.from_user?.first_name, notif.from_user?.middle_name, notif.from_user?.last_name].filter(Boolean).join(" ") || "Someone"}</b> commented on your design <b>{notif.designs?.title ?? notif.design_id}</b></>
                       }
                     </span>
                     <span className="ml-auto text-xs text-gray-400">
@@ -237,8 +237,8 @@ export function NotificationsModal({
                     )}
                     <span>
                       {notif.type === "heart"
-                        ? <><b>{notif.from_user?.full_name ?? "Someone"}</b> loved your design <b>{notif.designs?.title ?? notif.design_id}</b></>
-                        : <><b>{notif.from_user?.full_name ?? "Someone"}</b> commented on your design <b>{notif.designs?.title ?? notif.design_id}</b></>
+                        ? <><b>{[notif.from_user?.first_name, notif.from_user?.middle_name, notif.from_user?.last_name].filter(Boolean).join(" ") || "Someone"}</b> loved your design <b>{notif.designs?.title ?? notif.design_id}</b></>
+                        : <><b>{[notif.from_user?.first_name, notif.from_user?.middle_name, notif.from_user?.last_name].filter(Boolean).join(" ") || "Someone"}</b> commented on your design <b>{notif.designs?.title ?? notif.design_id}</b></>
                       }
                     </span>
                     <span className="ml-auto text-xs text-gray-400">
