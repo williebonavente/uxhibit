@@ -36,6 +36,7 @@
     "@tabler/icons-react": "^3.34.0",
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-table": "^8.21.3",
+    "@tiptap/extension-bullet-list": "^3.6.2",
     "@tiptap/extension-history": "^3.6.1",
     "@tiptap/extension-placeholder": "^3.6.1",
     "@tiptap/extension-text-align": "^3.6.1",

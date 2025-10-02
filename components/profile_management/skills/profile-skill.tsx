@@ -23,8 +23,11 @@ export default function ProfileSkills({
 
     return (
         <div className="flex-1 bg-white dark:bg-[#1A1A1A]/25 rounded-xl p-5 shadow-md">
+            {/* Header */}
             <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-semibold text-[#1A1A1A] dark:text-white">Skills & Tools</h2>
+                <h2 className="text-lg font-semibold text-[#1A1A1A] dark:text-white">
+                    Skills &amp; Tools
+                </h2>
                 {isOwner && (
                     <button
                         onClick={() => setShowManage(true)}
@@ -36,17 +39,26 @@ export default function ProfileSkills({
                     </button>
                 )}
             </div>
-            <ul className="flex flex-wrap gap-2 mb-4">
-                {localSkills.map((skill, i) => (
-                    <li
-                        key={i}
-                        className="flex items-center gap-2 px-6 py-3 bg-[#ED5E20] text-white rounded-full text-sm transition group"
-                    >
-                        <span>{skill}</span>
-                    </li>
-                ))}
-            </ul>
 
+            {/* Skills list */}
+            {localSkills.length > 0 ? (
+                <ul className="flex flex-wrap gap-2 mb-4">
+                    {localSkills.map((skill, i) => (
+                        <li
+                            key={i}
+                            className="flex items-center gap-2 px-6 py-3 bg-[#ED5E20] text-white rounded-full text-sm transition"
+                        >
+                            <span>{skill}</span>
+                        </li>
+                    ))}
+                </ul>
+            ) : (
+                <p className="text-sm text-gray-500 dark:text-gray-400 italic mb-4">
+                    No skills added yet.
+                </p>
+            )}
+
+            {/* Manage modal */}
             {showManage && (
                 <ProfileSkillForm
                     skills={localSkills}

@@ -221,7 +221,6 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
               initialHighlights={careerHighlights}
               profileId={profile.id}
             />
-
           </div>
         </div>
         {/* UXhibit Evaluations */}
