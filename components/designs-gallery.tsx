@@ -1,10 +1,20 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { IconEdit, IconRocket, IconArchive, IconFilter, IconHeart, IconLayoutGrid, IconList, IconTrash, IconEye } from "@tabler/icons-react";
+import {
+  IconEdit,
+  IconRocket,
+  IconArchive,
+  IconFilter,
+  IconHeart,
+  IconLayoutGrid,
+  IconList,
+  IconTrash,
+  IconEye
+} from "@tabler/icons-react";
 import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
-import { LoadingInspiration } from "./animation/loading-fetching";
+// import { LoadingInspiration } from "./animation/loading-fetching";
 import Image from "next/image";
 import PublishConfirmModal from "@/app/designs/[id]/dialogs/PublishConfirmModal";
 
@@ -27,7 +37,7 @@ type PublishedDesign = {
   num_of_views: number;
 };
 
-export default function DesignsGallery() {
+export default function DesignsGallery({ profileId, isOwnProfile }: { profileId: string, isOwnProfile?: boolean }) {
   const [designs, setDesigns] = useState<DesignRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showOverlay, setShowOverlay] = useState(false);
@@ -93,7 +103,7 @@ export default function DesignsGallery() {
               current_version_id,
               published_designs(is_active, num_of_hearts, num_of_views) 
               `)
-      .eq("owner_id", currentUserId) // Only fetch owner's designs
+      .eq("owner_id", profileId) // using the profileId, not the currentUserId
       .order("updated_at", { ascending: false });
     console.log("Designs data:", data);
     if (error) {
@@ -166,7 +176,7 @@ export default function DesignsGallery() {
 
     if (isPublished) {
       toast(
-        <div  className="items-center justify-center text-center text-black dark:text-white">
+        <div className="items-center justify-center text-center text-black dark:text-white">
           <div className="flex flex-col items-center justify-center text-center">
             <Image
               src="/images/let-go-of-this-design.svg"
@@ -308,10 +318,10 @@ export default function DesignsGallery() {
                   throw versionsError;
                 }
 
-                const { error: commentsError } = await supabase 
-                .from("comments")
-                .delete()
-                .eq("design_id", id);
+                const { error: commentsError } = await supabase
+                  .from("comments")
+                  .delete()
+                  .eq("design_id", id);
 
                 if (commentsError) {
                   console.error(`Failed to delete coments: " ${commentsError.message}`);
@@ -354,24 +364,24 @@ export default function DesignsGallery() {
       </div>,
       {
         position: "top-center",
-          duration: 999999,
-          className: "bg-white dark:bg-[#120F12] text-black dark:text-white rounded-2xl items-center justify-center text-center",
-          onAutoClose: () => setShowOverlay(false),
+        duration: 999999,
+        className: "bg-white dark:bg-[#120F12] text-black dark:text-white rounded-2xl items-center justify-center text-center",
+        onAutoClose: () => setShowOverlay(false),
       }
     );
   };
 
   // Unified publish/unpublish handler
-    const togglePublish = async (design: DesignRow) => {
+  const togglePublish = async (design: DesignRow) => {
     const supabase = createClient();
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData?.user?.id;
-  
+
     if (!design?.id || !userId) {
       toast.error("Missing design or user information.");
       return;
     }
-  
+
     // Check if a published record already exists
     const { data: existing, error: fetchError } = await supabase
       .from("published_designs")
@@ -379,15 +389,15 @@ export default function DesignsGallery() {
       .eq("design_id", design.id)
       .eq("user_id", userId)
       .single();
-  
+
     if (fetchError && fetchError.code !== "PGRST116") {
       toast.error("Failed to check publish status.");
       return;
     }
-  
+
     let error;
     const newStatus = !design.is_published;
-  
+
     if (existing) {
       ({ error } = await supabase
         .from("published_designs")
@@ -408,7 +418,7 @@ export default function DesignsGallery() {
           is_active: true,
         }));
     }
-  
+
     if (!error) {
       setDesigns((prev) =>
         prev.map((d) =>
@@ -424,13 +434,11 @@ export default function DesignsGallery() {
       );
     } else {
       toast.error(
-        `Failed to ${newStatus ? "publish" : "unpublish"} design: ${
-          error.message || "Unknown error"
+        `Failed to ${newStatus ? "publish" : "unpublish"} design: ${error.message || "Unknown error"
         }`
       );
     }
-  }; 
-
+  };
   const [publishModalOpen, setPublishModalOpen] = useState(false);
   const [selectedDesign, setSelectedDesign] = useState<DesignRow | null>(null);
   const [publishMode, setPublishMode] = useState<"publish" | "unpublish">("publish");
@@ -453,7 +461,7 @@ export default function DesignsGallery() {
     );
   }
   if (designs.length === 0) {
-     return (
+    return (
       <div className="flex flex-col items-center justify-center text-center py-24">
         <Image
           src="/images/your-gallery-is-waiting-for-its-first-design.svg"
@@ -513,65 +521,65 @@ export default function DesignsGallery() {
   }
 
   return (
-    <div className="space-y-5"> 
-      <div className="flex justify-end items-center gap-2 mb-3 relative">
-        {/* Filter Button */}
-        <div className="relative inline-block text-left">
+    <div className="space-y-5">
+      {isOwnProfile && (
+        <div className="flex justify-end items-center gap-2 mb-3 relative">
+          {/* Filter Button */}
+          <div className="relative inline-block text-left">
+            <button
+              onClick={() => setShowFilterDropdown((prev) => !prev)}
+              className="w-10 h-10 flex justify-center items-center rounded-lg bg-transparent text-white hover:bg-[#ED5E20]/50 cursor-pointer transition-colors"
+              title="Filter Designs"
+            >
+              <IconFilter size={20} />
+            </button>
+
+            {showFilterDropdown && (
+              <div className="absolute right-0 mt-2 w-40 rounded-md shadow-lg bg-white dark:bg-accent border z-10">
+                <div className="py-1">
+                  <button
+                    onClick={() => { setFilter("all"); setShowFilterDropdown(false); }}
+                    className="block w-full text-left px-4 py-2 text-sm hover:bg-[#ED5E20]/20 cursor-pointer"
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => { setFilter("published"); setShowFilterDropdown(false); }}
+                    className="block w-full text-left px-4 py-2 text-sm hover:bg-[#ED5E20]/20 cursor-pointer"
+                  >
+                    Published
+                  </button>
+                  <button
+                    onClick={() => { setFilter("unpublished"); setShowFilterDropdown(false); }}
+                    className="block w-full text-left px-4 py-2 text-sm hover:bg-[#ED5E20]/20 cursor-pointer"
+                  >
+                    Unpublished
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Grid/List Toggle Buttons */}
           <button
-            onClick={() => setShowFilterDropdown((prev) => !prev)}
-            className="w-10 h-10 flex justify-center items-center rounded-lg bg-transparent text-white hover:bg-[#ED5E20]/50 cursor-pointer transition-colors"
-            title="Filter Designs"
+            onClick={() => setViewMode("grid")}
+            className={`w-10 h-10 flex justify-center items-center rounded-lg cursor-pointer transition-colors hover:bg-[#ED5E20]/50 ${viewMode === "grid" ? "bg-[#ED5E20]/20 text-[#ED5E20]" : "text-[#ED5E20] dark:text-white"
+              }`}
+            title="Grid View"
           >
-            <IconFilter size={20} />
+            <IconLayoutGrid size={20} />
           </button>
 
-          {showFilterDropdown && (
-            <div className="absolute right-0 mt-2 w-40 rounded-md shadow-lg bg-white dark:bg-accent border z-10">
-              <div className="py-1">
-                <button
-                  onClick={() => { setFilter("all"); setShowFilterDropdown(false); }}
-                  className="block w-full text-left px-4 py-2 text-sm hover:bg-[#ED5E20]/20 cursor-pointer"
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => { setFilter("published"); setShowFilterDropdown(false); }}
-                  className="block w-full text-left px-4 py-2 text-sm hover:bg-[#ED5E20]/20 cursor-pointer"
-                >
-                  Published
-                </button>
-                <button
-                  onClick={() => { setFilter("unpublished"); setShowFilterDropdown(false); }}
-                  className="block w-full text-left px-4 py-2 text-sm hover:bg-[#ED5E20]/20 cursor-pointer"
-                >
-                  Unpublished
-                </button>
-              </div>
-            </div>
-          )}
+          <button
+            onClick={() => setViewMode("list")}
+            className={`w-10 h-10 flex justify-center items-center rounded-lg cursor-pointer transition-colors hover:bg-[#ED5E20]/50 ${viewMode === "list" ? "bg-[#ED5E20]/20 text-[#ED5E20]" : "text-[#ED5E20] dark:text-white"
+              }`}
+            title="List View"
+          >
+            <IconList size={20} />
+          </button>
         </div>
-
-        {/* Grid/List Toggle Buttons */}
-        <button
-          onClick={() => setViewMode("grid")}
-          className={`w-10 h-10 flex justify-center items-center rounded-lg cursor-pointer transition-colors hover:bg-[#ED5E20]/50 ${
-            viewMode === "grid" ? "bg-[#ED5E20]/20 text-[#ED5E20]" : "text-[#ED5E20] dark:text-white"
-          }`}
-          title="Grid View"
-        >
-          <IconLayoutGrid size={20} />
-        </button>
-
-        <button
-          onClick={() => setViewMode("list")}
-          className={`w-10 h-10 flex justify-center items-center rounded-lg cursor-pointer transition-colors hover:bg-[#ED5E20]/50 ${
-            viewMode === "list" ? "bg-[#ED5E20]/20 text-[#ED5E20]" : "text-[#ED5E20] dark:text-white"
-          }`}
-          title="List View"
-        >
-          <IconList size={20} />
-        </button>
-      </div>
+      )}
 
       {/* Gallery */}
       {filteredDesigns.length === 0 ? (
@@ -588,15 +596,15 @@ export default function DesignsGallery() {
             {filter === "published"
               ? "No Published Designs Yet"
               : filter === "unpublished"
-              ? "No Unpublished Designs Yet"
-              : "No Designs Yet"}
+                ? "No Unpublished Designs Yet"
+                : "No Designs Yet"}
           </h2>
           <p className="text-gray-500 text-sm mb-4">
             {filter === "published"
-              ? "You don’t have any published designs yet."
+              ? "You don't have any published designs yet."
               : filter === "unpublished"
-              ? "You don’t have any unpublished designs yet."
-              : "Your gallery is waiting for its first design!"}
+                ? "You don't have any unpublished designs yet."
+                : "Your gallery is waiting for its first design!"}
           </p>
         </div>
       ) : viewMode === "grid" ? (
@@ -615,6 +623,7 @@ export default function DesignsGallery() {
               setSelectedDesign={setSelectedDesign}
               setPublishModalOpen={setPublishModalOpen}
               setPublishMode={setPublishMode}
+              isOwnProfile={isOwnProfile}
             />
           ))}
         </div>
@@ -641,18 +650,18 @@ export default function DesignsGallery() {
 
       {/* Publish/Unpublish Modal */}
       {selectedDesign && (
-      <PublishConfirmModal
-        open={publishModalOpen}
-        mode={publishMode}
-        onClose={() => setPublishModalOpen(false)}
-        onConfirm={async () => {
-          if (selectedDesign) {
-            await togglePublish(selectedDesign); // actually toggle after confirmation
-            setPublishModalOpen(false);
-          }
-        }}
-      />
-    )}
+        <PublishConfirmModal
+          open={publishModalOpen}
+          mode={publishMode}
+          onClose={() => setPublishModalOpen(false)}
+          onConfirm={async () => {
+            if (selectedDesign) {
+              await togglePublish(selectedDesign); // actually toggle after confirmation
+              setPublishModalOpen(false);
+            }
+          }}
+        />
+      )}
 
     </div>
   );
@@ -669,6 +678,7 @@ function DesignCard({
   setSelectedDesign,
   setPublishModalOpen,
   setPublishMode,
+  isOwnProfile
 }: any) {
   const [isEditing, setIsEditing] = useState(false);
 
@@ -721,38 +731,42 @@ function DesignCard({
 
         {/* Buttons */}
         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition flex-shrink-0">
-          <button
-            onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
-            title="Edit"
-            className="text-gray-500 hover:text-blue-500 cursor-pointer"
-          >
-            <IconEdit size={20} />
-          </button>
+          {isOwnProfile && (
+            <>
+              <button
+                onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
+                title="Edit"
+                className="text-gray-500 hover:text-blue-500 cursor-pointer"
+              >
+                <IconEdit size={20} />
+              </button>
 
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setSelectedDesign(design);
-              setPublishMode(design.is_published ? "unpublish" : "publish");
-              setPublishModalOpen(true);
-            }}
-            title={design.is_published ? "Unpublish" : "Publish"}
-            className={`text-gray-500 ${
-              design.is_published ? "hover:text-yellow-500" : "hover:text-green-500"
-            } transition cursor-pointer`}
-          >
-            {design.is_published ? <IconArchive size={20} /> : <IconRocket size={20} />}
-          </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedDesign(design);
+                  setPublishMode(design.is_published ? "unpublish" : "publish");
+                  setPublishModalOpen(true);
+                }}
+                title={design.is_published ? "Unpublish" : "Publish"}
+                className={`text-gray-500 ${design.is_published ? "hover:text-yellow-500" : "hover:text-green-500"
+                  } transition cursor-pointer`}
+              >
+                {design.is_published ? <IconArchive size={20} /> : <IconRocket size={20} />}
+              </button>
 
-
-          <button
-            onClick={(e) => { e.stopPropagation(); handleDelete(design.id, design.is_published); }}
-            title="Delete"
-            className="text-gray-500 hover:text-red-500 cursor-pointer"
-          >
-            <IconTrash size={20} />
-          </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleDelete(design.id, design.is_published); }}
+                title="Delete"
+                className="text-gray-500 hover:text-red-500 cursor-pointer"
+              >
+                <IconTrash size={20} />
+              </button>
+            </>
+          )}
         </div>
+
+
       </div>
 
       {/* Published badge */}
@@ -862,7 +876,7 @@ function DesignListRow({
               <IconEye size={16} /> {design.views ?? 0}
             </span>
           </div>
-        </div>   
+        </div>
       </div>
 
       {/* Action buttons */}
@@ -875,20 +889,19 @@ function DesignListRow({
           <IconEdit size={20} />
         </button>
 
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          setSelectedDesign(design);
-          setPublishMode(design.is_published ? "unpublish" : "publish");
-          setPublishModalOpen(true);
-        }}
-        title={design.is_published ? "Unpublish" : "Publish"}
-        className={`text-gray-500 ${
-          design.is_published ? "hover:text-yellow-500" : "hover:text-green-500"
-        } transition cursor-pointer`}
-      >
-        {design.is_published ? <IconArchive size={20} /> : <IconRocket size={20} />}
-      </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedDesign(design);
+            setPublishMode(design.is_published ? "unpublish" : "publish");
+            setPublishModalOpen(true);
+          }}
+          title={design.is_published ? "Unpublish" : "Publish"}
+          className={`text-gray-500 ${design.is_published ? "hover:text-yellow-500" : "hover:text-green-500"
+            } transition cursor-pointer`}
+        >
+          {design.is_published ? <IconArchive size={20} /> : <IconRocket size={20} />}
+        </button>
 
 
         <button

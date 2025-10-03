@@ -2,13 +2,16 @@
 import { createClient } from "@/utils/supabase/client";
 import { notFound } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-// import { IconArrowLeft } from "@tabler/icons-react";
 import Link from "next/link";
 import DesignsGallery from "@/components/designs-gallery";
 import Image from "next/image";
 import {
-  ArrowUpRight, Mail, Globe,
-  Users, Heart, Eye, LayoutGrid, Accessibility, Star, FileText, Check
+  ArrowUpRight,
+  Globe,
+  Accessibility,
+  Star,
+  FileText,
+  Check
 } from "lucide-react";
 import { getInitials } from "../../dashboard/page";
 import { ProfileSkillRow } from "@/lib/declaration/profileTypes";
@@ -17,8 +20,9 @@ import ProfileAboutSectionClient from "@/components/profile_management/about/pro
 import ProfileDesignPhiloClient from "@/components/profile_management/design-philo/profile-design-philo-client";
 import ProfileCareerHighlightsClient from "@/components/profile_management/career-highlights/profile-career-high-client";
 import ProfileContactClient from "@/components/profile_management/contacts/profile-contact-cilent";
-import ProfileStatsGrid from "@/components/profile_management/profie-stats/profile-stats-grid";
 import ProfileStatsGridContainer from "@/components/profile_management/profie-stats/profile-stats-grid-container";
+import ProfileOwnershipCheckClient from "@/components/profile_management/profile-owner-check/profile-owner-check-checklist";
+import ProfileOwnershipCheckSection from "@/components/profile_management/profile-owner-check/profile-ownership-check-section";
 // import dynamicImport from "next/dynamic";
 
 export const dynamicMode = "force-dynamic";
@@ -29,6 +33,7 @@ type ProfilePages = {
 }
 
 export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
+
 
   const props = await propsPromise;
   const params = await props.params;
@@ -152,6 +157,8 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
   //   { label: "WCAG Success Criteria Met", value: "100%" },
   // ];
 
+
+
   return (
     <div className="bg-accent/25 dark:bg-[#120F12]">
       {/* Profile Header - centered layout */}
@@ -214,7 +221,7 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
         {/* UXhibit Evaluations */}
         <div className="bg-white/50 dark:bg-[#1A1A1A]/25 rounded-xl p-5 shadow-md">
           <h2 className="text-lg font-semibold mb-2 text-[#1A1A1A] dark:text-white">UXhibit Evaluations</h2>
-          <DesignsGallery />
+           <ProfileOwnershipCheckSection profileId={profile.id} />
         </div>
 
         {/* Portfolio & Case Studies */}
