@@ -84,25 +84,6 @@ export function AccountInfoModal({
             onSubmit={async (e) => {
               e.preventDefault();
               const supabase = createClient();
-              // STORING PATH ONLY 
-              // let imageUrl = profile.avatar_url;
-
-              // if (pendingAvatar) {
-              //   const filePath = `${profile.id}/${Date.now()}-${pendingAvatar.name}`;
-              //   const { error: uploadError } = await supabase.storage
-              //     .from("avatars")
-              //     .upload(filePath, pendingAvatar, {
-              //       cacheControl: "31536000",
-              //       upsert: true,
-              //     });
-              //   if (uploadError) {
-              //     toast.error(uploadError.message);
-              //     return;
-              //   }
-              //   imageUrl = filePath;
-              // }
-
-              // STORING SIGNED URL
               let imageUrl = profile.avatar_url;
 
               if (pendingAvatar) {
@@ -171,17 +152,6 @@ export function AccountInfoModal({
                     onClick={() => document.getElementById("avatar-upload")?.click()}
                   >
                     <Avatar className="h-24 w-24 sm:h-32 sm:w-32 rounded-full border-4 border-gray-300 group-hover:border-blue-500 transition shadow-xl">
-                      {/* <AvatarImage
-                        src={
-                          avatarPreview
-                          ?? (profile?.avatar_url
-                            ? (profile.avatar_url.startsWith("http")
-                              ? profile.avatar_url
-                              : `/api/avatars?path=${encodeURIComponent(profile.avatar_url)}`)
-                            : undefined)
-                        }
-                        alt={profile?.fullname ?? email ?? "User"}
-                      /> */}
                       <AvatarImage
                         src={
                           avatarPreview

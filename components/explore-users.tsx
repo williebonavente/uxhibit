@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { LoadingInspiration } from "./animation/loading-fetching";
 import { DesignCard } from "./design-card";
 import { Comment } from "./comments-user";
+import { UserProfilePopover } from "./user-profile-popover/user-profile-popover";
 
 
 type DesignInfo = {
@@ -33,6 +34,9 @@ type UserInfo = {
   user_id: string;
   name: string;
   user_avatar: string;
+  role?: string;
+  bio?: string;
+  website?: string;
   designs: DesignInfo[];
 };
 
@@ -99,52 +103,57 @@ export default function ExplorePage() {
   const [newCommentText, setNewCommentText] = useState("");
   const [currentUserProfile, setCurrentUserProfile] = useState<{ fullName: string; avatarUrl: string } | null>(null);
 
-
-  const fetchUsersWithDesigns = useCallback(async () => {
+    const fetchUsersWithDesigns = useCallback(async () => {
     setLoading(true);
     const supabase = createClient();
     try {
-      // Fetch users
+      // Fetch users (with bio)
       const { data: usersData, error: usersError } = await supabase
         .from("profiles")
-        .select("id, first_name, middle_name, last_name, avatar_url");
-
-      console.log("Fetched usersData:", usersData);
+        .select("id, first_name, middle_name, last_name, avatar_url, bio");
+  
       if (usersError) {
-        console.error("Users fetch error:", usersError);
         setLoading(false);
         return;
       }
+  
+      // Fetch roles from profile_details
+      const { data: detailsData } = await supabase
+        .from("profile_details")
+        .select("id, profile_id, role"); // <-- include id
+  
+      // Fetch websites from profile_contacts
+      const { data: contactsData } = await supabase
+        .from("profile_contacts")
+        .select("profile_details_id, website");
+  
       // Fetch designs
       const { data: designsData, error: designsError } = await supabase
         .from("designs")
-        .select("id, owner_id, title, figma_link, thumbnail_url");
-
-      console.log("Fetched designsData:", designsData);
+        .select("id, owner_id, title, figma_link, thumbnail_url, created_at");
+  
       if (designsError) {
-        console.error("Designs fetch error:", designsError);
         setLoading(false);
         return;
       }
-
+  
+      // Fetch published designs
       const { data: publishedData, error: publishedError } = await supabase
         .from("published_designs")
-        .select(` design_id, user_id, num_of_hearts, num_of_views,
-                designs (id, owner_id, title, figma_link, thumbnail_url),
-                profiles (id, first_name, middle_name, last_name, avatar_url)`)
+        .select(`design_id, user_id, num_of_hearts, num_of_views, published_at,  
+              designs (id, owner_id, title, figma_link, thumbnail_url, created_at), 
+              profiles (id, first_name, middle_name, last_name, avatar_url)`)
         .eq("is_active", true);
-
+  
       if (publishedError) {
         setLoading(false);
         return;
       }
-      const publishedDesignIds = publishedData?.map((p) => p.design_id) || [];
-
+  
       const publishedLookup = Object.fromEntries(
         (publishedData || []).map((p) => [p.design_id, p])
-      )
-      console.log("Published designs:", publishedDesignIds);
-
+      );
+  
       let likedDesignIds: string[] = [];
       if (currentUserId) {
         const { data: likesData } = await supabase
@@ -153,31 +162,46 @@ export default function ExplorePage() {
           .eq("user_id", currentUserId);
         likedDesignIds = (likesData || []).map(like => like.design_id);
       }
-
-      const usersWithDesigns = usersData.map((user) => ({
-        user_id: user.id,
-        name: [user.first_name, user.middle_name, user.last_name].filter(Boolean).join(" "),
-        user_avatar: user.avatar_url,
-        designs: (designsData || [])
-          .filter((d) =>
-            d.owner_id === user.id && publishedLookup[d.id]
-          )
-          .map((d) => {
-            const published = publishedLookup[d.id];
-            return {
-              design_id: d.id,
-              project_name: d.title,
-              figma_link: d.figma_link,
-              likes: published?.num_of_hearts ?? 0,
-              views: published?.num_of_views ?? 0,
-              liked: likedDesignIds.includes(d.id),
-              thumbnail_url: d.thumbnail_url,
-              isPublished: !!published,
-            };
-          }),
-      }));
-      console.log("usersWithDesigns:", usersWithDesigns);
-
+  
+      // Build lookup maps for details and contacts
+      const detailsIdMap = Object.fromEntries((detailsData || []).map(d => [d.profile_id, d.id])); // profile_id (uuid) -> details.id (int)
+      const detailsRoleMap = Object.fromEntries((detailsData || []).map(d => [d.profile_id, d.role]));
+      const contactsMap = Object.fromEntries((contactsData || []).map(c => [c.profile_details_id, c.website]));
+  
+      const usersWithDesigns = usersData.map((user) => {
+        const detailsId = detailsIdMap[user.id]; // get profile_details.id for this user
+        const website = detailsId ? contactsMap[detailsId] : undefined;
+        const role = detailsRoleMap[user.id] || undefined;
+        const bio = user.bio || undefined;
+  
+        return {
+          user_id: user.id,
+          name: [user.first_name, user.middle_name, user.last_name].filter(Boolean).join(" "),
+          user_avatar: user.avatar_url,
+          role,
+          bio,
+          website,
+          designs: (designsData || [])
+            .filter((d) =>
+              d.owner_id === user.id && publishedLookup[d.id]
+            )
+            .map((d) => {
+              const published = publishedLookup[d.id];
+              return {
+                design_id: d.id,
+                project_name: d.title,
+                figma_link: d.figma_link,
+                likes: published?.num_of_hearts ?? 0,
+                views: published?.num_of_views ?? 0,
+                liked: likedDesignIds.includes(d.id),
+                thumbnail_url: d.thumbnail_url,
+                isPublished: !!published,
+                created_at: published?.published_at || d.created_at,
+              };
+            }),
+        };
+      });
+  
       setUsers(usersWithDesigns);
     } catch (e) {
       console.log(e);
@@ -427,8 +451,7 @@ export default function ExplorePage() {
             >
               {/* Post Header */}
               <div className="flex items-center gap-3 p-4 bg-white dark:bg-[#1A1A1A]">
-                <UserAvatar avatarPath={user.user_avatar} alt={user.name} />
-                <h2 className="font-semibold text-gray-800 dark:text-gray-200">{user.name}</h2>
+                <UserProfilePopover user={user} />
               </div>
 
               {/* Design Card */}

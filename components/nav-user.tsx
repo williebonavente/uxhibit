@@ -35,12 +35,11 @@ import { type User } from "@supabase/supabase-js";
 import { Skeleton } from "./ui/skeleton";
 import { Bug, UserRound, Trash } from "lucide-react";
 import { useDesignNotifications } from "../lib/notification"
-import { IconBell, IconX } from "@tabler/icons-react";
+import { IconBell } from "@tabler/icons-react";
 import { ReportBugModal } from "./report-bug-modal";
 import { AccountInfoModal } from "./account-info-modal";
 import DeleteAccountPage from "./delete-account-dialog";
 import { NotificationsModal } from "./notifcation-modal";
-
 
 export function NavUser({ user }: { user: User | null }) {
   const { isMobile } = useSidebar();
@@ -48,12 +47,8 @@ export function NavUser({ user }: { user: User | null }) {
   const [loading, setLoading] = useState(true)
   const [fullname, setFullName] = useState<string | null>(null)
   const [email, setEmail] = useState<string | null>(null)
-  // const [username, setUsername] = useState<string | null>(null)
-  // const [website, setWebsite] = useState<string | null>(null)
-  // const [age, setAge] = useState<string | null>(null)
   const [avatar_url, setAvatarUrl] = useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  // Add state for pending avatar 
   const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [showNotifModal, setShowNotifModal] = useState(false);
@@ -66,16 +61,23 @@ export function NavUser({ user }: { user: User | null }) {
   const [profile, setProfile] = useState<{
     id: string,
     username: string,
-    fullname: string;
+    first_name?: string;
+    middle_name?: string;
+    last_name?: string;
     avatar_url?: string;
     gender: string;
     bio: string;
   } | null>(null);
+
   const notifPerpage = 5;
+  const fullName =
+    profile
+      ? [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(" ")
+      : "";
 
   const paginatedNotifcations = notifications.slice(
-    (notifPage - 1) * notifPage,
-    notifPage * notifPage
+    (notifPage - 1) * notifPerpage,
+    notifPage * notifPerpage
   );
   const totalPages = Math.ceil(notifications.length / notifPerpage);
   const unreadNotifications = notifications.filter(n => !n.read);
@@ -118,7 +120,9 @@ export function NavUser({ user }: { user: User | null }) {
         setProfile({
           id: data.id,
           username: data.username,
-          fullname,
+          first_name: data.first_name ?? "",
+          middle_name: data.middle_name ?? "",
+          last_name: data.last_name ?? "",
           avatar_url: data.avatar_url,
           gender: data.gender,
           bio: data.bio,
@@ -170,11 +174,14 @@ export function NavUser({ user }: { user: User | null }) {
         setProfile({
           id: data.id,
           username: data.username,
-          fullname,
+          first_name: data.first_name ?? "",
+          middle_name: data.middle_name ?? "",
+          last_name: data.last_name ?? "",
           avatar_url: data.avatar_url,
           gender: data.gender,
           bio: data.bio,
         });
+        setFullName(fullname);
         setOpen(true);
       }
     }
@@ -278,7 +285,6 @@ export function NavUser({ user }: { user: User | null }) {
     toast.success("You have been logout.");
   }
 
-
   if (loading) {
     return (
       <div className="flex items-center justify-center mt-8h-32 gap-4">
@@ -303,7 +309,6 @@ export function NavUser({ user }: { user: User | null }) {
                 className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground py-7"
               >
                 <Avatar className="h-8 w-8 rounded-bl-full ">
-                  {/* <AvatarImage src={profile?.avatar_url} alt={profile?.fullname} /> */}
                   <AvatarImage
                     src={
                       avatarPreview
@@ -313,17 +318,14 @@ export function NavUser({ user }: { user: User | null }) {
                           : `/api/avatars?path=${encodeURIComponent(profile.avatar_url)}`)
                         : undefined)
                     }
-                    alt={profile?.fullname}
+                    alt={fullName}
                   />
-                  {/* Display the the initial if the user does not have avatar */}
                   <AvatarFallback className="rounded-lg grayscale">{getInitials(fullname)}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  {/* Getting the name from the database */}
                   <span className="truncate font-medium">{fullname}</span>
                   <span className="text-muted-foreground truncate text-xs">
-                    {/* Getting the email from the database */}
-                    <span className="truncate font-medium">{profile?.username ?? email ?? profile?.fullname}</span>
+                    <span className="truncate font-medium">{profile?.username ?? email ?? fullName}</span>
                   </span>
                 </div>
                 <IconDotsVertical className="ml-auto size-4" />
@@ -335,13 +337,9 @@ export function NavUser({ user }: { user: User | null }) {
               align="end"
               sideOffset={4}
             >
-              {/* TODO:  */}
               <DropdownMenuLabel className="p-0 font-normal">
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                   <Avatar className="h-8 w-8 rounded-bl-full">
-
-                    {/* <AvatarImage 
-                      src={profile?.avatar_url ?? undefined} alt={profile?.fullname ?? email ?? "User"} /> */}
                     <AvatarImage
                       src={
                         avatarPreview
@@ -351,7 +349,7 @@ export function NavUser({ user }: { user: User | null }) {
                             : `/api/avatars?path=${encodeURIComponent(profile.avatar_url)}`)
                           : undefined)
                       }
-                      alt={profile?.fullname}
+                      alt={fullName}
                     />
                     <AvatarFallback className="rounded-lg">{getInitials(fullname)}</AvatarFallback>
                   </Avatar>
@@ -376,7 +374,6 @@ export function NavUser({ user }: { user: User | null }) {
                     <span className="ml-2 inline-block w-2 h-2 bg-red-500 rounded-full"></span>
                   )}
                 </DropdownMenuItem>
-
                 <DropdownMenuItem>
                   <UserRound />
                   About Us
@@ -412,7 +409,7 @@ export function NavUser({ user }: { user: User | null }) {
                   : profile.avatar_url
                     ? `/api/avatars?path=${encodeURIComponent(profile.avatar_url)}`
                     : "",
-              fullName: profile.fullname,
+              fullName,
             }
             : null
         }
@@ -433,7 +430,6 @@ export function NavUser({ user }: { user: User | null }) {
         userId={user?.id}
         email={user?.email}
       />
-
       <NotificationsModal
         open={showNotifModal}
         onClose={() => setShowNotifModal(false)}
