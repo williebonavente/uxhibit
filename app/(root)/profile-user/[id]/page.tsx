@@ -17,6 +17,8 @@ import ProfileAboutSectionClient from "@/components/profile_management/about/pro
 import ProfileDesignPhiloClient from "@/components/profile_management/design-philo/profile-design-philo-client";
 import ProfileCareerHighlightsClient from "@/components/profile_management/career-highlights/profile-career-high-client";
 import ProfileContactClient from "@/components/profile_management/contacts/profile-contact-cilent";
+import ProfileStatsGrid from "@/components/profile_management/profie-stats/profile-stats-grid";
+import ProfileStatsGridContainer from "@/components/profile_management/profie-stats/profile-stats-grid-container";
 // import dynamicImport from "next/dynamic";
 
 export const dynamicMode = "force-dynamic";
@@ -186,26 +188,8 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
       {/* Sections */}
       <div className="flex flex-col gap-5 mt-5 bg-accent/25 dark:bg-[#120F12]">
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[{
-            label: "Designs", value: 24, icon: <LayoutGrid size={25} className="text-white" />
-          }, {
-            label: "Likes", value: 1280, icon: <Heart size={25} className="text-white" />
-          }, {
-            label: "Views", value: "15.2K", icon: <Eye size={25} className="text-white" />
-          }, {
-            label: "Followers", value: 342, icon: <Users size={25} className="text-white" />
-          }].map((stat, i) => (
-            <div key={i} className="flex flex-col sm:flex-row items-center sm:items-start gap-2 sm:gap-4 
-                                      bg-white dark:bg-[#1A1A1A]/25 rounded-xl p-4 break-words shadow-md">
-              <div className="bg-[#ED5E20] p-3 rounded-full shrink-0">{stat.icon}</div>
-              <div className="text-center sm:text-left">
-                <p className="text-xl font-bold text-[#1A1A1A] dark:text-white truncate">{stat.value}</p>
-                <p className="text-sm text-gray-500 dark:text-gray-300 truncate">{stat.label}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+        {/* Profile stats  */}
+        <ProfileStatsGridContainer profileId={profile.id} />
 
         {/* About & Skills */}
         <div className="flex flex-col sm:flex-row gap-4">

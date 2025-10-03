@@ -1,4 +1,3 @@
-// DesignCard.tsx
 import { useState, useEffect } from "react";
 import { useOnScreen } from "./countViews/view-counter";
 import { createClient } from "@/utils/supabase/client";
@@ -7,6 +6,8 @@ import Link from "next/link";
 import { IconHeart, IconHeartFilled, IconEye } from "@tabler/icons-react";
 import { SparkleEffect } from "./animation/heart-pop";
 import { MessageSquare } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { UserProfilePopover } from "./user-profile-popover/user-profile-popover";
 
 
 export type DesignInfo = {
@@ -17,9 +18,11 @@ export type DesignInfo = {
     views: number;
     liked: boolean;
     thumbnail_url?: string;
+    created_at?: string;
+    isPublished?: boolean; 
 };
 
-type UserInfo = {
+export type UserInfo = {
     user_id: string;
     name: string;
     user_avatar: string;
@@ -52,7 +55,7 @@ export function DesignCard({
         const fetchCommentCount = async () => {
             const supabase = createClient();
             const { count, error } = await supabase
-                .from("comments") 
+                .from("comments")
                 .select("*", { count: "exact", head: true })
                 .eq("design_id", design.design_id)
                 .neq("user_id", user.user_id);
@@ -116,6 +119,11 @@ export function DesignCard({
                     <h3 className="w-full text-lg truncate">
                         {design.project_name}
                     </h3>
+                    {design.isPublished && design.created_at && (
+                        <span className="text-xs text-gray-400 ml-2 whitespace-nowrap">
+                            {formatDistanceToNow(new Date(design.created_at), { addSuffix: true })}
+                        </span>
+                    )}
                 </div>
                 <div className="text-sm text-gray-500 flex items-center justify-between">
                     <span className="relative flex items-center gap-2">
