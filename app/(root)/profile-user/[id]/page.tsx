@@ -71,7 +71,7 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
 
   const avatarUrl = profile.avatar_url || undefined;
 
-  const bio = details?.about || "UI/UX Designer passionate about building human-centered digital products.";
+  const bio = details?.about || "";
   const designPhilo = details?.design_philo || "";
   const careerHighlights = details?.career_highlights || [];
 
@@ -184,7 +184,7 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
       </div>
 
       {/* Sections */}
-      <div className="flex flex-col gap-5 mt-5 bg-accent/25 dark:bg-[#120F12]">
+      <div className="flex flex-col gap-10 mt-10 bg-accent/25 dark:bg-[#120F12]">
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[{
@@ -207,26 +207,23 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
           ))}
         </div>
 
-        {/* About & Skills */}
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col gap-4">
+          {/* About Section */}
           <ProfileAboutSectionClient bio={bio} profileId={profile.id} />
+
+          {/* Skills Section */}
           <ProfileSkillsSection initialSkills={skills} profileId={profile.id} />
+
+          {/* Design Philosophy Section */}
+          <ProfileDesignPhiloClient designPhilo={designPhilo} profileId={profile.id} />
+
+          {/* Career Highlights Section */}
+          <ProfileCareerHighlightsClient
+            initialHighlights={careerHighlights}
+            profileId={profile.id}
+          />
         </div>
 
-        {/* Design Philosophy & Career Highlights */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 relative">
-            <ProfileDesignPhiloClient designPhilo={designPhilo} profileId={profile.id} />
-          </div>
-          {/* Career Highlights Card */}
-          <div className="flex-1 relative">
-            <ProfileCareerHighlightsClient
-              initialHighlights={careerHighlights}
-              profileId={profile.id}
-            />
-
-          </div>
-        </div>
         {/* UXhibit Evaluations */}
         <div className="bg-white/50 dark:bg-[#1A1A1A]/25 rounded-xl p-5 shadow-md">
           <h2 className="text-lg font-semibold mb-2 text-[#1A1A1A] dark:text-white">UXhibit Evaluations</h2>

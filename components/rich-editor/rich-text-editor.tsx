@@ -1,3 +1,4 @@
+
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import BulletList from "@tiptap/extension-bullet-list";
@@ -73,150 +74,161 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
 
   return (
     <div className={className}>
-      <div className="bg-white dark:bg-[#1A1A1A] rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="flex gap-1 p-1.5 flex-wrap bg-white dark:bg-[#1A1A1A] border-b border-gray-200 dark:border-gray-700">
+      <div className="flex flex-col h-[50vh] bg-white dark:bg-[#1A1A1A] border border-accent rounded shadow-sm rounded-lg overflow-hidden">
+
+        {/* Toolbar */}
+        <div className="sticky top-0 flex gap-2 p-1
+                      bg-[#ED5E20] rounded-lg justify-center">
           {/* Font Style */}
           <button
             type="button"
             onClick={() => editor.chain().focus().toggleBold().run()}
             disabled={!editor.can().chain().focus().toggleBold().run()}
-            className={`p-1.5 rounded transition 
-              ${editor.isActive("bold") ? "bg-[#D1D1D1] dark:bg-[#333]" : "hover:bg-[#E5E5E5] dark:hover:bg-[#222]"}
-              `}
+            className={`flex p-1.5 rounded transition cursor-pointer w-10 h-10 justify-center items-center
+            ${editor.isActive("bold") ? "bg-orange-400  dark:[#ED5E20]/50" : "hover:bg-orange-400"}
+          `}
             title="Bold (Ctrl+B)"
           >
-            <Bold size={16} />
+            <Bold size={16} className="text-white" />
           </button>
           <button
             type="button"
             onClick={() => editor.chain().focus().toggleItalic().run()}
             disabled={!editor.can().chain().focus().toggleItalic().run()}
-            className={`p-1.5 rounded transition 
-              ${editor.isActive("italic") ? "bg-[#D1D1D1] dark:bg-[#333]" : "hover:bg-[#E5E5E5] dark:hover:bg-[#222]"}
-              `}
+            className={`flex p-1.5 rounded transition cursor-pointer w-10 h-10 justify-center items-center
+            ${editor.isActive("italic") ? "bg-orange-400  dark:[#ED5E20]/50" : "hover:bg-orange-400"}
+          `}
             title="Italic (Ctrl+I)"
           >
-            <Italic size={16} />
+            <Italic size={16} className="text-white" />
           </button>
           <button
             type="button"
             onClick={() => editor.chain().focus().toggleUnderline().run()}
             disabled={!editor.can().chain().focus().toggleUnderline().run()}
-            className={`p-1.5 rounded transition 
-              ${editor.isActive("underline") ? "bg-[#D1D1D1] dark:bg-[#333]" : "hover:bg-[#E5E5E5] dark:hover:bg-[#222]"}
-              `}
+            className={`flex p-1.5 rounded transition cursor-pointer w-10 h-10 justify-center items-center
+            ${editor.isActive("underline") ? "bg-orange-400  dark:[#ED5E20]/50" : "hover:bg-orange-400"}
+          `}
             title="Underline (Ctrl+U)"
           >
-            <UnderlineIcon size={16} />
+            <UnderlineIcon size={16} className="text-white" />
           </button>
+
           {/* Headings */}
           <button
             type="button"
             onClick={() => editor.chain().focus().setHeading({ level: 1 }).run()}
-            className={`p-1.5 rounded transition 
-              ${editor.isActive("heading", { level: 1 }) ? "bg-[#D1D1D1] dark:bg-[#333]" : "hover:bg-[#E5E5E5] dark:hover:bg-[#222]"}
-              `}
+            className={`flex p-1.5 rounded transition cursor-pointer w-10 h-10 justify-center items-center
+            ${editor.isActive("heading", { level: 1 }) ? "bg-orange-400  dark:[#ED5E20]/50" : "hover:bg-orange-400"}
+          `}
             title="Heading 1"
           >
-            <Type size={16} /> <span className="ml-1 text-sm font-bold">H1</span>
+            <span className="text-sm font-medium text-white">H1</span>
           </button>
           <button
             type="button"
             onClick={() => editor.chain().focus().setHeading({ level: 2 }).run()}
-            className={`p-1.5 rounded transition 
-              ${editor.isActive("heading", { level: 2 }) ? "bg-[#D1D1D1] dark:bg-[#333]" : "hover:bg-[#E5E5E5] dark:hover:bg-[#222]"}
-              `}
+            className={`flex p-1.5 rounded transition cursor-pointer w-10 h-10 justify-center items-center
+            ${editor.isActive("heading", { level: 2 }) ? "bg-orange-400  dark:[#ED5E20]/50" : "hover:bg-orange-400"}
+          `}
             title="Heading 2"
           >
-            <Type size={16} /> <span className="ml-1 text-sm font-bold">H2</span>
+            <span className="text-sm font-medium text-white">H2</span>
           </button>
           <button
             type="button"
             onClick={() => editor.chain().focus().setHeading({ level: 3 }).run()}
-            className={`p-1.5 rounded transition 
-              ${editor.isActive("heading", { level: 3 }) ? "bg-[#D1D1D1] dark:bg-[#333]" : "hover:bg-[#E5E5E5] dark:hover:bg-[#222]"}
-              `}
+            className={`flex p-1.5 rounded transition cursor-pointer w-10 h-10 justify-center items-center
+            ${editor.isActive("heading", { level: 3 }) ? "bg-orange-400  dark:[#ED5E20]/50" : "hover:bg-orange-400"}
+          `}
             title="Heading 3"
           >
-            <Type size={16} /> <span className="ml-1 text-sm font-bold">H3</span>
+            <span className="text-sm font-medium text-white">H3</span>
           </button>
+
           {/* Lists */}
           <button
             type="button"
             onClick={() => editor.chain().focus().toggleBulletList().run()}
-            className={`p-1.5 rounded transition 
-              ${editor.isActive("bulletList") ? "bg-[#D1D1D1] dark:bg-[#333]" : "hover:bg-[#E5E5E5] dark:hover:bg-[#222]"}
-              `}
+            className={`flex p-1.5 rounded transition cursor-pointer w-10 h-10 justify-center items-center
+            ${editor.isActive("bulletList") ? "bg-orange-400  dark:[#ED5E20]/50" : "hover:bg-orange-400"}
+          `}
             title="Bullet List"
           >
-            <List size={16} />
+            <List size={16} className="text-white" />
           </button>
           <button
             type="button"
             onClick={() => editor.chain().focus().toggleOrderedList().run()}
-            className={`p-1.5 rounded transition 
-              ${editor.isActive("orderedList") ? "bg-[#D1D1D1] dark:bg-[#333]" : "hover:bg-[#E5E5E5] dark:hover:bg-[#222]"}
-              `}
+            className={`flex p-1.5 rounded transition cursor-pointer w-10 h-10 justify-center items-center
+            ${editor.isActive("orderedList") ? "bg-orange-400  dark:[#ED5E20]/50" : "hover:bg-orange-400"}
+          `}
             title="Numbered List"
           >
-            <ListOrdered size={16} />
+            <ListOrdered size={16} className="text-white" />
           </button>
+
           {/* Alignment */}
           <button
             type="button"
             onClick={() => editor.chain().focus().setTextAlign("left").run()}
-            className={`p-1.5 rounded transition 
-              ${editor.isActive({ textAlign: "left" }) ? "bg-[#D1D1D1] dark:bg-[#333]" : "hover:bg-[#E5E5E5] dark:hover:bg-[#222]"}
-              `}
+            className={`flex p-1.5 rounded transition cursor-pointer w-10 h-10 justify-center items-center
+            ${editor.isActive({ textAlign: "left" }) ? "bg-orange-400  dark:[#ED5E20]/50" : "hover:bg-orange-400"}
+          `}
             title="Align Left"
           >
-            <AlignLeft size={16} />
+            <AlignLeft size={16} className="text-white" />
           </button>
           <button
             type="button"
             onClick={() => editor.chain().focus().setTextAlign("center").run()}
-            className={`p-1.5 rounded transition 
-              ${editor.isActive({ textAlign: "center" }) ? "bg-[#D1D1D1] dark:bg-[#333]" : "hover:bg-[#E5E5E5] dark:hover:bg-[#222]"}
-              `}
+            className={`flex p-1.5 rounded transition cursor-pointer w-10 h-10 justify-center items-center
+            ${editor.isActive({ textAlign: "center" }) ? "bg-orange-400  dark:[#ED5E20]/50" : "hover:bg-orange-400"}
+          `}
             title="Align Center"
           >
-            <AlignCenter size={16} />
+            <AlignCenter size={16} className="text-white" />
           </button>
           <button
             type="button"
             onClick={() => editor.chain().focus().setTextAlign("right").run()}
-            className={`p-1.5 rounded transition 
-              ${editor.isActive({ textAlign: "right" }) ? "bg-[#D1D1D1] dark:bg-[#333]" : "hover:bg-[#E5E5E5] dark:hover:bg-[#222]"}
-              `}
+            className={`flex p-1.5 rounded transition cursor-pointer w-10 h-10 justify-center items-center
+            ${editor.isActive({ textAlign: "right" }) ? "bg-orange-400  dark:[#ED5E20]/50" : "hover:bg-orange-400"}
+          `}
             title="Align Right"
           >
-            <AlignRight size={16} />
+            <AlignRight size={16} className="text-white" />
           </button>
+
           {/* Blockquote & Horizontal Rule */}
           <button
             type="button"
             onClick={() => editor.chain().focus().toggleBlockquote().run()}
-            className={`p-1.5 rounded transition 
-              ${editor.isActive("blockquote") ? "bg-[#D1D1D1] dark:bg-[#333]" : "hover:bg-[#E5E5E5] dark:hover:bg-[#222]"}
-              `}
+            className={`flex p-1.5 rounded transition cursor-pointer w-10 h-10 justify-center items-center
+            ${editor.isActive("blockquote") ? "bg-orange-400  dark:[#ED5E20]/50" : "hover:bg-orange-400"}
+          `}
             title="Blockquote"
           >
-            <Quote size={16} />
+            <Quote size={16} className="text-white" />
           </button>
           <button
             type="button"
             onClick={() => editor.chain().focus().setHorizontalRule().run()}
-            className="p-1.5 rounded transition hover:bg-[#E5E5E5] dark:hover:bg-[#222]"
+            className="flex p-1.5 rounded transition hover:bg-[#E5E5E5] hover:bg-orange-400 cursor-pointer w-10 h-10 justify-center items-center"
             title="Horizontal Rule"
           >
-            <Minus size={16} />
+            <Minus size={16} className="text-white" />
           </button>
         </div>
-        {/* Editor Content */}
-        <EditorContent
-          editor={editor}
-          className="min-h-[620px] px-3 py-2 outline-none ProseMirror bg-white dark:bg-[#1A1A1A] text-black dark:text-white"
-        />
+
+        {/* Scrollable Editor Content */}
+        <div className="flex-1 overflow-y-auto">
+          <EditorContent
+            editor={editor}
+            className="h-full px-3 py-2 outline-none ProseMirror
+               bg-white dark:bg-[#1A1A1A] text-black dark:text-white"
+          />
+        </div>
       </div>
     </div>
   );

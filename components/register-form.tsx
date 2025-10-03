@@ -24,7 +24,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { registerFormSchema } from "@/lib/validation-schemas";
 import { createClient } from "@/utils/supabase/client";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/uxhibit/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 
 export default function RegistrationForm() {

@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import ProfileDesignPhilosophy from "./profile-design-philo";
 import { createClient } from "@/utils/supabase/client";
 import RichTextEditor from "@/components/rich-editor/rich-text-editor";
+import { Undo2, Redo2, Eraser } from "lucide-react";
 
 export default function ProfileDesignPhiloClient({
   designPhilo,
@@ -99,6 +100,8 @@ export default function ProfileDesignPhiloClient({
   }, [profileId, supabase]);
 
 
+
+
   return (
     <>
       <ProfileDesignPhilosophy
@@ -106,52 +109,147 @@ export default function ProfileDesignPhiloClient({
         editable={isOwner}
         onEdit={handleEdit}
       />
-      <div
-        style={{ display: showEdit ? "block" : "none" }}
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-      >
-        <div className="bg-white dark:bg-[#1A1A1A] rounded-2xl p-8 shadow-2xl w-full max-w-lg mx-auto border border-gray-200 dark:border-gray-800">
-          <h3 className="text-xl font-bold mb-6 text-[#1A1A1A] dark:text-white">
-            {value ? "Edit" : "Add"} Design Philosophy
-          </h3>
-          <RichTextEditor
-            ref={editorRef}
-            value={editValue}
-            onChange={setEditValue}
-            disabled={loading}
-            className="min-h-[700px] max-h-[500px] overflow-auto w-full max-w-2xl mx-auto rounded-lg bg-white dark:bg-[#1A1A1A]"
-          />
-          {error && (
-            <p className="text-red-500 text-sm mt-2">{error}</p>
-          )}
-          <hr className="my-6 border-gray-200 dark:border-gray-700" />
-          <div className="flex justify-between gap-2">
-            <button
-              onClick={handleErase}
-              className="px-4 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition font-medium cursor-pointer"
-              disabled={loading || !editValue}
-            >
-              Erase
-            </button>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowEdit(false)}
-                className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition font-medium cursor-pointer"
-                disabled={loading}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                className="px-4 py-2 rounded-lg bg-[#ED5E20] text-white hover:bg-[#d94e13] transition font-medium cursor-pointer"
-                disabled={loading || !editValue}
-              >
-                {loading ? "Saving..." : "Save"}
-              </button>
+
+      {showEdit && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm cursor-pointer p-4"
+          onClick={() => setShowEdit(false)}
+        >
+          {/* Card */}
+          <div
+            className="relative z-10 flex flex-col w-full max-w-sm sm:max-w-md md:max-w-3xl 
+                     p-6 sm:p-8 md:p-10 bg-white dark:bg-[#1A1A1A] 
+                     rounded-2xl shadow-xl border border-white/20 text-center cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Title */}
+            <h3 className="text-2xl sm:text-3xl font-bold text-center gradient-text mb-6">
+              {value ? "Edit Design Philosophy" : "Add Design Philosophy"}
+            </h3>
+
+            {/* Editor */}
+            <RichTextEditor
+              ref={editorRef}
+              value={editValue}
+              onChange={setEditValue}
+              disabled={loading}
+              className="overflow-hidden w-full rounded-lg 
+                       bg-white dark:bg-[#1A1A1A] text-left min-h-[300px] max-h-[500px]"
+            />
+
+            {error && (
+              <p className="text-red-500 text-sm mt-3">{error}</p>
+            )}
+
+            {/* Buttons */}
+            <div className="flex justify-between items-center w-full mt-4">
+              {/* Left controls */}
+              <div className="flex gap-2">
+                {/* Undo */}
+                <button
+                  onClick={() => editorRef.current?.commands.undo()}
+                  disabled={loading}
+                  className="inline-flex items-center justify-center w-10 h-10 rounded-xl
+                           border border-neutral-300/70 dark:border-neutral-600/60 
+                           bg-white/60 dark:bg-neutral-800/50
+                           text-neutral-700 dark:text-neutral-200
+                           shadow-sm backdrop-blur
+                           hover:bg-white/80 dark:hover:bg-neutral-800/70
+                           transition-colors cursor-pointer"
+                  title="Undo"
+                >
+                  <Undo2 size={18} />
+                </button>
+
+                {/* Redo */}
+                <button
+                  onClick={() => editorRef.current?.commands.redo()}
+                  disabled={loading}
+                  className="inline-flex items-center justify-center w-10 h-10 rounded-xl
+                           border border-neutral-300/70 dark:border-neutral-600/60 
+                           bg-white/60 dark:bg-neutral-800/50
+                           text-neutral-700 dark:text-neutral-200
+                           shadow-sm backdrop-blur
+                           hover:bg-white/80 dark:hover:bg-neutral-800/70
+                           transition-colors cursor-pointer"
+                  title="Redo"
+                >
+                  <Redo2 size={18} />
+                </button>
+              </div>
+
+              {/* Right controls */}
+              <div className="flex gap-3">
+                {/* Clear */}
+                <button
+                  onClick={handleErase}
+                  disabled={loading || !editValue}
+                  className="inline-flex items-center justify-center w-10 h-10 rounded-xl
+                           border border-neutral-300/70 dark:border-neutral-600/60 
+                           bg-white/60 dark:bg-neutral-800/50
+                           text-neutral-700 dark:text-neutral-200
+                           shadow-sm backdrop-blur
+                           hover:bg-white/80 dark:hover:bg-neutral-800/70
+                           transition-colors cursor-pointer"
+                  title="Clear"
+                >
+                  <Eraser size={18} />
+                </button>
+
+                {/* Cancel */}
+                <button
+                  onClick={() => setShowEdit(false)}
+                  disabled={loading}
+                  className="inline-flex items-center justify-center px-5 py-2 rounded-xl text-sm font-medium
+                          border border-neutral-300/70 dark:border-neutral-600/60 
+                          bg-white/60 dark:bg-neutral-800/50
+                          text-neutral-700 dark:text-neutral-200
+                          shadow-sm backdrop-blur
+                          hover:bg-white/80 dark:hover:bg-neutral-800/70
+                          transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                {/* Save */}
+                <button
+                  onClick={handleSave}
+                  disabled={loading || !editValue}
+                  className="group relative inline-flex items-center justify-center
+                          px-6 py-2.5 rounded-xl text-sm text-white font-semibold tracking-wide
+                          transition-all duration-300 cursor-pointer
+                          focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40
+                          disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span
+                    aria-hidden
+                    className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b]"
+                  />
+                  <span
+                    aria-hidden
+                    className="absolute inset-[2px] rounded-[10px] bg-[linear-gradient(145deg,rgba(255,255,255,0.28),rgba(255,255,255,0.07))] backdrop-blur-[2px]"
+                  />
+                  <span
+                    aria-hidden
+                    className="absolute -left-1 -right-1 top-0 h-full overflow-hidden rounded-xl"
+                  >
+                    <span className="absolute inset-y-0 -left-full w-1/2 translate-x-0 
+                       bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 
+                       transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70" />
+                  </span>
+                  <span
+                    aria-hidden
+                    className="absolute inset-0 rounded-xl ring-1 ring-white/30 group-hover:ring-white/50"
+                  />
+                  <span className="relative z-10">
+                    {loading ? "Saving..." : "Save"}
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </>
   );
 }

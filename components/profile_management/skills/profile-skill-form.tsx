@@ -40,14 +40,14 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
 
     // Add Skill
     const handleAddSkill = async () => {
-        if (!newSkill.trim()) return;
+        if (!newSkill.trim()) return false;
 
         const normalizedNewSkill = newSkill.trim().toLowerCase();
         const skillExists = skills.some(s => s.trim().toLowerCase() === normalizedNewSkill);
         if (skillExists) {
             toast.error("This skill is already in place. Would you mind adding another skill?");
             setAddLoading(false);
-            return;
+            return false;
         }
 
         setAddLoading(true);
@@ -87,7 +87,7 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
                     profileSkillError.message.includes("unique constraint")
                 ) {
                     toast.error("This skill is already in place. Would you mind adding another skill?");
-                    return;
+                    return false;
                 }
                 throw profileSkillError;
             }
@@ -105,13 +105,18 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
             // updatedSkills is an array of objects like { skills: { name: "SkillName" } }
             setSkills(updatedSkills.map((row: any) => row.skills.name));
             if (onSkillsChange) onSkillsChange(updatedSkills.map((row: any) => row.skills.name));
+
+            // keep input section open
             setNewSkill("");
+            setShowAddInput(true);
+            return true;
         } catch (err: unknown) {
             if (err instanceof Error) {
                 setError(err.message || "Error adding skill");
             } else {
                 setError("Unknown error adding skill");
             }
+            return false;
         } finally {
             setAddLoading(false);
         }
@@ -215,197 +220,161 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            <div className="bg-white dark:bg-[#1A1A1A] rounded-xl shadow-xl p-8 w-full max-w-xl mx-4 relative">
-                {/* X icon button at top right */}
-                <div className="absolute top-4 right-4 z-10 flex items-center">
-                    <button
-                        type="button"
-                        className="cursor-pointer p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 transition"
-                        onClick={onCancel}
-                        aria-label="Close"
-                        disabled={addLoading || editLoading}
-                    >
-                        <X size={22} className="text-gray-500 dark:text-gray-300" />
-                    </button>
-                </div>
-                {/* Header row: Title only, no Add button */}
-                <div className="flex items-center justify-between mb-6">
-                    <h2
-                        className="flex-1 text-xl font-semibold text-[#ED5E20] dark:text-orange-300 text-center"
-                        id="skills-modal-title"
-                        tabIndex={-1}
-                    >
-                        Manage Skills &amp; Tools
-                    </h2>
-                </div>
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm cursor-pointer"
+      onClick={onCancel}
+    >
+      <div
+        className="relative z-10 flex flex-col w-full max-w-sm sm:max-w-md md:max-w-xl 
+                   p-6 sm:p-8 md:p-10 bg-white dark:bg-[#1A1A1A] 
+                   rounded-2xl shadow-xl border border-white/20 cursor-default"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Title */}
+        <h2 className="text-2xl sm:text-3xl font-bold text-center gradient-text mb-6">
+          Manage Career Highlights
+        </h2>
 
-                <table className="w-full mb-4 border-separate border-spacing-y-2">
-                    <thead>
-                        <tr className="text-left text-sm text-gray-700 dark:text-gray-200">
-                            <th className="pl-2">Skill/Tool</th>
-                            <th className="text-center">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {paginatedSkills.map((skill, i) => (
-                            <tr key={i} className="bg-gray-50 dark:bg-gray-900 rounded">
-                                <td className="pl-2 py-2">
-                                    {editingIndex === i ? (
-                                        <input
-                                            value={editValue}
-                                            onChange={e => setEditValue(e.target.value)}
-                                            className="border rounded px-2 py-1 w-full"
-                                            disabled={editLoading}
-                                            autoFocus
-                                        />
-                                    ) : (
-                                        <span className="font-medium">{skill}</span>
-                                    )}
-                                </td>
-                                <td className="py-2 text-center">
-                                    {editingIndex === i ? (
-                                        <>
-                                            <button
-                                                onClick={() => handleEditSkill(skill, editValue, i)}
-                                                className="cursor-pointer p-2 rounded-full bg-green-500 hover:bg-green-600 text-white mr-2"
-                                                disabled={editLoading || !editValue.trim()}
-                                                title="Save"
-                                                aria-label="Save"
-                                            >
-                                                <Check size={18} />
-                                            </button>
-                                            <button
-                                                onClick={() => { setEditingIndex(null); setEditValue(""); }}
-                                                className="cursor-pointer p-2 rounded-full bg-gray-300 hover:bg-gray-400 text-gray-800"
-                                                disabled={editLoading}
-                                                title="Cancel"
-                                                aria-label="Cancel"
-                                            >
-                                                <X size={18} />
-                                            </button>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <button
-                                                onClick={() => { setEditingIndex(i); setEditValue(skill); }}
-                                                className="p-2 rounded-full bg-yellow-100 hover:bg-yellow-300 transition-colors mr-2 cursor-pointer"
-                                                disabled={editLoading}
-                                                title="Edit"
-                                                aria-label="Edit skill"
-                                            >
-                                                <Pencil size={18} className="text-yellow-700" />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteSkill(skill, i)}
-                                                className="p-2 rounded-full bg-red-100 hover:bg-red-300 transition-colors cursor-pointer"
-                                                disabled={editLoading}
-                                                title="Delete"
-                                                aria-label="Delete skill"
-                                            >
-                                                <Trash2 size={18} className="text-red-700" />
-                                            </button>
-                                        </>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                <div className="flex items-center justify-center gap-4 my-2">
-                    <button
-                        className={`cursor-pointer p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition ${page === 1 ? "cursor-not-allowed opacity-50" : ""}`}
-                        onClick={() => setPage(Math.max(1, page - 1))}
-                        disabled={page === 1}
-                        aria-label="Previous page"
-                    >
-                        <ChevronLeft size={18} />
-                    </button>
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                        Page {page} of {totalPages}
-                    </span>
-                    <button
-                        className={`cursor-pointer p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition ${page === totalPages ? "cursor-not-allowed opacity-50" : ""}`}
-                        onClick={() => setPage(page + 1)}
-                        disabled={page === totalPages}
-                        aria-label="Next page"
-                    >
-                        <ChevronRight size={18} />
-                    </button>
-                </div>
-
-                {editingIndex === null && !showAddInput && (
-                    <div className="absolute bottom-6 right-6 z-20">
-                        <button
-                            type="button"
-                            className="flex items-center gap-1 px-4 py-2 rounded-full bg-[#ED5E20] text-white font-semibold shadow-lg hover:bg-[#d94e13] transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-400"
-                            onClick={() => setShowAddInput(true)}
-                            disabled={addLoading}
-                            aria-label="Add skill"
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          {/* Highlights list */}
+          <div className="overflow-y-auto max-h-64 mb-2 rounded-xl">
+            <table className="w-full text-sm sm:text-base border-separate border-spacing-y-3 pr-2">
+              <tbody>
+                {highlights.map((item, idx) => (
+                  <tr
+                    key={idx}
+                    className="bg-gray-50 dark:bg-accent rounded-xl transition"
+                  >
+                    <td className="pl-3 pr-3 py-2 rounded-xl">
+                      <div className="flex items-center justify-between gap-3">
+                        {/* Icon select */}
+                        <Select
+                          value={item.icon}
+                          onValueChange={value => handleChange(idx, "icon", value)}
                         >
-                            <Plus size={22} />
+                          <SelectTrigger
+                            className="border rounded-lg px-3 py-2 w-[120px]"
+                            aria-label="Icon"
+                          >
+                            <SelectValue placeholder="Choose icon" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {iconOptions.map(icon => (
+                              <SelectItem key={icon} value={icon}>
+                                {icon}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        {/* Description input */}
+                        <Input
+                          type="text"
+                          value={item.content}
+                          onChange={e => handleChange(idx, "content", e.target.value)}
+                          placeholder="Highlight description"
+                          className="border rounded-lg px-3 py-2 flex-1"
+                        />
+
+                        {/* Delete button */}
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(idx)}
+                          className="p-2"
+                          aria-label="Delete highlight"
+                        >
+                          <Trash2
+                            size={18}
+                            className="text-gray-500 hover:text-red-600 cursor-pointer transition"
+                          />
                         </button>
-                    </div>
-                )}
-                {showAddInput && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                        <div className="bg-white dark:bg-[#1A1A1A] rounded-xl shadow-xl p-6 w-full max-w-xs mx-4 flex flex-col gap-4">
-                            <h3 className="text-lg font-semibold text-[#ED5E20] dark:text-orange-300 text-center">
-                                Add a Skill
-                            </h3>
-                            <input
-                                type="text"
-                                value={newSkill}
-                                onChange={e => setNewSkill(e.target.value)}
-                                placeholder="Enter skill"
-                                className="border rounded px-2 py-2 text-base"
-                                disabled={addLoading}
-                                autoFocus
-                                onKeyDown={async (e) => {
-                                    if (e.key === "Enter" && newSkill.trim()) {
-                                        await handleAddSkill();
-                                        setShowAddInput(false);
-                                    }
-                                }}
-                            />
-                            <div className="flex gap-2 justify-end">
-                                {!addLoading && (
-                                    <button
-                                        onClick={async () => {
-                                            await handleAddSkill();
-                                            setShowAddInput(false);
-                                        }}
-                                        className="px-4 py-2 rounded bg-green-500 text-white font-semibold hover:bg-green-600 transition cursor-pointer"
-                                        disabled={!newSkill.trim()}
-                                    >
-                                        Confirm
-                                    </button>
-                                )}
-                                {addLoading && (
-                                    <span className="flex items-center gap-2 px-4 py-2 text-green-700 font-semibold animate-pulse">
-                                        <Loader2 size={20} className="animate-spin" />
-                                        Adding skill...
-                                    </span>
-                                )}
-                                {!addLoading && (
-                                    <button
-                                        type="button"
-                                        className="px-4 py-2 rounded bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300 transition cursor-pointer"
-                                        onClick={() => {
-                                            setShowAddInput(false);
-                                            setNewSkill("");
-                                        }}
-                                    >
-                                        Cancel
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Add highlight button */}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleAdd}
+              className="relative inline-flex items-center justify-center
+                         px-5 py-2.5 rounded-xl text-sm text-white font-semibold tracking-wide
+                         transition-all duration-300 cursor-pointer overflow-hidden
+                         focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40
+                         group"
+            >
+              <span
+                aria-hidden
+                className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b]"
+              />
+              <span
+                aria-hidden
+                className="absolute inset-[2px] rounded-[10px] bg-[linear-gradient(145deg,rgba(255,255,255,0.25),rgba(255,255,255,0.06))] backdrop-blur-[2px]"
+              />
+              <span
+                aria-hidden
+                className="absolute -left-1 -right-1 top-0 h-full overflow-hidden rounded-xl"
+              >
+                <span className="absolute inset-y-0 -left-full w-1/2 
+                                bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 
+                                transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70" />
+              </span>
+              <span className="relative z-10">+ Add Highlight</span>
+            </button>
+          </div>
+
+          {/* Cancel / Save buttons */}
+          <div className="flex gap-4 mt-6">
+            <button
+              type="button"
+              onClick={onCancel}
+              aria-label="Close"
+              className="flex-1 inline-flex items-center justify-center rounded-xl text-sm font-medium
+                         border border-neutral-300/70 dark:border-neutral-600/60
+                         bg-white/70 dark:bg-neutral-800/70
+                         text-neutral-700 dark:text-neutral-200
+                         shadow-sm backdrop-blur
+                         hover:bg-neutral-100 dark:hover:bg-neutral-700
+                         transition-colors h-12 cursor-pointer"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              className="relative flex-1 inline-flex items-center justify-center
+                         rounded-xl text-sm text-white font-semibold tracking-wide
+                         transition-all duration-300 h-12 overflow-hidden
+                         focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40 
+                         cursor-pointer group"
+            >
+              <span
+                aria-hidden
+                className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b]"
+              />
+              <span
+                aria-hidden
+                className="absolute inset-[2px] rounded-[10px] bg-[linear-gradient(145deg,rgba(255,255,255,0.25),rgba(255,255,255,0.06))] backdrop-blur-[2px]"
+              />
+              <span
+                aria-hidden
+                className="absolute -left-1 -right-1 top-0 h-full overflow-hidden rounded-xl"
+              >
+                <span className="absolute inset-y-0 -left-full w-1/2 
+                                bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 
+                                transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70" />
+              </span>
+              <span className="relative z-10">Save All</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 };
 
 export default ProfileSkillForm;

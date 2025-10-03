@@ -14,30 +14,34 @@ const ProfileAboutSection: React.FC<ProfileAboutSectionProps> = ({
   onEditClick,
   editable = false,
   isEmpty = false,
-}) => (
-  <div className="flex-1 bg-white dark:bg-[#1A1A1A]/25 rounded-xl p-5 shadow-md relative">
-    <h2 className="text-lg font-semibold mb-3 text-[#1A1A1A] dark:text-white flex items-center justify-between">
-      About
+}) => {
+  return (
+    <div className="flex-1 bg-white dark:bg-[#1A1A1A]/25 rounded-xl p-5 shadow-md relative group">
+      <h2 className="text-lg font-semibold mb-3 text-[#1A1A1A] dark:text-white flex items-center gap-2">
+        About
+      </h2>
+
       {editable && (
         <button
           onClick={onEditClick}
-          className="ml-2 p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+          className="absolute top-5 right-5 p-2 cursor-pointer flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
           title={isEmpty ? "Add About" : "Edit About"}
           aria-label={isEmpty ? "Add About" : "Edit About"}
         >
-          {isEmpty ? (
-            <Plus size={18} className="text-gray-700 dark:text-gray-200" />
-          ) : (
-            <Pencil size={18} className="text-gray-700 dark:text-gray-200" />
-          )}
+          {isEmpty ? <Plus size={18} className="text-gray-500 hover:text-orange-500 dark:hover:text-white" /> : <Pencil size={18} className="text-gray-500 hover:text-orange-500 dark:hover:text-white" />}
         </button>
       )}
-    </h2>
-    <div
-      className="prose prose-lg dark:prose-invert mb-2 break-words"
-      dangerouslySetInnerHTML={{ __html: bio }}
-    />
-  </div>
-);
+
+      {isEmpty ? (
+        <p className="italic text-gray-400 text-sm">Add your bio to shine!</p>
+      ) : (
+        <div
+          className="prose prose-lg dark:prose-invert mb-2 break-words text-gray-500 dark:text-gray-300"
+          dangerouslySetInnerHTML={{ __html: bio }}
+        />
+      )}
+    </div>
+  );
+};
 
 export default ProfileAboutSection;
