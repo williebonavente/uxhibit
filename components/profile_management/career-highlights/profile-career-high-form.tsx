@@ -168,20 +168,23 @@ const ProfileCareerHighForm: React.FC<ProfileCareerHighFormProps> = ({
                                         </td>
                                     </tr>
                                 ))}
+
                                 {/* Add highlight button */}
-                                <div className="flex justify-center">
-                                    <button
-                                        type="button"
-                                        onClick={handleAdd}
-                                        className="w-full h-11 mt-2 flex items-center justify-center rounded-xl 
-                                                border border-[#ED5E20]/50 dark:border-[#ED5E20]/25 
-                                                text-[#ED5E20] hover:bg-[#ED5E20]/20 dark:hover:bg-[#ED5E20]/10  
-                                                transition cursor-pointer"
-                                        aria-label="Add Highlight"
-                                    >
-                                        +
-                                    </button>
-                                </div>
+                                <tr>
+                                    <td className="px-3 py-2">
+                                        <button
+                                            type="button"
+                                            onClick={handleAdd}
+                                            className="w-full h-11 flex items-center justify-center rounded-xl 
+                   border border-[#ED5E20]/50 dark:border-[#ED5E20]/25 
+                   text-[#ED5E20] hover:bg-[#ED5E20]/20 dark:hover:bg-[#ED5E20]/10  
+                   transition cursor-pointer"
+                                            aria-label="Add Highlight"
+                                        >
+                                            +
+                                        </button>
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>

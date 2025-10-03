@@ -219,162 +219,273 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
         }
     };
 
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+
+        if (!profileId) {
+            console.error("profileId is missing!");
+            return;
+        }
+
+        try {
+            // Save all current skills to the profile_details table
+            const skillsArray = skills.map((s) => s.trim());
+
+            const { error } = await supabase
+                .from("profile_details")
+                .update({ skills: skillsArray })
+                .eq("id", profileId);
+
+            if (error) {
+                console.error("Failed to save skills:", error);
+                toast.error("Failed to save skills. Please try again.");
+                return;
+            }
+
+            toast.success("Skills saved successfully!");
+            if (onSkillsChange) onSkillsChange(skills);
+            if (onCancel) onCancel();
+        } catch (err: unknown) {
+            console.error("Error saving skills:", err);
+            toast.error("Error saving skills. Please try again.");
+        }
+    };
+
     return (
-    <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm cursor-pointer"
-      onClick={onCancel}
-    >
-      <div
-        className="relative z-10 flex flex-col w-full max-w-sm sm:max-w-md md:max-w-xl 
-                   p-6 sm:p-8 md:p-10 bg-white dark:bg-[#1A1A1A] 
-                   rounded-2xl shadow-xl border border-white/20 cursor-default"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Title */}
-        <h2 className="text-2xl sm:text-3xl font-bold text-center gradient-text mb-6">
-          Manage Career Highlights
-        </h2>
+        <div
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm cursor-pointer"
+            onClick={onCancel}
+        >
+            <div
+                className="relative z-10 flex flex-col w-full max-w-sm sm:max-w-md md:max-w-xl 
+                 p-6 sm:p-8 md:p-10 bg-white dark:bg-[#1A1A1A] 
+                 rounded-2xl shadow-xl border border-white/20 cursor-default"
+                onClick={(e) => e.stopPropagation()}
+            >
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          {/* Highlights list */}
-          <div className="overflow-y-auto max-h-64 mb-2 rounded-xl">
-            <table className="w-full text-sm sm:text-base border-separate border-spacing-y-3 pr-2">
-              <tbody>
-                {highlights.map((item, idx) => (
-                  <tr
-                    key={idx}
-                    className="bg-gray-50 dark:bg-accent rounded-xl transition"
-                  >
-                    <td className="pl-3 pr-3 py-2 rounded-xl">
-                      <div className="flex items-center justify-between gap-3">
-                        {/* Icon select */}
-                        <Select
-                          value={item.icon}
-                          onValueChange={value => handleChange(idx, "icon", value)}
-                        >
-                          <SelectTrigger
-                            className="border rounded-lg px-3 py-2 w-[120px]"
-                            aria-label="Icon"
-                          >
-                            <SelectValue placeholder="Choose icon" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {iconOptions.map(icon => (
-                              <SelectItem key={icon} value={icon}>
-                                {icon}
-                              </SelectItem>
+                {/* Title */}
+                <h2 className="text-2xl sm:text-3xl font-bold text-center gradient-text mb-6">
+                    Manage Skills / Tools
+                </h2>
+
+                {/* Skills Table (scrollable instead of pagination) */}
+                <div className="overflow-y-auto max-h-64 mb-3 rounded-xl">
+                    <table className="w-full text-sm sm:text-base border-separate border-spacing-y-3 pr-3">
+                        <tbody>
+                            {skills.map((skill, i) => (
+                                <tr
+                                    key={i}
+                                    className="bg-gray-50 dark:bg-accent rounded-xl transition"
+                                >
+                                    <td className="pl-3 pr-3 py-2 rounded-xl">
+                                        {/* Each row is its own group */}
+                                        <div className="flex items-center justify-between group">
+                                            {editingIndex === i ? (
+                                                <input
+                                                    value={editValue}
+                                                    onChange={(e) => setEditValue(e.target.value)}
+                                                    className="border rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-1 focus:ring-[#ED5E20]/60 focus:border-[#ED5E20]"
+                                                    disabled={editLoading}
+
+                                                />
+                                            ) : (
+                                                <span className="font-medium">{skill}</span>
+                                            )}
+
+                                            {/* Only show buttons when THIS row is hovered */}
+                                            <div className="ml-3 flex items-center">
+                                                {editingIndex === i ? (
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleEditSkill(skill, editValue, i)}
+                                                            className="p-2"
+                                                            disabled={editLoading || !editValue.trim()}
+                                                            title="Save"
+                                                            aria-label="Save"
+                                                        >
+                                                            <Check size={18} className="text-gray-500 hover:text-green-400 cursor-pointer" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingIndex(null);
+                                                                setEditValue("");
+                                                            }}
+                                                            className="p-2"
+                                                            disabled={editLoading}
+                                                            title="Cancel"
+                                                            aria-label="Cancel"
+                                                        >
+                                                            <X size={18} className="text-gray-500 hover:text-red-400 cursor-pointer" />
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingIndex(i);
+                                                                setEditValue(skill);
+                                                            }}
+                                                            className="p-2"
+                                                            disabled={editLoading}
+                                                            title="Edit"
+                                                            aria-label="Edit skill"
+                                                        >
+                                                            <Pencil
+                                                                size={18}
+                                                                className="text-gray-500 hover:text-orange-500 cursor-pointer"
+                                                            />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteSkill(skill, i)}
+                                                            className="p-2"
+                                                            disabled={editLoading}
+                                                            title="Delete"
+                                                            aria-label="Delete skill"
+                                                        >
+                                                            <Trash2
+                                                                size={18}
+                                                                className="text-gray-500 hover:text-red-700 cursor-pointer"
+                                                            />
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
                             ))}
-                          </SelectContent>
-                        </Select>
+                        </tbody>
+                    </table>
+                </div>
 
-                        {/* Description input */}
-                        <Input
-                          type="text"
-                          value={item.content}
-                          onChange={e => handleChange(idx, "content", e.target.value)}
-                          placeholder="Highlight description"
-                          className="border rounded-lg px-3 py-2 flex-1"
+                {/* Add Skill Section */}
+                {showAddInput ? (
+                    <div className="mt-5 p-5 rounded-2xl border border-accent 
+                                    bg-white dark:bg-[#1A1A1A]  shadow-md">
+                        <label className="block text-md font-medium text-gray-600 dark:text-gray-300 mt-1 mb-3">
+                            Add a new skill or tool
+                        </label>
+                        <input
+                            type="text"
+                            value={newSkill}
+                            onChange={(e) => setNewSkill(e.target.value)}
+                            placeholder="e.g., UI/UX, Figma, Photoshop..."
+                            className="border border-accent rounded-xl px-4 py-2.5 w-full
+                                        text-base bg-gray-50 dark:bg-neutral-800 
+                                        focus:outline-none focus:ring-1 focus:ring-[#ED5E20]/60 focus:border-[#ED5E20]
+                                        placeholder-gray-400 dark:placeholder-gray-500
+                                        mb-4 transition"
+                            disabled={addLoading}
+                            onKeyDown={async (e) => {
+                                if (e.key === "Enter" && newSkill.trim()) {
+                                    await handleAddSkill();
+                                }
+                            }}
                         />
 
-                        {/* Delete button */}
+                        <div className="flex gap-3 justify-end">
+                            {/* Cancel */}
+                            <button
+                                type="button"
+                                className="px-5 py-2.5 rounded-xl text-sm font-medium
+                                            border border-neutral-300/70 dark:border-neutral-600/60 
+                                            bg-white/70 dark:bg-neutral-800/70
+                                            text-neutral-700 dark:text-neutral-200
+                                            shadow-sm backdrop-blur
+                                            hover:bg-neutral-100 dark:hover:bg-neutral-700
+                                            transition-colors cursor-pointer"
+                                onClick={() => {
+                                    setShowAddInput(false);
+                                    setNewSkill("");
+                                }}
+                                disabled={addLoading}
+                            >
+                                Cancel
+                            </button>
+
+                            {/* Add */}
+                            <button
+                                onClick={async () => {
+                                    await handleAddSkill();
+                                }}
+                                className="relative inline-flex items-center justify-center
+                                            px-6 py-2.5 rounded-xl text-sm text-white font-semibold tracking-wide
+                                            transition-all duration-300 cursor-pointer overflow-hidden
+                                            focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40
+                                            disabled:opacity-50 disabled:cursor-not-allowed group"
+                                disabled={!newSkill.trim()}
+                            >
+                                <span
+                                    aria-hidden
+                                    className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b]"
+                                />
+                                <span
+                                    aria-hidden
+                                    className="absolute inset-[2px] rounded-[10px] bg-[linear-gradient(145deg,rgba(255,255,255,0.25),rgba(255,255,255,0.06))] backdrop-blur-[2px]"
+                                />
+                                <span
+                                    aria-hidden
+                                    className="absolute -left-1 -right-1 top-0 h-full overflow-hidden rounded-xl"
+                                >
+                                    <span className="absolute inset-y-0 -left-full w-1/2 
+                                                    bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 
+                                                    transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70" />
+                                </span>
+                                <span className="relative z-10">{addLoading ? "Adding..." : "+ Add"}</span>
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex gap-4 mt-6">
+                        {/* Cancel */}
                         <button
-                          type="button"
-                          onClick={() => handleDelete(idx)}
-                          className="p-2"
-                          aria-label="Delete highlight"
+                            onClick={onCancel}
+                            aria-label="Close"
+                            disabled={addLoading || editLoading}
+                            className="flex-1 inline-flex items-center justify-center rounded-xl text-sm font-medium
+                                        border border-neutral-300/70 dark:border-neutral-600/60
+                                        bg-white/70 dark:bg-neutral-800/70
+                                        text-neutral-700 dark:text-neutral-200
+                                        shadow-sm backdrop-blur
+                                        hover:bg-neutral-100 dark:hover:bg-neutral-700
+                                        transition-colors h-12 cursor-pointer"
                         >
-                          <Trash2
-                            size={18}
-                            className="text-gray-500 hover:text-red-600 cursor-pointer transition"
-                          />
+                            Cancel
                         </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
 
-          {/* Add highlight button */}
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={handleAdd}
-              className="relative inline-flex items-center justify-center
-                         px-5 py-2.5 rounded-xl text-sm text-white font-semibold tracking-wide
-                         transition-all duration-300 cursor-pointer overflow-hidden
-                         focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40
-                         group"
-            >
-              <span
-                aria-hidden
-                className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b]"
-              />
-              <span
-                aria-hidden
-                className="absolute inset-[2px] rounded-[10px] bg-[linear-gradient(145deg,rgba(255,255,255,0.25),rgba(255,255,255,0.06))] backdrop-blur-[2px]"
-              />
-              <span
-                aria-hidden
-                className="absolute -left-1 -right-1 top-0 h-full overflow-hidden rounded-xl"
-              >
-                <span className="absolute inset-y-0 -left-full w-1/2 
-                                bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 
-                                transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70" />
-              </span>
-              <span className="relative z-10">+ Add Highlight</span>
-            </button>
-          </div>
-
-          {/* Cancel / Save buttons */}
-          <div className="flex gap-4 mt-6">
-            <button
-              type="button"
-              onClick={onCancel}
-              aria-label="Close"
-              className="flex-1 inline-flex items-center justify-center rounded-xl text-sm font-medium
-                         border border-neutral-300/70 dark:border-neutral-600/60
-                         bg-white/70 dark:bg-neutral-800/70
-                         text-neutral-700 dark:text-neutral-200
-                         shadow-sm backdrop-blur
-                         hover:bg-neutral-100 dark:hover:bg-neutral-700
-                         transition-colors h-12 cursor-pointer"
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              className="relative flex-1 inline-flex items-center justify-center
-                         rounded-xl text-sm text-white font-semibold tracking-wide
-                         transition-all duration-300 h-12 overflow-hidden
-                         focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40 
-                         cursor-pointer group"
-            >
-              <span
-                aria-hidden
-                className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b]"
-              />
-              <span
-                aria-hidden
-                className="absolute inset-[2px] rounded-[10px] bg-[linear-gradient(145deg,rgba(255,255,255,0.25),rgba(255,255,255,0.06))] backdrop-blur-[2px]"
-              />
-              <span
-                aria-hidden
-                className="absolute -left-1 -right-1 top-0 h-full overflow-hidden rounded-xl"
-              >
-                <span className="absolute inset-y-0 -left-full w-1/2 
-                                bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 
-                                transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70" />
-              </span>
-              <span className="relative z-10">Save All</span>
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
+                        {/* Add New Skill Button */}
+                        <button
+                            onClick={() => setShowAddInput(true)}
+                            disabled={addLoading}
+                            className="relative flex-1 inline-flex items-center justify-center
+                                        rounded-xl text-sm text-white font-semibold tracking-wide
+                                        transition-all duration-300 h-12 overflow-hidden
+                                        focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40 
+                                        cursor-pointer group"
+                        >
+                            <span
+                                aria-hidden
+                                className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b]"
+                            />
+                            <span
+                                aria-hidden
+                                className="absolute inset-[2px] rounded-[10px] bg-[linear-gradient(145deg,rgba(255,255,255,0.25),rgba(255,255,255,0.06))] backdrop-blur-[2px]"
+                            />
+                            <span
+                                aria-hidden
+                                className="absolute -left-1 -right-1 top-0 h-full overflow-hidden rounded-xl"
+                            >
+                                <span className="absolute inset-y-0 -left-full w-1/2 
+                                                    bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 
+                                                    transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70" />
+                            </span>
+                            <span className="relative z-10">+ Add Skill</span>
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
 };
 
 export default ProfileSkillForm;
