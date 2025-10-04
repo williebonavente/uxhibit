@@ -1,4 +1,9 @@
-import { Mail, Globe, Users, Pencil } from "lucide-react";
+import { Mail, Users, Pencil } from "lucide-react";
+import {
+    Book, Trophy, Rocket, Star, Medal, Flame, Sparkles, Lightbulb,
+    Heart, ThumbsUp, PartyPopper, Gem, Mountain, Globe,
+    Sun, Moon, Brain, Dumbbell
+} from "lucide-react";
 
 export type ProfileContactProps = {
     email: string;
@@ -7,6 +12,32 @@ export type ProfileContactProps = {
     onEdit?: () => void;
     isOwner?: boolean;
     extraFieldsRaw?: string;
+    icon:
+    | "book" | "trophy" | "rocket" | "star" | "medal" | "fire" | "sparkles" | "lightbulb"
+    | "heart" | "thumbsup" | "party" | "diamond" | "mountain" | "globe"
+    | "fireworks" | "muscle" | "brain" | "sun" | "moon";
+};
+
+const iconMap: Record<ProfileContactProps["icon"], React.ReactElement> = {
+    book: <Book className="w-5 h-5 text-blue-500" />,
+    trophy: <Trophy className="w-5 h-5 text-yellow-500" />,
+    rocket: <Rocket className="w-5 h-5 text-orange-500" />,
+    star: <Star className="w-5 h-5 text-amber-400" />,
+    medal: <Medal className="w-5 h-5 text-yellow-600" />,
+    fire: <Flame className="w-5 h-5 text-red-500" />,
+    sparkles: <Sparkles className="w-5 h-5 text-pink-400" />,
+    lightbulb: <Lightbulb className="w-5 h-5 text-amber-500" />,
+    heart: <Heart className="w-5 h-5 text-rose-500" />,
+    thumbsup: <ThumbsUp className="w-5 h-5 text-blue-600" />,
+    party: <PartyPopper className="w-5 h-5 text-purple-500" />,
+    diamond: <Gem className="w-5 h-5 text-cyan-500" />,
+    mountain: <Mountain className="w-5 h-5 text-gray-600" />,
+    globe: <Globe className="w-5 h-5 text-green-500" />,
+    fireworks: <PartyPopper className="w-5 h-5 text-fuchsia-500" />,
+    muscle: <Dumbbell className="w-5 h-5 text-slate-700" />,
+    brain: <Brain className="w-5 h-5 text-pink-500" />,
+    sun: <Sun className="w-5 h-5 text-orange-400" />,
+    moon: <Moon className="w-5 h-5 text-indigo-500" />,
 };
 
 export default function ProfileContact({
@@ -46,24 +77,24 @@ export default function ProfileContact({
     }
 
     return (
-        <div className="flex-1 bg-white dark:bg-[#1A1A1A]/25 rounded-xl p-5 justify-center shadow-md">
-            <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-semibold text-[#1A1A1A] dark:text-white">Contact</h2>
-                {isOwner && onEdit && (
-                    <button
-                        type="button"
-                        onClick={onEdit}
-                        className="cursor-pointer p-2 rounded-full hover:bg-orange-100 dark:hover:bg-orange-900 transition"
-                        aria-label="Edit Contact"
-                    >
-                        <Pencil size={20} className="text-orange-400" />
-                    </button>
-                )}
-            </div>
+        <div className="flex-1 bg-white dark:bg-[#1A1A1A]/25 rounded-xl p-5 shadow-md relative group">
+            <h2 className="text-xl font-semibold text-[#1A1A1A] dark:text-white mb-5 flex items-center gap-2">
+                Contact
+            </h2>
+
+            {isOwner && onEdit && (
+                <button
+                    onClick={onEdit}
+                    className="absolute top-5 right-5 p-2 cursor-pointer flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                    title={isEmpty ? "Add Contact Info" : "Edit Contact Info"}
+                    aria-label={isEmpty ? "Add Contact Info" : "Edit Contact Info"}
+                >
+                    <Pencil size={18} className="text-gray-500 hover:text-orange-500 dark:hover:text-white" />
+                </button>
+            )}
 
             {isEmpty ? (
                 <div className="flex flex-col items-center justify-center py-8">
-                    {/* Transparent SVG illustration */}
                     <svg
                         width="64"
                         height="64"
@@ -79,69 +110,56 @@ export default function ProfileContact({
                     <p className="text-gray-400 dark:text-gray-500 text-center">
                         No contact information provided yet.
                     </p>
-                    {isOwner && onEdit && (
-                        <button
-                            type="button"
-                            onClick={onEdit}
-                            className="cursor-pointer mt-4 px-4 py-2 bg-orange-400 text-white rounded shadow hover:bg-orange-500 transition"
-                        >
-                            <Pencil size={18} className="inline mr-2" />
-                            Add Contact Info
-                        </button>
-                    )}
                 </div>
-
             ) : (
-                <>
-                    <div className="flex flex-col flex-wrap gap-4">
-                        <div className="flex items-center gap-3 w-full sm:w-[calc(50%-0.5rem)]">
-                            <div className="bg-white/10 p-3 rounded-full shrink-0">
-                                <Mail size={24} className="text-orange-400" />
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-sm font-medium">Email</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="flex items-center gap-3 w-full sm:w-[calc(50%-0.5rem)]">
+                        <div className="bg-[#ED5E20]/20 dark:bg-[#ED5E20]/10 p-3 rounded-full shrink-0">
+                            <Mail size={24} className="text-orange-400" />
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-sm font-medium">Email</p>
+                            <a
+                                href={`mailto:${email}`}
+                                className="text-sm text-orange-300 hover:text-[#ED5E20] hover:underline truncate cursor-pointer"
+                            >
+                                {email}
+                            </a>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3 w-full sm:w-[calc(50%-0.5rem)]">
+                        <div className="bg-[#ED5E20]/20 dark:bg-[#ED5E20]/10 p-3 rounded-full shrink-0">
+                            <Globe size={24} className="text-blue-400" />
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-sm font-medium">Website</p>
+                            {website ? (
                                 <a
-                                    href={`mailto:${email}`}
+                                    href={website.startsWith("http") ? website : `https://${website}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
                                     className="text-sm text-orange-300 hover:text-[#ED5E20] hover:underline truncate cursor-pointer"
                                 >
-                                    {email}
+                                    {website}
                                 </a>
-                            </div>
+                            ) : (
+                                <p className="text-sm text-orange-300 truncate">{website}</p>
+                            )}
                         </div>
-                        <div className="flex items-center gap-3 w-full sm:w-[calc(50%-0.5rem)]">
-                            <div className="bg-white/10 p-3 rounded-full shrink-0">
-                                <Globe size={24} className="text-blue-400" />
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-sm font-medium">Website</p>
-                                {website ? (
-                                    <a
-                                        href={website.startsWith("http") ? website : `https://${website}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-sm text-orange-300 hover:text-[#ED5E20] hover:underline truncate cursor-pointer"
-                                    >
-                                        {website}
-                                    </a>
-                                ) : (
-                                    <p className="text-sm text-orange-300 truncate">{website}</p>
-                                )}
-                            </div>
+                    </div>
+                    <div className="flex items-center gap-3 w-full sm:w-[calc(50%-0.5rem)]">
+                        <div className="bg-[#ED5E20]/20 dark:bg-[#ED5E20]/10 p-3 rounded-full shrink-0">
+                            <Users size={24} className="text-green-400" />
                         </div>
-                        <div className="flex items-center gap-3 w-full">
-                            <div className="bg-white/10 p-3 rounded-full shrink-0">
-                                <Users size={24} className="text-green-400" />
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-sm font-medium">Open to</p>
-                                <p className="text-sm text-gray-500 dark:text-gray-300 break-words whitespace-normal">{openTo}</p>
-                            </div>
+                        <div className="flex-1">
+                            <p className="text-sm font-medium">Open to</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-300 break-words whitespace-normal">{openTo}</p>
                         </div>
                     </div>
                     {extraFields.map((field, idx) => (
-                        <div key={idx} className="flex items-center gap-3 w-full mt-2">
-                            <div className="bg-white/10 p-3 rounded-full shrink-0 flex items-center justify-center">
-                                {renderIcon(field.icon)}
+                        <div key={idx} className="flex items-center gap-3 w-full sm:w-[calc(50%-0.5rem)]">
+                            <div className="bg-[#ED5E20]/20 dark:bg-[#ED5E20]/10 p-3 rounded-full shrink-0">
+                                {iconMap[field.icon as ProfileContactProps["icon"]]}
                             </div>
                             <div className="flex-1">
                                 <p className="text-sm font-medium">{field.label}</p>
@@ -149,7 +167,7 @@ export default function ProfileContact({
                             </div>
                         </div>
                     ))}
-                </>
+                </div>
             )}
         </div>
     );

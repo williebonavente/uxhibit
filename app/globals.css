@@ -189,7 +189,7 @@
 }
 
 .xhibit-gradient-text {
-  background: linear-gradient(to right, #FF4D00, #ED5E20, #FFA600, #FFDB97);
+  background: linear-gradient(to right, #FFA600, #FFDB97);
   background-clip: text;
   -webkit-background-clip: text;
   /* Safari/Chrome */

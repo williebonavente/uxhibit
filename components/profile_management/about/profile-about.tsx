@@ -17,7 +17,7 @@ const ProfileAboutSection: React.FC<ProfileAboutSectionProps> = ({
 }) => {
   return (
     <div className="flex-1 bg-white dark:bg-[#1A1A1A]/25 rounded-xl p-5 shadow-md relative group">
-      <h2 className="text-lg font-semibold mb-3 text-[#1A1A1A] dark:text-white flex items-center gap-2">
+      <h2 className="text-xl font-semibold mb-5 text-[#1A1A1A] dark:text-white flex items-center gap-2">
         About
       </h2>
 

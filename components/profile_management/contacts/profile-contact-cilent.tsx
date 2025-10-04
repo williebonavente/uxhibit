@@ -71,9 +71,7 @@ export default function ProfileContactClient({ profileDetailsId }: { profileDeta
                         openTo={contact?.open_to ?? ""}
                         extraFieldsRaw={contact?.extra_fields ?? ""}
                         isOwner={isOwner}
-                        onEdit={() => setIsEditing(true)}
-                    />
-
+                        onEdit={() => setIsEditing(true)} icon={"star"} />
                 </>
             )}
         </>

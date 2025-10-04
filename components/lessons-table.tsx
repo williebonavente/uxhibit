@@ -96,7 +96,7 @@ export default function HeuristicCarousel() {
           </Link>
 
           <div className="flex flex-col text-start gap-2 h-full justify-start">
-            <span className="font-semibold break-words leading-5 text-[#ED5E20]">{h.name}</span>
+            <span className="font-semibold break-words leading-5 text-[#ED5E20] dark:text-white">{h.name}</span>
             <p className="text-xs text-gray-800 dark:text-gray-400">
               {h.description}
             </p>

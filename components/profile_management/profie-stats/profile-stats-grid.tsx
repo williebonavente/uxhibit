@@ -20,11 +20,11 @@ export default function ProfileStatsGrid({
     ],
 }: ProfileStatsGridProps) {
     return (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-4">
             {stats.map((stat, i) => (
                 <div
                     key={i}
-                    className="flex flex-col sm:flex-row items-center sm:items-start gap-2 sm:gap-4 
+                    className="flex flex-col sm:flex-row items-center sm:items-start gap-2 sm:gap-4
             bg-white dark:bg-[#1A1A1A]/25 rounded-xl p-4 break-words shadow-md"
                 >
                     <div className="bg-[#ED5E20] p-3 rounded-full shrink-0">{stat.icon}</div>

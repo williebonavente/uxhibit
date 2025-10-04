@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import ProfileCareerHighlights, { Highlight } from "./profile-career-hig";
+import ProfileCareerHighlights, { Highlight } from "./profile-career-high";
 import { createClient } from "@/utils/supabase/client";
 import RichTextEditor from "@/components/rich-editor/rich-text-editor";
 import { ChevronDown } from "lucide-react";
@@ -111,8 +111,8 @@ export default function ProfileCareerHighlightsClient({
                 editable={true}
                 onAddHighlight={() => openModal()}
                 onEditHighlight={openModal}
-                onDeleteHighlight={handleDelete} 
-                profileDetailsId={profileId}           
+                onDeleteHighlight={handleDelete}
+                profileDetailsId={profileId}
                 />
             <div
                 style={{ display: showModal ? "block" : "none" }}

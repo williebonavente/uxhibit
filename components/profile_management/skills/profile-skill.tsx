@@ -29,7 +29,7 @@ export default function ProfileSkills({
   return (
     <div className="flex-1 bg-white dark:bg-[#1A1A1A]/25 rounded-xl p-5 shadow-md relative group break-words">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-semibold text-[#1A1A1A] dark:text-white">Skills & Tools</h2>
+        <h2 className="text-xl font-semibold text-[#1A1A1A] dark:text-white mb-3">Skills & Tools</h2>
 
         {isOwner && (
           <button
