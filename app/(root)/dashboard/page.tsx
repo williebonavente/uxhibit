@@ -67,7 +67,7 @@ export default async function Dashboard() {
             <span className="xhibit-gradient-text">Xhibit</span> Greatness.
           </p>
         </div>
-        <div className="user-card flex items-center justify-center gap-3 sm:gap-4 w-full sm:w-auto bg-white/5 rounded-xl p-2 sm:p-3 backdrop-blur supports-[backdrop-filter]:bg-white/10">
+        <div className="user-card hidden sm:flex items-center gap-3 sm:gap-4 bg-white/5 rounded-xl p-2 sm:p-3 backdrop-blur supports-[backdrop-filter]:bg-white/10">
           <Avatar className="h-24 w-24 sm:h-14 sm:w-14 md:h-16 md:w-16 rounded-bl-full">
             <AvatarImage
               src={

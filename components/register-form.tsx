@@ -10,6 +10,9 @@ import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import "react-datepicker/dist/react-datepicker.css";
+import { Calendar } from "lucide-react";
+import DatePicker from "react-datepicker";
 
 import {
   Form,
@@ -24,7 +27,13 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { registerFormSchema } from "@/lib/validation-schemas";
 import { createClient } from "@/utils/supabase/client";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 
 export default function RegistrationForm() {
@@ -118,9 +127,9 @@ export default function RegistrationForm() {
 
       if (!error && signUpData?.user?.id) {
         // Upsert profile_details for the new user
-        await supabase.from("profile_details").upsert([
-          { profile_id: signUpData.user.id }
-        ]);
+        await supabase
+          .from("profile_details")
+          .upsert([{ profile_id: signUpData.user.id }]);
       }
 
       toast.success("Check your email to confirm your account");
@@ -142,15 +151,22 @@ export default function RegistrationForm() {
       style={whiteCursor}
       className="relative min-h-screen flex items-center justify-center w-full overflow-hidden p-5"
     >
-      <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover">
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover"
+      >
         <source src="/images/uxhibit-gif-3(webm).webm" type="video/webm" />
       </video>
 
       <div className="absolute inset-0 bg-black/40" />
 
-      <div className="relative z-10 flex flex-col w-full max-w-sm sm:max-w-md md:max-w-lg xl:max-w-xl p-6 sm:p-8 md:p-10 lg:p-12
-                      bg-[#1E1E1E]/40 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20">
-
+      <div
+        className="relative z-10 flex flex-col w-full max-w-sm sm:max-w-md md:max-w-lg xl:max-w-2xl p-6 sm:p-8 md:p-10 lg:p-12
+                      bg-[#1E1E1E]/40 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20"
+      >
         <div className="flex justify-center mb-5">
           <Image
             src="/images/dark-header-icon.png"
@@ -166,44 +182,25 @@ export default function RegistrationForm() {
         </p>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
-            {/* Username */}
-            <FormField
-              control={form.control}
-              name="username"
-              render={({ field }) => (
-                <FormItem>
-                  <label htmlFor="username" className="block mb-1 text-white text-sm font-medium">
-                    Username <span className="text-[#ED5E20]">*</span>
-                  </label>
-                  <FormControl>
-                    <Input
-                      id="username"
-                      placeholder="Username"
-                      className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
             {/* Name Fields: First, Middle, Last Name in one row */}
-            <div className="flex gap-x-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <div className="flex-1">
                 <FormField
                   control={form.control}
                   name="first_name"
                   render={({ field }) => (
                     <FormItem>
-                      <label htmlFor="first_name" className="block mb-1 text-white text-sm font-medium">
+                      <label
+                        htmlFor="first_name"
+                        className="block text-white text-sm opacity-60"
+                      >
                         First Name <span className="text-[#ED5E20]">*</span>
                       </label>
                       <FormControl>
                         <Input
                           id="first_name"
-                          placeholder="First Name"
+                          placeholder=""
                           className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
                           {...field}
                         />
@@ -219,13 +216,16 @@ export default function RegistrationForm() {
                   name="middle_name"
                   render={({ field }) => (
                     <FormItem>
-                      <label htmlFor="middle_name" className="block mb-1 text-white text-sm font-medium">
-                        Middle Name <span className="text-white/50"></span>
+                      <label
+                        htmlFor="middle_name"
+                        className="block text-white text-sm opacity-60"
+                      >
+                        Middle Name <span className="text-[#ED5E20]">*</span>
                       </label>
                       <FormControl>
                         <Input
                           id="middle_name"
-                          placeholder="Middle Name"
+                          placeholder=""
                           className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
                           {...field}
                         />
@@ -241,13 +241,16 @@ export default function RegistrationForm() {
                   name="last_name"
                   render={({ field }) => (
                     <FormItem>
-                      <label htmlFor="last_name" className="block mb-1 text-white text-sm font-medium">
+                      <label
+                        htmlFor="last_name"
+                        className="block text-white text-sm opacity-60"
+                      >
                         Last Name <span className="text-[#ED5E20]">*</span>
                       </label>
                       <FormControl>
                         <Input
                           id="last_name"
-                          placeholder="Last Name"
+                          placeholder=""
                           className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
                           {...field}
                         />
@@ -259,19 +262,47 @@ export default function RegistrationForm() {
               </div>
             </div>
 
+            {/* Username */}
+            <FormField
+              control={form.control}
+              name="username"
+              render={({ field }) => (
+                <FormItem>
+                  <label
+                    htmlFor="username"
+                    className="block text-white text-sm opacity-60"
+                  >
+                    Username <span className="text-[#ED5E20]">*</span>
+                  </label>
+                  <FormControl>
+                    <Input
+                      id="username"
+                      placeholder=""
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             {/* Email */}
             <FormField
               control={form.control}
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <label htmlFor="email" className="block mb-1 text-white text-sm font-medium">
+                  <label
+                    htmlFor="email"
+                    className="block text-white text-sm opacity-60"
+                  >
                     Email <span className="text-[#ED5E20]">*</span>
                   </label>
                   <FormControl>
                     <Input
                       id="email"
-                      placeholder="Email"
+                      placeholder=""
                       type="email"
                       className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
                       {...field}
@@ -283,41 +314,64 @@ export default function RegistrationForm() {
             />
 
             {/* Birthday and Gender in one row */}
-            <div className="flex gap-x-2">
-              {/* Birthday */}
+            <div className="flex flex-col sm:flex-row gap-5">
+              {/* Birthday Field */}
               <div className="flex-1">
                 <FormField
                   control={form.control}
                   name="birthday"
                   render={({ field }) => (
                     <FormItem className="h-full">
-                      <label htmlFor="birthday" className="block mb-1 text-white text-sm font-medium">
+                      <label
+                        htmlFor="birthday"
+                        className="block text-white text-sm opacity-60"
+                      >
                         Birthday <span className="text-[#ED5E20]">*</span>
                       </label>
                       <FormControl>
-                        <Input
-                          id="birthday"
-                          placeholder="Birthday"
-                          type="date"
-                          className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A] rounded-xl px-3"
-                          {...field}
-                          value={field.value || ""}
-                          style={{ minHeight: "44px" }}
-                        />
+                        <div className="relative w-full">
+                          <DatePicker
+                            id="birthday"
+                            selected={
+                              field.value ? new Date(field.value) : null
+                            }
+                            onChange={(date: Date) =>
+                              field.onChange(
+                                date ? date.toISOString().split("T")[0] : ""
+                              )
+                            }
+                            placeholderText="MM/DD/YYYY"
+                            className="w-full h-12 text-sm sm:text-base border text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A] rounded-lg px-3 pr-10 shadow-sm focus:outline-none focus:ring-2 focus:ring-white/50 transition appearance-none"
+                            dateFormat="MM-dd-yyyy"
+                            wrapperClassName="w-full"
+                            popperClassName="z-50"
+                          />
+                          <Calendar
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-white cursor-pointer"
+                            size={20}
+                            onClick={() =>
+                              document.getElementById("birthday")?.focus()
+                            }
+                          />
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
-              {/* Gender */}
+
+              {/* Gender Field */}
               <div className="flex-1">
                 <FormField
                   control={form.control}
                   name="gender"
                   render={({ field }) => (
                     <FormItem className="h-full">
-                      <label htmlFor="gender" className="block mb-1 text-white text-sm font-medium">
+                      <label
+                        htmlFor="gender"
+                        className="block text-white text-sm opacity-60"
+                      >
                         Gender <span className="text-[#ED5E20]">*</span>
                       </label>
                       <FormControl>
@@ -328,12 +382,16 @@ export default function RegistrationForm() {
                         >
                           <SelectTrigger
                             id="gender"
-                            className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A] rounded-xl px-3 [&>span]:text-left"
-                            style={{ minHeight: "44px" }}
+                            className="w-full h-12 text-sm sm:text-base border text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A] rounded-lg px-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-white/50 transition appearance-none flex items-center cursor-pointer"
+                            style={{ minHeight: "48px", lineHeight: "1.25rem" }} // force same inner height
                           >
                             <SelectValue placeholder="Select gender" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent
+                            className="w-full min-w-full"
+                            position="popper"
+                            sideOffset={4}
+                          >
                             <SelectItem value="male">Male</SelectItem>
                             <SelectItem value="female">Female</SelectItem>
                           </SelectContent>
@@ -352,15 +410,18 @@ export default function RegistrationForm() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <label htmlFor="password" className="block mb-1 text-white text-sm font-medium">
+                  <label
+                    htmlFor="password"
+                    className="block text-white text-sm opacity-60"
+                  >
                     Password <span className="text-[#ED5E20]">*</span>
                   </label>
                   <FormControl>
                     <PasswordInput
                       id="password"
-                      placeholder="Password"
+                      placeholder=""
                       type="password"
-                      className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A] cursor-pointer"
                       {...field}
                     />
                   </FormControl>
@@ -375,13 +436,16 @@ export default function RegistrationForm() {
               name="confirmPassword"
               render={({ field }) => (
                 <FormItem>
-                  <label htmlFor="confirmPassword" className="block mb-1 text-white text-sm font-medium">
+                  <label
+                    htmlFor="confirmPassword"
+                    className="block text-white text-sm opacity-60"
+                  >
                     Confirm Password <span className="text-[#ED5E20]">*</span>
                   </label>
                   <FormControl>
                     <PasswordInput
                       id="confirmPassword"
-                      placeholder="Confirm Password"
+                      placeholder=""
                       type="password"
                       className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
                       {...field}
@@ -406,12 +470,16 @@ export default function RegistrationForm() {
                   href="/auth/terms"
                   onClick={() => {
                     const values = form.getValues();
-                    localStorage.setItem("registrationDraft", JSON.stringify(values));
+                    localStorage.setItem(
+                      "registrationDraft",
+                      JSON.stringify(values)
+                    );
                     router.push("/terms");
                   }}
                   className="text-[#ff7f3f] hover:text-[#ED5E20] transition-colors duration-200 hover:underline font-medium"
                 >
-                  Terms and Conditions <span className="text-[#ED5E20]">*</span>
+                  Terms and Conditions & Privacy Policy{" "}
+                  <span className="text-[#ED5E20]"></span>
                 </Link>
               </label>
             </div>
@@ -428,22 +496,31 @@ export default function RegistrationForm() {
               active:scale-[.97] focus:outline-none
               focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40"
             >
-              <span aria-hidden className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b]" />
-              <span aria-hidden className="absolute inset-[2px] rounded-[10px] bg-[linear-gradient(145deg,rgba(255,255,255,0.28),rgba(255,255,255,0.07))] backdrop-blur-[2px]" />
-              <span aria-hidden className="absolute -left-1 -right-1 top-0 h-full overflow-hidden rounded-xl">
+              <span
+                aria-hidden
+                className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b]"
+              />
+              <span
+                aria-hidden
+                className="absolute inset-[2px] rounded-[10px] bg-[linear-gradient(145deg,rgba(255,255,255,0.28),rgba(255,255,255,0.07))] backdrop-blur-[2px]"
+              />
+              <span
+                aria-hidden
+                className="absolute -left-1 -right-1 top-0 h-full overflow-hidden rounded-xl"
+              >
                 <span className="absolute inset-y-0 -left-full w-1/2 bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70" />
               </span>
-              <span aria-hidden className="absolute inset-0 rounded-xl ring-1 ring-white/30 group-hover:ring-white/50" />
+              <span
+                aria-hidden
+                className="absolute inset-0 rounded-xl ring-1 ring-white/30 group-hover:ring-white/50"
+              />
               <span className="relative z-10 flex items-center gap-2">
-                {isSubmitting && (
-                  <Loader2 className="animate-spin h-5 w-5" />
-                )}
+                {isSubmitting && <Loader2 className="animate-spin h-5 w-5" />}
                 {isSubmitting ? "Signing Up..." : "Sign Up"}
               </span>
             </Button>
           </form>
         </Form>
-
 
         <div className="mt-6 text-center text-xs sm:text-sm text-white font-light">
           Already have an account?{" "}
