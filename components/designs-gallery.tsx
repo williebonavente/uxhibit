@@ -105,9 +105,10 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
               `)
       .eq("owner_id", profileId) // using the profileId, not the currentUserId
       .order("updated_at", { ascending: false });
+    console.log("value of profileId: ",profileId);
     console.log("Designs data:", data);
     if (error) {
-      console.error(error);
+      console.error(error.message);
       setDesigns([]);
       setLoading(false);
       return;

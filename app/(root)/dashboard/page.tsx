@@ -120,7 +120,7 @@ export default async function Dashboard() {
       <div className="border-b-2 p-2">
         <h1 className="text-2xl font-medium">My Works</h1>
       </div>
-      <DesignsGallery />
+      <DesignsGallery profileId={profile?.id} isOwnProfile={true}/>
     </div>
   );
 }
