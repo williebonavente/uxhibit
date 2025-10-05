@@ -176,9 +176,9 @@ const ProfileCareerHighForm: React.FC<ProfileCareerHighFormProps> = ({
                                             type="button"
                                             onClick={handleAdd}
                                             className="w-full h-11 flex items-center justify-center rounded-xl 
-                   border border-[#ED5E20]/50 dark:border-[#ED5E20]/25 
-                   text-[#ED5E20] hover:bg-[#ED5E20]/20 dark:hover:bg-[#ED5E20]/10  
-                   transition cursor-pointer"
+                                            border border-[#ED5E20]/50 dark:border-[#ED5E20]/25 
+                                            text-[#ED5E20] hover:bg-[#ED5E20]/20 dark:hover:bg-[#ED5E20]/10  
+                                            transition cursor-pointer"
                                             aria-label="Add Highlight"
                                         >
                                             +

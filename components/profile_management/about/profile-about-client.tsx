@@ -98,9 +98,9 @@ export default function ProfileAboutSectionClient({
       setIsOwner(ownerCheck);
 
       // Log as requested
-      console.log("isOwner:", ownerCheck);
-      console.log("contact:", null); // You can replace null with actual contact data if available
-      console.log("isEditing:", false); // Or use your state if you have one
+      // console.log("isOwner:", ownerCheck);
+      // console.log("contact:", null); // You can replace null with actual contact data if available
+      // console.log("isEditing:", false); // Or use your state if you have one
     }
     checkOwner();
   }, [profileId, supabase]);

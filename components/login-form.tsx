@@ -41,6 +41,7 @@ export default function LoginForm() {
 
   const [loginLoading, setLoginLoading] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
+  const [figmaLoading, setFigmaLoading] = useState(false);
 
 
   const router = useRouter();
@@ -54,11 +55,13 @@ export default function LoginForm() {
 
   async function handleFigmaLogin(e: React.MouseEvent) {
     e.preventDefault();
+    setFigmaLoading(true);
     try {
       // Get the Figma auth URL
       const authUrl = await getFigmaAuthUrl();
       if (!authUrl) {
         toast.error("Failed to initialize Figma login");
+        setFigmaLoading(false);
         return;
       }
 
@@ -69,6 +72,7 @@ export default function LoginForm() {
       // Redirect to Figma OAuth
       window.location.href = authUrl;
     } catch (error) {
+      setFigmaLoading(false);
       console.error('Figma login error:', error);
       toast.error("Failed to start Figma authentication");
     }
@@ -327,36 +331,46 @@ export default function LoginForm() {
           <Button
             type="button"
             onClick={handleFigmaLogin}
+            disabled={figmaLoading}
             className={`group relative inline-flex items-center justify-center
-                        w-full h-11 sm:h-12 mt-2
-                        rounded-xl text-base tracking-wide
-                        transition-all duration-300 cursor-pointer
-                        text-white shadow-md
-                        hover:shadow-lg
-                        active:scale-[.97]
-                        focus:outline-none focus-visible:ring-4 focus-visible:ring-[#1E1E1E]/20
-                        bg-[#1E1E1E] dark:bg-[#2C2C2C]`}
+              w-full h-11 sm:h-12 mt-2
+              rounded-xl text-base tracking-wide
+              transition-all duration-300
+              text-white shadow-md
+              hover:shadow-lg
+              active:scale-[.97]
+              focus:outline-none focus-visible:ring-4 focus-visible:ring-[#1E1E1E]/20
+              bg-[#1E1E1E] dark:bg-[#2C2C2C]
+              ${figmaLoading ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
+              `}
           >
             <span
               aria-hidden
               className="absolute inset-[2px] rounded-[10px] 
-                            bg-[linear-gradient(145deg,rgba(255,255,255,0.12),rgba(255,255,255,0.03))]
-                            backdrop-blur-[2px]"
+              bg-[linear-gradient(145deg,rgba(255,255,255,0.12),rgba(255,255,255,0.03))]
+              backdrop-blur-[2px]"
             />
-
             <span
               aria-hidden
               className="absolute inset-0 rounded-xl ring-1 ring-white/10 group-hover:ring-white/20"
             />
-
             <span className="relative z-10 flex items-center gap-3">
-              <Image
-                src="/images/figma-logo.png"
-                alt="Figma Logo"
-                width={20}
-                height={10}
-              />
-              Continue with Figma
+              {figmaLoading ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" />
+                  Redirecting...
+                </>
+              ) : (
+                <>
+                  <Image
+                    src="/images/figma-logo.png"
+                    alt="Figma Logo"
+                    width={20}
+                    height={10}
+                  />
+                  Continue with Figma
+                </>
+              )}
             </span>
           </Button>
 

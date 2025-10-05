@@ -20,23 +20,7 @@ export function UserProfilePopover({ user }: { user: UserInfo }) {
 
     const [isLoading, setIsLoading] = useState(false);
     const [isFollowing, setIsFollowing] = useState(false);
-
-    useEffect(() => {
-        async function checkFollowing() {
-            const supabase = createClient();
-            const { data: { user: currentUser } } = await supabase.auth.getUser();
-            const currentUserId = currentUser?.id;
-            if (!currentUserId) return;
-            const { data, error } = await supabase
-                .from("follows")
-                .select("id")
-                .eq("follower_id", currentUserId)
-                .eq("following_id", user.user_id)
-                .maybeSingle();
-            if (data) setIsFollowing(true);
-        }
-        checkFollowing();
-    }, [user.user_id]);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
     async function handleFollow() {
         setIsLoading(true);
@@ -90,6 +74,33 @@ export function UserProfilePopover({ user }: { user: UserInfo }) {
         }
     }
 
+    useEffect(() => {
+        async function checkFollowing() {
+            const supabase = createClient();
+            const { data: { user: currentUser } } = await supabase.auth.getUser();
+            const currentUserId = currentUser?.id;
+            if (!currentUserId) return;
+            const { data } = await supabase
+                .from("follows")
+                .select("id")
+                .eq("follower_id", currentUserId)
+                .eq("following_id", user.user_id)
+                .maybeSingle();
+            if (data) setIsFollowing(true);
+        }
+        checkFollowing();
+    }, [user.user_id]);
+
+    useEffect(() => {
+        async function fetchCurrentUser() {
+            const supabase = createClient();
+            const { data: { user: currentUser } } = await supabase.auth.getUser();
+            setCurrentUserId(currentUser?.id ?? null);
+        }
+        fetchCurrentUser();
+    }, []);
+
+    const isOwnProfile = currentUserId === user.user_id;
 
     return (
         <HoverCard.Root>
@@ -164,30 +175,32 @@ export function UserProfilePopover({ user }: { user: UserInfo }) {
                     </div>
 
                     {/* Follow Button */}
-                    <Button
-                        className={`cursor-pointer w-full font-semibold py-2 rounded-lg transition-all flex items-center justify-center gap-2
+                    {!isOwnProfile && (
+                        <Button
+                            className={`cursor-pointer w-full font-semibold py-2 rounded-lg transition-all flex items-center justify-center gap-2
                     ${isFollowing ? "bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-400 dark:hover:bg-gray-600" : "bg-[#ED5E20] hover:bg-[#d44e0f] text-white"}
                 `}
-                        onClick={isFollowing ? handleUnfollow : handleFollow}
-                        disabled={isLoading}
-                    >
-                        {isLoading ? (
-                            <>
-                                <Loader2 className="animate-spin w-4 h-4" />
-                                {isFollowing ? "Unfollowing..." : "Following..."}
-                            </>
-                        ) : isFollowing ? (
-                            <>
-                                <UserMinus className="w-4 h-4" />
-                                Following
-                            </>
-                        ) : (
-                            <>
-                                <UserPlus className="w-4 h-4" />
-                                Follow
-                            </>
-                        )}
-                    </Button>
+                            onClick={isFollowing ? handleUnfollow : handleFollow}
+                            disabled={isLoading}
+                        >
+                            {isLoading ? (
+                                <>
+                                    <Loader2 className="animate-spin w-4 h-4" />
+                                    {isFollowing ? "Unfollowing..." : "Following..."}
+                                </>
+                            ) : isFollowing ? (
+                                <>
+                                    <UserMinus className="w-4 h-4" />
+                                    Following
+                                </>
+                            ) : (
+                                <>
+                                    <UserPlus className="w-4 h-4" />
+                                    Follow
+                                </>
+                            )}
+                        </Button>
+                    )}
                 </HoverCard.Content>
             </HoverCard.Portal>
         </HoverCard.Root>
