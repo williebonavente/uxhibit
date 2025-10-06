@@ -130,13 +130,18 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
               {getInitials(fullName)}
             </AvatarFallback>
           </Avatar>
-          <div className="text-start">
-            <p className="font-semibold text-base sm:text-lg truncate max-w-[240px]">{fullName}</p>
-            {/* Role here  */}
-            <ProfileRoleClient profileId={profile.id} initialRole={role} />
+
+          {/* Headline & Info */}
+          <div className="flex flex-col md:items-start items-center mt-3 md:mt-0 md:ml-6 text-center md:text-left gap-1 md:gap-2">
+            <p className="font-semibold text-white leading-tight text-xs sm:text-sm md:text-2xl max-w-full break-words">
+              <span className="xhibit-gradient-text">{fullName}</span>
+            </p>
+            <p className="text-lg sm:text-sm md:text-lg text-white max-w-full break-words opacity-80">
+              {role}
+            </p>
           </div>
         </div>
-      </div>
+      </div> 
 
       {/* Sections */}
       <div className="flex flex-col gap-10 mt-10 bg-accent/25 dark:bg-[#120F12]">
@@ -225,8 +230,6 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
         {/* Testimonials & Contact */}
         <div className="flex flex-col sm:flex-row gap-4">
           <TestimonialsSection profileId={profile.id} />
-          {/* Contact Testimonials here */}
-          <ProfileContactClient profileDetailsId={profileDetailsId} />
         </div>
         {/* Contact Testimonials here */}
         <ProfileContactClient profileDetailsId={profileDetailsId} />
