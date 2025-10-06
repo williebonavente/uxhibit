@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Handshake, Mail, Plus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -87,6 +87,7 @@ export default function ProfileContactForm({
             return [];
         }
     });
+    const extraFieldRefs = useRef<(HTMLTableRowElement | null)[]>([]);
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -108,10 +109,18 @@ export default function ProfileContactForm({
     }
 
     function handleAdd() {
-        setExtraFields((prev) => [
-            ...prev,
-            { label: "", value: "", icon: "star" },
-        ]);
+        setExtraFields((prev) => {
+            const updated = [
+                ...prev,
+                { label: "", value: "", icon: "star" },
+            ];
+            // Scroll to the new field after state updates
+            setTimeout(() => {
+                const lastIdx = updated.length - 1;
+                extraFieldRefs.current[lastIdx]?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }, 0);
+            return updated;
+        });
     }
 
     function handleChange(
@@ -192,6 +201,7 @@ export default function ProfileContactForm({
 
                                     <tr
                                         key={idx}
+                                        ref={el => { extraFieldRefs.current[idx] = el; } }
                                         className="bg-gray-50 dark:bg-accent rounded-xl transition shadow-md"
                                     >
                                         <td className="pl-5 pr-5 py-5 rounded-xl">
@@ -245,16 +255,16 @@ export default function ProfileContactForm({
                                                     />
 
                                                     <button
-                                                    type="button"
-                                                    onClick={() => handleDelete(idx)}
-                                                    className="pt-2"
-                                                    aria-label="Delete field"
-                                                >
-                                                    <Trash2
-                                                        size={18}
-                                                        className="text-gray-500 hover:text-red-600 cursor-pointer transition"
-                                                    />
-                                                </button>
+                                                        type="button"
+                                                        onClick={() => handleDelete(idx)}
+                                                        className="pt-2"
+                                                        aria-label="Delete field"
+                                                    >
+                                                        <Trash2
+                                                            size={18}
+                                                            className="text-gray-500 hover:text-red-600 cursor-pointer transition"
+                                                        />
+                                                    </button>
 
                                                 </div>
 
@@ -268,7 +278,6 @@ export default function ProfileContactForm({
                     </div>
 
                     {/* Add button */}
-
                     <button
                         type="button"
                         onClick={handleAdd}
@@ -285,12 +294,12 @@ export default function ProfileContactForm({
                             type="button"
                             onClick={onSave}
                             className="flex-1 inline-flex items-center justify-center rounded-xl text-sm font-medium
-              border border-neutral-300/70 dark:border-neutral-600/60
-              bg-white/70 dark:bg-neutral-800/70
-              text-neutral-700 dark:text-neutral-200
-              shadow-sm backdrop-blur
-              hover:bg-neutral-100 dark:hover:bg-neutral-700
-              transition-colors h-12 cursor-pointer"
+                            border border-neutral-300/70 dark:border-neutral-600/60
+                            bg-white/70 dark:bg-neutral-800/70
+                            text-neutral-700 dark:text-neutral-200
+                            shadow-sm backdrop-blur
+                            hover:bg-neutral-100 dark:hover:bg-neutral-700
+                            transition-colors h-12 cursor-pointer"
                         >
                             Cancel
                         </button>
@@ -298,10 +307,10 @@ export default function ProfileContactForm({
                         <button
                             type="submit"
                             className="relative flex-1 inline-flex items-center justify-center
-              rounded-xl text-sm text-white font-semibold tracking-wide
-              transition-all duration-300 h-12 overflow-hidden
-              focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40
-              cursor-pointer group"
+                            rounded-xl text-sm text-white font-semibold tracking-wide
+                            transition-all duration-300 h-12 overflow-hidden
+                            focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40
+                            cursor-pointer group"
                         >
                             <span
                                 aria-hidden
@@ -316,8 +325,8 @@ export default function ProfileContactForm({
                                 className="absolute -left-1 -right-1 top-0 h-full overflow-hidden rounded-xl"
                             >
                                 <span className="absolute inset-y-0 -left-full w-1/2
-                  bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0
-                  transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70" />
+                                bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0
+                                transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70" />
                             </span>
                             <span className="relative z-10">Save All</span>
                         </button>

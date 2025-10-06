@@ -11,8 +11,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import "react-datepicker/dist/react-datepicker.css";
-import { Calendar } from "lucide-react";
-import DatePicker from "react-datepicker";
+// import DatePicker from "react-datepicker";
+
 
 import {
   Form,
@@ -35,6 +35,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
 
 export default function RegistrationForm() {
   const router = useRouter();
@@ -96,6 +100,7 @@ export default function RegistrationForm() {
       return;
     }
 
+    setIsSubmitting(true);
     const supabase = createClient();
 
     try {
@@ -125,11 +130,29 @@ export default function RegistrationForm() {
         return;
       }
 
+      console.log(signUpData?.user?.id);
       if (!error && signUpData?.user?.id) {
-        // Upsert profile_details for the new user
-        await supabase
+        // 1. Upsert profile_details for the new user and get the inserted row
+        const { data: profileDetails, error: detailsError } = await supabase
           .from("profile_details")
-          .upsert([{ profile_id: signUpData.user.id }]);
+          .upsert([{ profile_id: signUpData.user.id }])
+          .select()
+          .single();
+
+        if (detailsError) {
+          console.error(detailsError.message);
+        }
+
+        // 2. If profile_details was created, insert profile_contacts
+        if (profileDetails && profileDetails.id) {
+          await supabase.from("profile_contacts").insert({
+            profile_details_id: profileDetails.id,
+            email: "",         // or initial value
+            website: "",
+            open_to: "",
+            extra_fields: "[]"
+          });
+        }
       }
 
       toast.success("Check your email to confirm your account");
@@ -138,6 +161,8 @@ export default function RegistrationForm() {
     } catch (e) {
       console.error("Unexpected registration error", e);
       toast.error("Failed to submit the form. Please try again.");
+    } finally {
+      setTimeout(() => setIsSubmitting(false), 400);
     }
   }
 
@@ -220,7 +245,7 @@ export default function RegistrationForm() {
                         htmlFor="middle_name"
                         className="block text-white text-sm opacity-60"
                       >
-                        Middle Name <span className="text-[#ED5E20]">*</span>
+                        Middle Name <span className="text-[#ED5E20]"></span>
                       </label>
                       <FormControl>
                         <Input
@@ -329,31 +354,43 @@ export default function RegistrationForm() {
                         Birthday <span className="text-[#ED5E20]">*</span>
                       </label>
                       <FormControl>
-                        <div className="relative w-full">
-                          <DatePicker
-                            id="birthday"
-                            selected={
-                              field.value ? new Date(field.value) : null
-                            }
-                            onChange={(date: Date) =>
-                              field.onChange(
-                                date ? date.toISOString().split("T")[0] : ""
-                              )
-                            }
-                            placeholderText="MM/DD/YYYY"
-                            className="w-full h-12 text-sm sm:text-base border text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A] rounded-lg px-3 pr-10 shadow-sm focus:outline-none focus:ring-2 focus:ring-white/50 transition appearance-none"
-                            dateFormat="MM-dd-yyyy"
-                            wrapperClassName="w-full"
-                            popperClassName="z-50"
-                          />
-                          <Calendar
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-white cursor-pointer"
-                            size={20}
-                            onClick={() =>
-                              document.getElementById("birthday")?.focus()
-                            }
-                          />
-                        </div>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full h-12 text-sm sm:text-base border text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A] rounded-lg px-3 pr-10 shadow-sm flex justify-between items-center"
+                              id="birthday"
+                              type="button"
+                            >
+                              <span className={field.value ? "" : "text-gray-500 dark:text-gray-500 opacity-60"}>
+                                {field.value
+                                  ? format(new Date(field.value), "MM/dd/yyyy")
+                                  : "MM/DD/YYYY"}
+                              </span>
+                              <CalendarIcon className="ml-2 h-5 w-5 text-gray-700 dark:text-white" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value ? new Date(field.value) : undefined}
+                              onSelect={date =>
+                                field.onChange(
+                                  date ? format(date, "yyyy-MM-dd") : ""
+                                )
+                              }
+                              captionLayout="dropdown"
+                              hidden={{
+                                before: new Date(1900, 0, 1),
+                                after: new Date(new Date().getFullYear(), 11, 31),
+                              }}
+                              disabled={[
+                                { from: new Date(), to: new Date(2100, 0, 1) }
+                              ]}
+                              autoFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -377,15 +414,22 @@ export default function RegistrationForm() {
                       <FormControl>
                         <Select
                           onValueChange={field.onChange}
-                          value={field.value || ""}
-                          defaultValue=""
+                          value={field.value || undefined}
                         >
                           <SelectTrigger
                             id="gender"
-                            className="w-full h-12 text-sm sm:text-base border text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A] rounded-lg px-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-white/50 transition appearance-none flex items-center cursor-pointer"
-                            style={{ minHeight: "48px", lineHeight: "1.25rem" }} // force same inner height
+                            className="w-full h-12 text-sm sm:text-base border text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A] 
+                              rounded-lg px-3 shadow-sm focus:outline-none focus:ring-2 
+                              focus:ring-white/50 transition appearance-none flex items-center cursor-pointer
+                              [&_[data-placeholder]]:text-gray-400 [&_[data-placeholder]]:opacity-60"
+                            style={{ minHeight: "48px", lineHeight: "1.25rem" }}
                           >
-                            <SelectValue placeholder="Select gender" />
+                            {!field.value ? (
+                              <span className="text-gray-600 dark:text-gray-400 opacity-60">Select gender</span>
+                            ) : (
+                              <SelectValue />
+                            )}
+
                           </SelectTrigger>
                           <SelectContent
                             className="w-full min-w-full"
@@ -394,6 +438,8 @@ export default function RegistrationForm() {
                           >
                             <SelectItem value="male">Male</SelectItem>
                             <SelectItem value="female">Female</SelectItem>
+                            <SelectItem value="others">Others</SelectItem>
+                            <SelectItem value="prefer-not-to-say">Prefer not to Say</SelectItem>
                           </SelectContent>
                         </Select>
                       </FormControl>

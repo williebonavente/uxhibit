@@ -57,17 +57,21 @@ export function NavUser({ user }: { user: User | null }) {
   const [notifPage, setNotifPage] = useState(1);
   const [showReportBug, setShowReportBug] = useState(false);
 
-  const [open, setOpen] = useState(false);
-  const [profile, setProfile] = useState<{
-    id: string,
+  type Profile = {
+    id: string;
     username: string,
     first_name?: string;
     middle_name?: string;
     last_name?: string;
     avatar_url?: string;
     gender: string;
+    birthday: string;
     bio: string;
-  } | null>(null);
+    role?: string;
+  }
+
+  const [open, setOpen] = useState(false);
+  const [profile, setProfile] = useState<Profile | null>(null);
 
   const notifPerpage = 5;
   const fullName =
@@ -75,17 +79,17 @@ export function NavUser({ user }: { user: User | null }) {
       ? [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(" ")
       : "";
 
-  const paginatedNotifcations = notifications.slice(
-    (notifPage - 1) * notifPerpage,
-    notifPage * notifPerpage
-  );
+  // const paginatedNotifcations = notifications.slice(
+  //   (notifPage - 1) * notifPerpage,
+  //   notifPage * notifPerpage
+  // );
   const totalPages = Math.ceil(notifications.length / notifPerpage);
   const unreadNotifications = notifications.filter(n => !n.read);
   const readNotifications = notifications.filter(n => n.read);
 
   // TODO: BE DELETED
-  const heartNotification = useDesignNotifications(user?.id ?? null);
-  const hasHeartNotifications = heartNotification.length > 0;
+  // const heartNotification = useDesignNotifications(user?.id ?? null);
+  // const hasHeartNotifications = heartNotification.length > 0;
 
   const handleProfileClick = async () => {
     const supabase = createClient();
@@ -101,40 +105,74 @@ export function NavUser({ user }: { user: User | null }) {
   };
 
   const getProfile = useCallback(async () => {
-    try {
-      setLoading(true)
-      const supabase = createClient()
-      const { data, error, status } = await supabase
-        .from('profiles')
-        .select(`id, username, first_name, middle_name, last_name, website, avatar_url, gender, bio`)
-        .eq('id', user?.id)
-        .single()
+    if (!user?.id) {
+      console.error("No user or user.id found:", user);
+      setLoading(false);
+      return;
+    }
 
-      if (error && status !== 406 && Object.keys(error).length > 0) {
-        console.log(error);
-        throw error;
+    console.log("User here no error: ",user);
+    try {
+      setLoading(true);
+      const supabase = createClient();
+
+      // Fetch profile from 'profiles' table
+      const { data: profileData, error: profileError, status } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          username,
+          first_name,
+          middle_name,
+          last_name,
+          website,
+          avatar_url,
+          gender,
+          bio,
+          birthday
+        `)
+        .eq('id', user?.id)
+        .single();
+
+      // Fetch role from 'profile_details' table
+      const { data: detailsData, error: detailsError } = await supabase
+        .from('profile_details')
+        .select('role')
+        .eq('profile_id', user?.id)
+        .single();
+
+      if ((profileError && status !== 406 && Object.keys(profileError).length > 0) || detailsError) {
+        // Log the full error object for debugging
+        console.error("Profile Error:", JSON.stringify(profileError));
+        console.error("Details Error:", JSON.stringify(detailsError));
+        // Throw only the message or stringified error
+        throw new Error(profileError?.message || detailsError?.message || "Unknown error");
       }
 
-      if (data) {
-        const fullname = [data.first_name, data.middle_name, data.last_name].filter(Boolean).join(" ");
+      if (profileData) {
+        const fullname = [profileData.first_name, profileData.middle_name, profileData.last_name].filter(Boolean).join(" ");
         setProfile({
-          id: data.id,
-          username: data.username,
-          first_name: data.first_name ?? "",
-          middle_name: data.middle_name ?? "",
-          last_name: data.last_name ?? "",
-          avatar_url: data.avatar_url,
-          gender: data.gender,
-          bio: data.bio,
+          id: profileData.id,
+          username: profileData.username,
+          first_name: profileData.first_name ?? "",
+          middle_name: profileData.middle_name ?? "",
+          last_name: profileData.last_name ?? "",
+          avatar_url: profileData.avatar_url,
+          birthday: profileData.birthday,
+          gender: profileData.gender,
+          bio: profileData.bio,
+          role: typeof detailsData?.role === "string" ? detailsData.role : "",
         });
         setFullName(fullname);
       }
-    } catch (error) {
-      console.log(error);
+    } catch (err) {
+      // Log the error for debugging
+      console.error("getProfile error:", err);
+      // Optionally show a toast or set an error state here
     } finally {
       setLoading(false);
     }
-  }, [user])
+  }, [user]);
 
   const getNotifications = useCallback(async () => {
     const supabase = createClient();
@@ -164,22 +202,44 @@ export function NavUser({ user }: { user: User | null }) {
     const { data: authData } = await supabase.auth.getUser();
 
     if (authData?.user?.id) {
-      const { data } = await supabase
+      // Fetch profile from 'profiles'
+      const { data: profileData } = await supabase
         .from("profiles")
-        .select("id, username, first_name, middle_name, last_name, website, avatar_url, gender, bio")
+        .select(`
+          id,
+          username,
+          first_name,
+          middle_name,
+          last_name,
+          website,
+          avatar_url,
+          gender,
+          birthday,
+          bio
+        `)
         .eq("id", authData.user.id)
         .single();
-      if (data) {
-        const fullname = [data.first_name, data.middle_name, data.last_name].filter(Boolean).join(" ");
+
+      // Fetch role from 'profile_details'
+      const { data: detailsData } = await supabase
+        .from("profile_details")
+        .select("role")
+        .eq("profile_id", authData.user.id)
+        .single();
+
+      if (profileData) {
+        const fullname = [profileData.first_name, profileData.middle_name, profileData.last_name].filter(Boolean).join(" ");
         setProfile({
-          id: data.id,
-          username: data.username,
-          first_name: data.first_name ?? "",
-          middle_name: data.middle_name ?? "",
-          last_name: data.last_name ?? "",
-          avatar_url: data.avatar_url,
-          gender: data.gender,
-          bio: data.bio,
+          id: profileData.id,
+          username: profileData.username,
+          first_name: profileData.first_name ?? "",
+          middle_name: profileData.middle_name ?? "",
+          last_name: profileData.last_name ?? "",
+          avatar_url: profileData.avatar_url,
+          gender: profileData.gender,
+          birthday: profileData.birthday,
+          bio: profileData.bio,
+          role: detailsData?.role ?? "",
         });
         setFullName(fullname);
         setOpen(true);

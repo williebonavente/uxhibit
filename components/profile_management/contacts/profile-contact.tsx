@@ -113,27 +113,32 @@ export default function ProfileContact({
                 </div>
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="flex items-center gap-3 w-full sm:w-[calc(50%-0.5rem)]">
-                        <div className="bg-[#ED5E20]/20 dark:bg-[#ED5E20]/10 p-3 rounded-full shrink-0">
-                            <Mail size={24} className="text-orange-400" />
+                    {/* Email */}
+                    {email && (
+                        <div className="flex items-center gap-3 w-full sm:w-[calc(50%-0.5rem)]">
+                            <div className="bg-[#ED5E20]/20 dark:bg-[#ED5E20]/10 p-3 rounded-full shrink-0">
+                                <Mail size={24} className="text-orange-400" />
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-sm font-medium">Email</p>
+                                <a
+                                    href={`mailto:${email}`}
+                                    className="text-sm text-orange-300 hover:text-[#ED5E20] hover:underline truncate cursor-pointer"
+                                >
+                                    {email}
+                                </a>
+                            </div>
                         </div>
-                        <div className="flex-1">
-                            <p className="text-sm font-medium">Email</p>
-                            <a
-                                href={`mailto:${email}`}
-                                className="text-sm text-orange-300 hover:text-[#ED5E20] hover:underline truncate cursor-pointer"
-                            >
-                                {email}
-                            </a>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3 w-full sm:w-[calc(50%-0.5rem)]">
-                        <div className="bg-[#ED5E20]/20 dark:bg-[#ED5E20]/10 p-3 rounded-full shrink-0">
-                            <Globe size={24} className="text-blue-400" />
-                        </div>
-                        <div className="flex-1">
-                            <p className="text-sm font-medium">Website</p>
-                            {website ? (
+                    )}
+
+                    {/* Website */}
+                    {website && (
+                        <div className="flex items-center gap-3 w-full sm:w-[calc(50%-0.5rem)]">
+                            <div className="bg-[#ED5E20]/20 dark:bg-[#ED5E20]/10 p-3 rounded-full shrink-0">
+                                <Globe size={24} className="text-blue-400" />
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-sm font-medium">Website</p>
                                 <a
                                     href={website.startsWith("http") ? website : `https://${website}`}
                                     target="_blank"
@@ -142,30 +147,36 @@ export default function ProfileContact({
                                 >
                                     {website}
                                 </a>
-                            ) : (
-                                <p className="text-sm text-orange-300 truncate">{website}</p>
-                            )}
+                            </div>
                         </div>
-                    </div>
-                    <div className="flex items-center gap-3 w-full sm:w-[calc(50%-0.5rem)]">
-                        <div className="bg-[#ED5E20]/20 dark:bg-[#ED5E20]/10 p-3 rounded-full shrink-0">
-                            <Users size={24} className="text-green-400" />
-                        </div>
-                        <div className="flex-1">
-                            <p className="text-sm font-medium">Open to</p>
-                            <p className="text-sm text-gray-500 dark:text-gray-300 break-words whitespace-normal">{openTo}</p>
-                        </div>
-                    </div>
-                    {extraFields.map((field, idx) => (
-                        <div key={idx} className="flex items-center gap-3 w-full sm:w-[calc(50%-0.5rem)]">
+                    )}
+
+                    {/* Open To */}
+                    {openTo && (
+                        <div className="flex items-center gap-3 w-full sm:w-[calc(50%-0.5rem)]">
                             <div className="bg-[#ED5E20]/20 dark:bg-[#ED5E20]/10 p-3 rounded-full shrink-0">
-                                {iconMap[field.icon as ProfileContactProps["icon"]]}
+                                <Users size={24} className="text-green-400" />
                             </div>
                             <div className="flex-1">
-                                <p className="text-sm font-medium">{field.label}</p>
-                                <p className="text-sm text-gray-500 dark:text-gray-300 break-words whitespace-normal">{field.value}</p>
+                                <p className="text-sm font-medium">Open to</p>
+                                <p className="text-sm text-gray-500 dark:text-gray-300 break-words whitespace-normal">{openTo}</p>
                             </div>
                         </div>
+                    )}
+
+                    {/* Extra fields */}
+                    {extraFields.map((field, idx) => (
+                        field.value && (
+                            <div key={idx} className="flex items-center gap-3 w-full sm:w-[calc(50%-0.5rem)]">
+                                <div className="bg-[#ED5E20]/20 dark:bg-[#ED5E20]/10 p-3 rounded-full shrink-0">
+                                    {iconMap[field.icon as ProfileContactProps["icon"]]}
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-sm font-medium">{field.label}</p>
+                                    <p className="text-sm text-gray-500 dark:text-gray-300 break-words whitespace-normal">{field.value}</p>
+                                </div>
+                            </div>
+                        )
                     ))}
                 </div>
             )}

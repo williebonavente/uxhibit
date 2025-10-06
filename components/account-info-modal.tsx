@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+import { format } from "date-fns";
 
 export function AccountInfoModal({
   open,
@@ -31,6 +31,8 @@ export function AccountInfoModal({
   const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [signedAvatarUrl, setSignedAvatarUrl] = useState<string | null>(null);
+
+  const [step, setStep] = useState(1);
 
   const router = useRouter();
 
@@ -117,13 +119,19 @@ export function AccountInfoModal({
                   first_name: profile.first_name,
                   middle_name: profile.middle_name,
                   last_name: profile.last_name,
-                  age: profile.age,
                   avatar_url: imageUrl,
                   bio: profile.bio,
+                  birthday: profile.birthday,
                   gender: profile.gender,
                 })
                 .eq("id", profile.id);
-              if (!error) {
+              const { error: roleError } = await supabase
+                .from("profile_details")
+                .update({
+                  role: profile.role,
+                })
+                .eq("profile_id", profile.id);
+              if (!error && !roleError) {
                 toast.success("Profile Updated!");
                 setFullName(profile.fullname);
                 setAvatarUrl(imageUrl ?? null);
@@ -195,49 +203,77 @@ export function AccountInfoModal({
                   />
                 </div>
               </div>
-              <label>Username</label>
-              <Input
-                value={profile.username ?? generateUsername(profile.fullname)}
-                onChange={e => setProfile({ ...profile, username: e.target.value })}
-              />
-            </div>
-            <div>
-              <label>First Name</label>
-              <Input
-                value={profile.first_name || ""}
-                onChange={e => setProfile({ ...profile, first_name: e.target.value })}
-              />
-            </div>
-            <div>
-              <label>Middle Name</label>
-              <Input
-                value={profile.middle_name || ""}
-                onChange={e => setProfile({ ...profile, middle_name: e.target.value })}
-                placeholder="(optional)"
-              />
-            </div>
-            <div>
-              <label>Last Name</label>
-              <Input
-                value={profile.last_name || ""}
-                onChange={e => setProfile({ ...profile, last_name: e.target.value })}
-              />
-            </div>
-            <div className="cursor-not-allowed">
-              <label>Email</label>
-              <Input
-                value={email ?? "Cannot fetch User email"}
-                disabled
-              />
-            </div>
-            {/* TODO: Update their birthday??? */}
-            <div>
-              <label>Gender</label>
-              <Input
-                value={profile?.gender?.trim() || ""}
-                onChange={e => setProfile({ ...profile, gender: e.target.value })}
-                placeholder="Specify your gender"
-              />
+              <div>
+
+                <div>
+                  <label>Username</label>
+                  <Input
+                    value={profile.username ?? generateUsername(profile.fullname)}
+                    onChange={e => setProfile({ ...profile, username: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div>
+                <label>First Name</label>
+                <Input
+                  value={profile.first_name || ""}
+                  onChange={e => setProfile({ ...profile, first_name: e.target.value })}
+                />
+              </div>
+              <div>
+                <label>Middle Name</label>
+                <Input
+                  value={profile.middle_name || ""}
+                  onChange={e => setProfile({ ...profile, middle_name: e.target.value })}
+                  placeholder="(optional)"
+                />
+              </div>
+              <div>
+                <label>Last Name</label>
+                <Input
+                  value={profile.last_name || ""}
+                  onChange={e => setProfile({ ...profile, last_name: e.target.value })}
+                />
+              </div>
+              <div className="cursor-not-allowed">
+                <label>Email</label>
+                <Input
+                  value={email ?? "Cannot fetch User email"}
+                  disabled
+                />
+              </div>
+              {/* Show here the birthday */}
+              <div>
+                <label>Gender</label>
+                <Input
+                  value={profile?.gender?.trim() || ""}
+                  onChange={e => setProfile({ ...profile, gender: e.target.value })}
+                  placeholder="Specify your gender"
+                />
+              </div>
+              <div>
+                <label>Birthday</label>
+                <Input
+                  value={
+                    profile?.birthday
+                      ? format(new Date(profile.birthday), "MM/dd/yyyy")
+                      : ""
+                  }
+                  readOnly
+                  placeholder="Birthday not set"
+                  className="bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <label>Role</label>
+                <Input
+                  // value={typeof profile?.role === "string" ? profile.role : ""}
+                  value={profile?.role || ""}
+                  onChange={e => setProfile({ ...profile, role: e.target.value })}
+                  placeholder="Role not set"
+                  className="bg-gray-100 dark:bg-gray-800"
+                />
+              </div>
             </div>
             <footer className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-4 mt-12">
               <Button

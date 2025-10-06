@@ -29,7 +29,7 @@ export default function ProfileContactClient({ profileDetailsId }: { profileDeta
                 .select("id, profile_details_id, email, website, open_to, extra_fields")
                 .eq("profile_details_id", profileDetailsId)
                 .single();
-            console.log("Contact fetch result:", data, "Error:", error);
+            console.log("Error: ", error);
             if (data) setContact(data);
         }
         fetchContact();
@@ -38,7 +38,7 @@ export default function ProfileContactClient({ profileDetailsId }: { profileDeta
     useEffect(() => {
         async function checkOwner() {
             const { data: { user }, error } = await supabase.auth.getUser();
-            console.log("Auth user:", user, "Error:", error);
+            console.log("Error: ", error);
 
             const { data: profileDetails } = await supabase
                 .from("profile_details")
@@ -51,9 +51,9 @@ export default function ProfileContactClient({ profileDetailsId }: { profileDeta
         checkOwner();
     }, [profileDetailsId, supabase]);
 
-    console.log("isOwner:", isOwner);
-    console.log("contact:", contact);
-    console.log("isEditing:", isEditing);
+    // console.log("isOwner:", isOwner);
+    // console.log("contact:", contact);
+    // console.log("isEditing:", isEditing);
 
     return (
         <>

@@ -22,21 +22,25 @@ import { User } from "@supabase/supabase-js";
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
   const [user, setUser] = useState<User | null>(null);
-
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
     const supabase = createClient();
+
     const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser();
+      const { data, error } = await supabase.auth.getUser();
+      if (error) {
+        console.error("Supabase getUser error:", error);
+      }
       setUser(data?.user ?? null);
     };
     fetchUser();
 
-    // Optionally, refetch user on auth state change
+    // Refetch user on auth state change
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
@@ -45,7 +49,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       listener?.subscription.unsubscribe();
     };
   }, []);
+
   if (!mounted) return null;
+
 
   const logoSrc =
     resolvedTheme === "dark"
@@ -67,7 +73,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={navMain} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={user} />
+        <SidebarFooter>
+          {user ? <NavUser user={user} /> : null}
+        </SidebarFooter>
       </SidebarFooter>
     </Sidebar>
   );
