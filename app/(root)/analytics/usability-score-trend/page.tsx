@@ -9,7 +9,7 @@ import {
   CartesianGrid,
   ResponsiveContainer,
 } from "recharts";
-import { generateUsabilityTrendReport } from "@/lib/trendPdfGenerator";
+import { generateUsabilityTrendReport } from "@/lib/systemGeneratedReport/trendPdfGenerator";
 // import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { IconLoader2, IconDownload } from "@tabler/icons-react";
@@ -20,15 +20,6 @@ export default function UsabilityScoreTrendPage() {
   const [trendData, setTrendData] = useState<
     { version: string; score: number; label: string }[]
   >([]);
-
-  // // Sample data for the usability score trend
-  // const trendData = [
-  //   { version: "Q1", score: 1.2, label: "01" },
-  //   { version: "Q2", score: 7.8, label: "02" },
-  //   { version: "Q3", score: 6.1, label: "03" },
-  //   { version: "Q4", score: 8.7, label: "04" },
-  //   { version: "Q5", score: 9.4, label: "05" },
-  // ];
 
   useEffect(() => {
     const fetchTrendData = async () => {

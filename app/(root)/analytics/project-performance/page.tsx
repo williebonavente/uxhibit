@@ -6,7 +6,7 @@ import {
   IconChevronDown,
   IconFilter,
 } from "@tabler/icons-react";
-import { generateProjectComparisonReport } from "@/lib/projectComparisonPdfGenerator";
+import { generateProjectComparisonReport } from "@/lib/systemGeneratedReport/projectComparisonPdfGenerator";
 import { toast } from "sonner";
 import { IconLoader2, IconDownload } from "@tabler/icons-react";
 import {

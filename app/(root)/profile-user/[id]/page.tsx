@@ -182,8 +182,8 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
           profileId={profile?.id}
         />
 
-        {/* Impact Metrics */}
-        <div className="bg-white dark:bg-[#1A1A1A]/25 rounded-xl p-5 shadow-md">
+        {/*TODO: To be implemented later Impact Metrics */}
+        {/* <div className="bg-white dark:bg-[#1A1A1A]/25 rounded-xl p-5 shadow-md">
           <h2 className="text-xl font-semibold mb-5 text-[#1A1A1A] dark:text-white">
             Impact Metrics
           </h2>
@@ -225,7 +225,8 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
               </div>
             ))}
           </div>
-        </div>
+        </div> */}
+
           {/*TODO: TO BE IMPLEMENTED  */}
         {/* Testimonials & Contact */}
         <div className="flex flex-col sm:flex-row gap-4">

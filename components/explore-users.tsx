@@ -5,18 +5,14 @@ import {
   useEffect,
   useCallback
 } from "react";
-import {
-  IconEye,
-  IconHeart,
-  IconSearch,
-} from "@tabler/icons-react";
+import { IconSearch } from "@tabler/icons-react";
 import Image from "next/image";
 
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import { LoadingInspiration } from "./animation/loading-fetching";
 import { DesignCard } from "./design-card";
-import { Comment } from "./comments-user";
+import { randomBytes, createCipheriv } from 'crypto';
 import { UserProfilePopover } from "./user-profile-popover/user-profile-popover";
 
 
@@ -28,6 +24,7 @@ type DesignInfo = {
   views: number;
   liked: boolean;
   thumbnail_url?: string;
+  created_at: string;
 };
 
 type UserInfo = {
@@ -45,8 +42,6 @@ type UserAvatarProps = {
   alt: string;
   className?: string;
 }
-
-
 export const UserAvatar: React.FC<UserAvatarProps> = ({ avatarPath, alt, className }) => (
   <Image
     src={avatarPath || "/iamges/default_avatar.png"}
@@ -91,19 +86,15 @@ export function useSignedAvatarUrl(avatarPath: string | null) {
 }
 export default function ExplorePage() {
 
-  const initialComments: Comment[] = [];
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [users, setUsers] = useState<UserInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [animatingHeart, setAnimatingHeart] = useState<string | null>(null);
-  // debounce state
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState(search);
-  const [comments, setComments] = useState<Comment[]>(initialComments);
-  const [newCommentText, setNewCommentText] = useState("");
   const [currentUserProfile, setCurrentUserProfile] = useState<{ fullName: string; avatarUrl: string } | null>(null);
 
-    const fetchUsersWithDesigns = useCallback(async () => {
+  const fetchUsersWithDesigns = useCallback(async () => {
     setLoading(true);
     const supabase = createClient();
     try {
@@ -111,49 +102,50 @@ export default function ExplorePage() {
       const { data: usersData, error: usersError } = await supabase
         .from("profiles")
         .select("id, first_name, middle_name, last_name, avatar_url, bio");
-  
+
       if (usersError) {
         setLoading(false);
         return;
       }
-  
+
       // Fetch roles from profile_details
       const { data: detailsData } = await supabase
         .from("profile_details")
-        .select("id, profile_id, role"); // <-- include id
-  
+        .select("id, profile_id, role");
+
       // Fetch websites from profile_contacts
       const { data: contactsData } = await supabase
         .from("profile_contacts")
         .select("profile_details_id, website");
-  
+
       // Fetch designs
       const { data: designsData, error: designsError } = await supabase
         .from("designs")
         .select("id, owner_id, title, figma_link, thumbnail_url, created_at");
-  
+
       if (designsError) {
         setLoading(false);
         return;
       }
-  
+
       // Fetch published designs
       const { data: publishedData, error: publishedError } = await supabase
         .from("published_designs")
         .select(`design_id, user_id, num_of_hearts, num_of_views, published_at,  
               designs (id, owner_id, title, figma_link, thumbnail_url, created_at), 
               profiles (id, first_name, middle_name, last_name, avatar_url)`)
-        .eq("is_active", true);
-  
+        .eq("is_active", true)
+        .order("published_at", { ascending: false });
+
       if (publishedError) {
         setLoading(false);
         return;
       }
-  
+
       const publishedLookup = Object.fromEntries(
         (publishedData || []).map((p) => [p.design_id, p])
       );
-  
+
       let likedDesignIds: string[] = [];
       if (currentUserId) {
         const { data: likesData } = await supabase
@@ -162,18 +154,18 @@ export default function ExplorePage() {
           .eq("user_id", currentUserId);
         likedDesignIds = (likesData || []).map(like => like.design_id);
       }
-  
+
       // Build lookup maps for details and contacts
       const detailsIdMap = Object.fromEntries((detailsData || []).map(d => [d.profile_id, d.id])); // profile_id (uuid) -> details.id (int)
       const detailsRoleMap = Object.fromEntries((detailsData || []).map(d => [d.profile_id, d.role]));
       const contactsMap = Object.fromEntries((contactsData || []).map(c => [c.profile_details_id, c.website]));
-  
+
       const usersWithDesigns = usersData.map((user) => {
         const detailsId = detailsIdMap[user.id]; // get profile_details.id for this user
         const website = detailsId ? contactsMap[detailsId] : undefined;
         const role = detailsRoleMap[user.id] || undefined;
         const bio = user.bio || undefined;
-  
+
         return {
           user_id: user.id,
           name: [user.first_name, user.middle_name, user.last_name].filter(Boolean).join(" "),
@@ -198,10 +190,10 @@ export default function ExplorePage() {
                 isPublished: !!published,
                 created_at: published?.published_at || d.created_at,
               };
-            }),
+            })
         };
       });
-  
+
       setUsers(usersWithDesigns);
     } catch (e) {
       console.log(e);
@@ -215,7 +207,7 @@ export default function ExplorePage() {
     ownerUserId: string,
     designId: string
   ) => {
-    setAnimatingHeart(designId); // Start animation
+    setAnimatingHeart(designId);
     setTimeout(() => setAnimatingHeart(null), 1000)
 
     if (!currentUserId) return;
@@ -247,7 +239,6 @@ export default function ExplorePage() {
     let error;
 
     if (wasLiked) {
-      // Unlike (delete from design_likes)
       const { error: delError } = await supabase
         .from("design_likes")
         .delete()
@@ -267,7 +258,6 @@ export default function ExplorePage() {
       }
     }
 
-    // Always update the heart count in published_designs
     const { count } = await supabase
       .from("design_likes")
       .select("*", { count: "exact", head: true })
@@ -283,7 +273,6 @@ export default function ExplorePage() {
       toast.error("Failed to update like!");
     }
   };
-
   // Debounce state
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -325,93 +314,6 @@ export default function ExplorePage() {
     fetchProfile();
   }, [currentUserId]);
 
-  useEffect(() => {
-    const fetchComments = async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("comments")
-        .select("id, text, user_id, created_at, local_time, parent_id")
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.log("Supabase error:", error);
-
-        toast.error("Failed to fetch comments!");
-        return;
-      }
-
-      const commentsWithUser = await Promise.all(
-        (data || []).map(async (comment) => {
-          const { data: userData } = await supabase
-            .from("profiles")
-            .select("first_name, middle_name, last_name, avatar_url")
-            .eq("id", comment.user_id)
-            .single();
-          return {
-            id: comment.id,
-            text: comment.text,
-            user: {
-              id: comment.user_id,
-              fullName: [userData?.first_name, userData?.middle_name, userData?.last_name]
-                .filter(Boolean)
-                .join(" ") || "",
-              avatarUrl: userData?.avatar_url || "",
-            },
-            replies: [],
-            parentId: comment.parent_id,
-            createdAt: new Date(comment.created_at),
-            localTime: comment.local_time,
-          };
-        })
-      );
-
-      // Build a map for quick lookup
-      const commentMap: { [id: string]: any } = {};
-      commentsWithUser.forEach(comment => {
-        commentMap[comment.id] = { ...comment, replies: [] };
-      });
-
-      // Build the tree
-      const rootComments: any[] = [];
-      commentsWithUser.forEach(comment => {
-        if (comment.parentId) {
-          // This is a reply, add to its parent
-          if (commentMap[comment.parentId]) {
-            commentMap[comment.parentId].replies.push(commentMap[comment.id]);
-          }
-        } else {
-          // Top-level comment
-          rootComments.push(commentMap[comment.id]);
-        }
-      });
-      setComments(rootComments);
-    };
-
-    fetchComments();
-
-    const supabase = createClient()
-    const channel = supabase
-      .channel('comments-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'comments',
-        },
-        (payload) => {
-          fetchComments();
-          console.log("Payload information", payload)
-        }
-      )
-      .subscribe();
-
-    // Cleanup on unmount
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
   const filteredUsers = users
     .map((user) => ({
       ...user,
@@ -423,13 +325,34 @@ export default function ExplorePage() {
     }))
     .filter((user) => user.designs.length > 0);
 
+  function useCurrentUserProfile(profile: { fullName: string; avatarUrl: string } | null) {
+    const algorithm = 'aes-256-cbc';
+    const key = randomBytes(32); // 32 bytes for AES-256
+    const iv = randomBytes(16);  // 16 bytes for CBC mode
+
+    function encrypt(text: string): string {
+      const cipher = createCipheriv(algorithm, key, iv);
+      const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
+      return encrypted.toString('hex');
+    }
+
+    if (profile) {
+      const json = JSON.stringify(profile);
+      const encryptedProfile = encrypt(json);
+      console.log('Profile of the user: ', encryptedProfile);
+    } else {
+      console.log('No profile data to encrypt.');
+    }
+  }
+
+  useCurrentUserProfile(currentUserProfile);
   if (loading) {
     return <LoadingInspiration />
   }
+
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-6">
-      {/* Search Bar */}
-      <div className="sticky top-0 z-10 bg-white/80 dark:bg-[#1A1A1A] backdrop-blur-md rounded-xl shadow px-4 py-2 flex items-center gap-3 w-full mx-auto">
+      <div className="sticky top-0 bg-white/80 dark:bg-[#1A1A1A] backdrop-blur-md rounded-xl shadow px-4 py-2 flex items-center gap-3 w-full mx-auto">
         <IconSearch size={20} className="text-gray-500" />
         <input
           type="text"
@@ -440,31 +363,31 @@ export default function ExplorePage() {
         />
       </div>
 
-
-      {/* Feed */}
       <div className="flex flex-col items-center space-y-8">
         {filteredUsers.flatMap((user) =>
-          user.designs.map((design) => (
-            <div
-              key={design.design_id}
-              className="bg-white dark:bg-neutral-900 rounded-2xl shadow-md overflow-hidden w-full"
-            >
-              {/* Post Header */}
-              <div className="flex items-center gap-3 p-4 bg-white dark:bg-[#1A1A1A]">
-                <UserProfilePopover user={user} />
+          // Sort designs by published_at DESC (latest first)
+          [...user.designs]
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .map((design) => (
+              <div
+                key={design.design_id}
+                className="bg-white dark:bg-neutral-900 rounded-2xl shadow-md overflow-hidden w-full"
+              >
+                {/* Post Header */}
+                <div className="flex items-center gap-3 p-4 bg-white dark:bg-[#1A1A1A]">
+                  <UserProfilePopover user={user} />
+                </div>
+                {/* Design Card */}
+                <DesignCard
+                  design={design}
+                  user={user}
+                  currentUserId={currentUserId}
+                  animatingHeart={animatingHeart}
+                  handleToggleLike={handleToggleLike}
+                  fetchUsersWithDesigns={fetchUsersWithDesigns}
+                />
               </div>
-
-              {/* Design Card */}
-              <DesignCard
-                design={design}
-                user={user}
-                currentUserId={currentUserId}
-                animatingHeart={animatingHeart}
-                handleToggleLike={handleToggleLike}
-                fetchUsersWithDesigns={fetchUsersWithDesigns}
-              />
-            </div>
-          ))
+            ))
         )}
       </div>
     </div>

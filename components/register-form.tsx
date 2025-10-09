@@ -130,7 +130,11 @@ export default function RegistrationForm() {
         return;
       }
 
-      console.log(signUpData?.user?.id);
+      if (!signUpData?.user?.id) {
+        toast.error("Registration failed. Please try again.");
+        return;
+      }
+
       if (!error && signUpData?.user?.id) {
         // 1. Upsert profile_details for the new user and get the inserted row
         const { data: profileDetails, error: detailsError } = await supabase
@@ -140,7 +144,16 @@ export default function RegistrationForm() {
           .single();
 
         if (detailsError) {
-          console.error(detailsError.message);
+          // Check for foreign key violation and show a friendly message
+          if (
+            detailsError.message?.includes("violates foreign key constraint") ||
+            detailsError.message?.includes("profile_details_profile_id_fkey")
+          ) {
+            toast.error("This email is already registered.");
+          } else {
+            toast.error(detailsError.message || "Failed to create profile details.");
+          }
+          return;
         }
 
         // 2. If profile_details was created, insert profile_contacts
@@ -153,11 +166,12 @@ export default function RegistrationForm() {
             extra_fields: "[]"
           });
         }
-      }
 
-      toast.success("Check your email to confirm your account");
-      localStorage.removeItem("registrationDraft");
-      router.push("/auth/login");
+        toast.success("Check your email to confirm your account");
+        localStorage.removeItem("registrationDraft");
+        router.push("/auth/login");
+        return;
+      }
     } catch (e) {
       console.error("Unexpected registration error", e);
       toast.error("Failed to submit the form. Please try again.");
@@ -362,7 +376,7 @@ export default function RegistrationForm() {
                               id="birthday"
                               type="button"
                             >
-                              <span className={field.value ? "" : "text-gray-500 dark:text-gray-500 opacity-60"}>
+                              <span className={field.value ? "" : "text-gray-400 dark:text-gray-500 opacity-60"}>
                                 {field.value
                                   ? format(new Date(field.value), "MM/dd/yyyy")
                                   : "MM/DD/YYYY"}

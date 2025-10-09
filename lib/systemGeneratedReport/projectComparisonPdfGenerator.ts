@@ -1,3 +1,5 @@
+// Line chart here
+
 import jsPDF from 'jspdf';
 
 export interface ProjectData {

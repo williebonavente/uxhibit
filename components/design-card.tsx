@@ -7,8 +7,6 @@ import { IconHeart, IconHeartFilled, IconEye } from "@tabler/icons-react";
 import { SparkleEffect } from "./animation/heart-pop";
 import { MessageSquare } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { UserProfilePopover } from "./user-profile-popover/user-profile-popover";
-
 
 export type DesignInfo = {
     design_id: string;
