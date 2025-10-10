@@ -9,7 +9,7 @@ import {
   Radar,
   ResponsiveContainer,
 } from "recharts";
-import { generateHeuristicReportSimple } from "@/lib/pdfGenerator";
+import { generateHeuristicReportSimple } from "@/lib/systemGeneratedReport/pdfGenerator";
 import { toast } from "sonner";
 import { IconLoader2, IconDownload } from "@tabler/icons-react";
 import { createClient } from "@/utils/supabase/client";

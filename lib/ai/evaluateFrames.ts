@@ -1,0 +1,128 @@
+import { AiEvaluator, aiEvaluator } from "@/lib/ai/aiEvaluator";
+
+export async function evaluateFrames({
+  frameIds,
+  frameImages,
+  user,
+  designId,
+  fileKey,
+  snapshot,
+  authError,
+  supabase,
+  sleep = (ms: number) => new Promise(res => setTimeout(res, ms)),
+}: {
+  frameIds: string[],
+  frameImages: Record<string, string>,
+  user: any,
+  designId: string,
+  fileKey: string,
+  snapshot?: any,
+  authError?: any,
+  supabase: any,
+  sleep?: (ms: number) => Promise<void>
+}) {
+  const frameSupabaseUrls: Record<string, string> = {};
+
+  for (const [frameId, figmaUrl] of Object.entries(frameImages) as [string, string][]) {
+    let supabaseUrl: string | null = null;
+    try {
+      const imgRes = await fetch(figmaUrl);
+      if (!imgRes.ok) {
+        frameSupabaseUrls[frameId] = figmaUrl;
+        continue;
+      }
+      const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
+      const filePath = `${user?.id}/${designId}/${frameId}.png`;
+      const { error } = await supabase.storage
+        .from('figma-frames')
+        .upload(filePath, imgBuffer, {
+          contentType: 'image/png',
+          upsert: true,
+        });
+      if (!error) {
+        const { data: signedData } = await supabase.storage
+          .from('figma-frames')
+          .createSignedUrl(filePath, 60 * 60 * 24 * 365);
+        supabaseUrl = signedData?.signedUrl || figmaUrl;
+      } else {
+        supabaseUrl = figmaUrl;
+      }
+    } catch {
+      supabaseUrl = figmaUrl;
+    }
+    frameSupabaseUrls[frameId] = supabaseUrl || figmaUrl;
+  }
+
+  const heuristics = {};
+  if (authError || !user) {
+    throw new Error('Unauthorized - user not found');
+  }
+
+  const frameResults: any[] = [];
+  for (const [index, nodeId] of frameIds.entries()) {
+    const imageUrl = frameSupabaseUrls[nodeId] || frameImages[nodeId];
+    let ai: AiEvaluator | null = null;
+    let ai_error: string | undefined;
+
+    try {
+      ai = await aiEvaluator(imageUrl, heuristics, snapshot);
+      if (!ai) ai_error = "mistral_skipped_or_empty";
+      if (ai && Array.isArray(ai.issues)) {
+        ai.issues = ai.issues.map((issue, issueIdx) => ({
+          ...issue,
+          id: `frame${index + 1}-issue${issueIdx}`,
+        }));
+      }
+    } catch (e: unknown) {
+      ai_error = `mistral_error: ${e instanceof Error ? e.message : "unknown"}`;
+    }
+
+    if (ai) {
+      try {
+        await supabase.from("design_frame_evaluations").upsert({
+          design_id: designId,
+          file_key: fileKey,
+          node_id: nodeId,
+          thumbnail_url: imageUrl,
+          ai_summary: ai.summary || null,
+          ai_data: ai,
+          snapshot: (() => {
+            if (!snapshot) return null;
+            if (typeof snapshot === "string") {
+              try { return JSON.parse(snapshot); } catch { return null; }
+            }
+            return snapshot;
+          })(),
+          created_at: new Date().toISOString(),
+          owner_id: user.id
+        });
+      } catch (err) {
+        console.log(err);
+        throw err
+      }
+    }
+
+    frameResults.push({
+      node_id: nodeId,
+      thumbnail_url: imageUrl,
+      ai,
+      ai_error,
+    });
+    // TODO: Remove the delay 
+    await sleep(1000);
+  }
+
+  // Aggregate results
+  const validResults = frameResults.filter(r => r.ai);
+  const total_score = validResults.length
+    ? Math.round(validResults.reduce((sum, r) => sum + (r.ai?.overall_score ?? 0), 0) / validResults.length)
+    : 0;
+  const summary = `Aggregate summary: ${validResults.map(r => r.ai?.summary).join(" | ")}`;
+
+  return {
+    frameResults,
+    validResults,
+    total_score,
+    summary,
+  };
+}

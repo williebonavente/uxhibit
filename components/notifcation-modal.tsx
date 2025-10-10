@@ -6,6 +6,30 @@ import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 
+
+export interface INotification {
+  id: string;
+  type: "heart" | "comment";
+  read: boolean;
+  created_at: string;
+  design_id?: string;
+  designs?: { title?: string };
+  from_user?: {
+    first_name?: string;
+    middle_name?: string;
+    last_name?: string;
+  };
+}
+
+interface User {
+  id: string;
+  first_name?: string;
+  middle_name?: string;
+  last_name?: string;
+}
+
+
+
 export function NotificationsModal({
   open,
   onClose,
@@ -23,11 +47,11 @@ export function NotificationsModal({
 }: {
   open: boolean;
   onClose: () => void;
-  user: any;
-  notifications: any[];
-  setNotifications: (fn: (prev: any[]) => any[]) => void;
-  unreadNotifications: any[];
-  readNotifications: any[];
+  user: User | null;
+  notifications: INotification[];
+  setNotifications: (fn: (prev: INotification[]) => INotification[]) => void;
+  unreadNotifications: INotification[];
+  readNotifications: INotification[];
   notifLoading: string | null;
   setNotifLoading: (id: string | null) => void;
   notifPage: number;
@@ -45,7 +69,7 @@ export function NotificationsModal({
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative z-[301] bg-white dark:bg-[#141414] rounded-xl shadow-lg p-6 max-w-md w-full">
+      <div className="relative z-[301] bg-white dark:bg-[#141414] rounded-xl shadow-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
         <button
           onClick={onClose}
           className="absolute top-3 right-3 text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-white text-xl font-bold focus:outline-none"
@@ -163,7 +187,7 @@ export function NotificationsModal({
                     )}
                     <span>
                       {notif.type === "heart"
-                        ? <><b>{[notif.from_user?.first_name, notif.from_user?.middle_name, notif.from_user?.last_name].filter(Boolean).join(" ") || "Someone"}</b> loved your design <b>{notif.designs?.title ?? notif.design_id}</b></>
+                        ? <><b>{[notif.from_user?.first_name, notif.from_user?.middle_name, notif.from_user?.last_name].filter(Boolean).join(" ") || "Someone"}</b> heart your design <b>{notif.designs?.title ?? notif.design_id}</b></>
                         : <><b>{[notif.from_user?.first_name, notif.from_user?.middle_name, notif.from_user?.last_name].filter(Boolean).join(" ") || "Someone"}</b> commented on your design <b>{notif.designs?.title ?? notif.design_id}</b></>
                       }
                     </span>
@@ -237,7 +261,7 @@ export function NotificationsModal({
                     )}
                     <span>
                       {notif.type === "heart"
-                        ? <><b>{[notif.from_user?.first_name, notif.from_user?.middle_name, notif.from_user?.last_name].filter(Boolean).join(" ") || "Someone"}</b> loved your design <b>{notif.designs?.title ?? notif.design_id}</b></>
+                        ? <><b>{[notif.from_user?.first_name, notif.from_user?.middle_name, notif.from_user?.last_name].filter(Boolean).join(" ") || "Someone"}</b> heart your design <b>{notif.designs?.title ?? notif.design_id}</b></>
                         : <><b>{[notif.from_user?.first_name, notif.from_user?.middle_name, notif.from_user?.last_name].filter(Boolean).join(" ") || "Someone"}</b> commented on your design <b>{notif.designs?.title ?? notif.design_id}</b></>
                       }
                     </span>
@@ -309,7 +333,7 @@ export function NotificationsModal({
           </div>
         )}
         {/* Remove all the notifications here */}
-        <div className="flex justify-end mt-4 gap-2">
+        <div className="flex justify-end mt-12 gap-2">
           <Button
             variant="destructive"
             onClick={() => {
@@ -347,7 +371,9 @@ export function NotificationsModal({
           >
             Remove All
           </Button>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline"
+            className={"cursor-pointer"}
+            onClick={onClose}>
             Close
           </Button>
         </div>

@@ -1,5 +1,7 @@
-import jsPDF from 'jspdf';
+// heuristic-report
 
+
+import jsPDF from 'jspdf';
 export interface HeuristicData {
   heuristic: string;
   fullName: string;
@@ -193,6 +195,8 @@ export const generateHeuristicReportSimple = async (
     
     pdf.setFontSize(11);
     pdf.setTextColor(0, 0, 0);
+
+    // TODO: fetch this properly in the database the summarize report
     const recommendations = [
       '1. Focus on high-scoring heuristics (Major severity) first',
       '2. Review projects with consistent violation patterns',

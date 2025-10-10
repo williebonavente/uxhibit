@@ -1,7 +1,8 @@
 import React from "react";
+import { EvalResponse } from "../page";
 
 interface EvaluationResultProps {
-  evalResult: any;
+  evalResult: EvalResponse;
   loadingEval: boolean;
   currentFrame: any;
   frameEvaluations: any[];
@@ -270,6 +271,56 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
           </ul>
         </div>
       )}
+
+      {/* Recommendation Resources */}
+    {/* Recommendation Resources */}
+  {evalResult.ai?.resources && evalResult.ai.resources.length > 0 && (
+    <div className="p-4 rounded-2xl bg-white dark:bg-[#18181b] mb-4 shadow-lg border-l-8 border-blue-400/80">
+      <h3 className="font-bold mb-4 text-blue-600 dark:text-blue-300 text-lg flex items-center gap-2">
+        <span className="text-2xl">📚</span>
+        Recommended Resources
+      </h3>
+      <ul className="flex flex-col gap-4">
+        {evalResult.ai.resources.map((resource: any, i: number) => {
+          // Find the related issue for context
+          const issue = (evalResult.ai?.issues ?? []).find(
+            (iss: any) => iss.id === resource.issue_id
+          );
+          return (
+            <li
+              key={resource.issue_id || i}
+              className="bg-blue-50 dark:bg-[#232345] rounded-lg px-4 py-3 shadow-sm border-l-4 border-blue-400"
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-semibold text-blue-700 dark:text-blue-200">{resource.title}</span>
+                {resource.issue_id && (
+                  <span className="ml-2 px-2 py-1 rounded-full text-xs bg-blue-200 text-blue-800 font-mono">
+                    Issue: {resource.issue_id}
+                  </span>
+                )}
+              </div>
+              {issue && (
+                <div className="text-xs text-neutral-600 dark:text-neutral-400 mb-1">
+                  Related Issue: {issue.message}
+                </div>
+              )}
+              <div className="text-sm text-neutral-700 dark:text-neutral-200 mb-1">
+                {resource.description}
+              </div>
+              <a
+                href={resource.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-600 dark:text-blue-300 underline"
+              >
+                {resource.url}
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  )} 
     </>
   );
 };

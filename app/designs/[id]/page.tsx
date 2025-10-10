@@ -25,8 +25,6 @@ import ZoomControls from "./dialogs/ZoomControls";
 import { CommentsSection } from "./comments/page";
 import { Comment } from "@/components/comments-user";
 import EvaluationParamsModal from "@/components/evaluation-params-modal";
-import VisitorEngagement from "@/components/visitors/visitor-engagement";
-import DesignChats from "@/components/chat-system/design_chats";
 import DesignHeaderTitle from "@/components/arrow-back-button";
 
 interface FrameEvaluation {
@@ -83,7 +81,12 @@ export type Versions = {
   created_at: string;
 };
 
-
+type EvalResource = {
+  issue_id: string;
+  title: string;
+  url: string;
+  description: string;
+}
 export type Design = {
   is_active: boolean;
   id: string;
@@ -112,7 +115,7 @@ type EvaluateInput = {
   url?: string;
 }
 
-type EvalResponse = {
+export type EvalResponse = {
   nodeId: string;
   imageUrl: string;
   summary: string;
@@ -120,7 +123,7 @@ type EvalResponse = {
   ai_status?: "ok" | "skipped";
   overall_score?: number | null;
   strengths?: string[];
-  weaknesses?: string[]; // added
+  weaknesses?: string[];
   issues?: {
     id: string;
     severity: string;
@@ -128,11 +131,12 @@ type EvalResponse = {
     suggestion: string;
   }[];
   category_scores?: Record<string, number> | null;
+  resources?: EvalResource[];
   ai?: {
     overall_score?: number;
     summary?: string;
     strengths?: string[];
-    weaknesses?: string[]; // added
+    weaknesses?: string[];
     issues?: {
       id: string;
       severity: string;
@@ -140,6 +144,8 @@ type EvalResponse = {
       suggestions: string;
     }[];
     category_scores?: Record<string, number>;
+    resources?: EvalResource[];
+
   } | null;
 };
 
@@ -338,12 +344,12 @@ export default function DesignDetailPage({
 
   const currentFrame = sortedFrameEvaluations[selectedFrameIndex];
 
-    async function handleOpenComments() {
+  async function handleOpenComments() {
     setShowComments(true);
     setLoadingComments(true);
-  
+
     const supabase = createClient();
-  
+
     if (currentUserId && design?.id) {
       await supabase
         .from("comments")
@@ -352,7 +358,7 @@ export default function DesignDetailPage({
         .eq("user_id", currentUserId)
         .eq("is_read", false);
     }
-  
+
     const { data, error } = await supabase
       .from("comments")
       .select(`
@@ -364,7 +370,7 @@ export default function DesignDetailPage({
       `)
       .eq("design_id", design?.id)
       .order("created_at", { ascending: false });
-  
+
     if (!error && data) {
       const mappedComments = (data || []).map((comment: any) => ({
         id: comment.id,
@@ -384,7 +390,7 @@ export default function DesignDetailPage({
         design_id: comment.design_id,
         is_read: comment.is_read,
       }));
-  
+
       const commentMap: { [id: string]: any } = {};
       mappedComments.forEach(comment => {
         commentMap[comment.id] = { ...comment, replies: [] };
@@ -399,7 +405,7 @@ export default function DesignDetailPage({
           rootComments.push(commentMap[comment.id]);
         }
       });
-  
+
       setComments(rootComments);
     }
     setLoadingComments(false);
@@ -600,7 +606,7 @@ export default function DesignDetailPage({
     }
   }
 
-    async function fetchCommentWithProfile(commentId: string) {
+  async function fetchCommentWithProfile(commentId: string) {
     const supabase = createClient();
     const { data, error } = await supabase
       .from("comments")
@@ -616,7 +622,7 @@ export default function DesignDetailPage({
       console.error("Failed to fetch comment with profile:", error);
       return null;
     }
-  
+
     return {
       id: data.id,
       text: data.text,
@@ -725,9 +731,9 @@ export default function DesignDetailPage({
 
   };
 
-    const fetchComments = useCallback(async () => {
+  const fetchComments = useCallback(async () => {
     const supabase = createClient();
-  
+
     if (!design?.id) {
       return;
     }
@@ -743,7 +749,7 @@ export default function DesignDetailPage({
       .eq("design_id", design?.id)
       .order("created_at", { ascending: false });
     // .range(0, 19);
-  
+
     if (error) {
       console.log("Supabase error:", error);
       toast.error(`Failed to fetch comments! ${error.message}`);
@@ -767,14 +773,14 @@ export default function DesignDetailPage({
       localTime: comment.local_time,
       design_id: comment.design_id,
     }));
-  
+
     console.log("commentsWithUser", commentsWithUser);
-  
+
     const commentMap: { [id: string]: any } = {};
     commentsWithUser.forEach(comment => {
       commentMap[comment.id] = { ...comment, replies: [] };
     });
-  
+
     const rootComments: any[] = [];
     commentsWithUser.forEach(comment => {
       if (comment.parentId) {
@@ -818,12 +824,12 @@ export default function DesignDetailPage({
       }));
   }, []);
 
-    useEffect(() => {
+  useEffect(() => {
     const supabase = createClient();
     async function fetchUserProfile() {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUserId(user?.id ?? null);
-  
+
       if (user?.id) {
         const { data: profile } = await supabase
           .from("profiles")
@@ -1425,6 +1431,7 @@ export default function DesignDetailPage({
     }
   }, [sidebarTab]);
 
+  console.log(evalResult?.ai?.resources);
 
   if (designLoading)
     return (
@@ -1449,9 +1456,7 @@ export default function DesignDetailPage({
         <p>Design not found.</p>
       </div>
     );
-  // Validate the logic later 
   const isOwner = currentUserId && design?.id && currentUserId === design?.owner_id;
-
   return (
     <div>
       <div className="mb-2">
@@ -1624,22 +1629,23 @@ export default function DesignDetailPage({
                     />
                   )}
                 </div>
-
-                <div className="mt-auto pt-4">
-                  <button
-                    onClick={handleOpenEvalParams}
-                    disabled={loadingEval}
-                    className="w-full px-4 py-2 text-sm rounded-md bg-[#ED5E20] text-white hover:bg-orange-600 disabled:opacity-50 cursor-pointer"
-                  >
-                    {loadingEval ? "Evaluating..." : "Re-Evaluate"}
-                  </button>
-                  <EvaluationParamsModal
-                    open={showEvalParams}
-                    onClose={() => setShowEvalParams(false)}
-                    onSubmit={handleEvalParamsSubmit}
-                    initialParams={pendingParams || {}}
-                  />
-                </div>
+                {isOwner && (
+                  <div className="mt-auto pt-4">
+                    <button
+                      onClick={handleOpenEvalParams}
+                      disabled={loadingEval}
+                      className="w-full px-4 py-2 text-sm rounded-md bg-[#ED5E20] text-white hover:bg-orange-600 disabled:opacity-50 cursor-pointer"
+                    >
+                      {loadingEval ? "Evaluating..." : "Re-Evaluate"}
+                    </button>
+                    <EvaluationParamsModal
+                      open={showEvalParams}
+                      onClose={() => setShowEvalParams(false)}
+                      onSubmit={handleEvalParamsSubmit}
+                      initialParams={pendingParams || {}}
+                    />
+                  </div>
+                )}
               </>
             )}
             {sidebarTab === "comments" && (

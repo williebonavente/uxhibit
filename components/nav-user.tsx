@@ -30,46 +30,40 @@ import { toast } from "sonner";
 import { getInitials } from "@/app/(root)/dashboard/page";
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { Button } from "./ui/button";
 import { type User } from "@supabase/supabase-js";
 import { Skeleton } from "./ui/skeleton";
 import { Bug, UserRound, Trash } from "lucide-react";
-import { useDesignNotifications } from "../lib/notification"
 import { IconBell } from "@tabler/icons-react";
 import { ReportBugModal } from "./report-bug-modal";
 import { AccountInfoModal } from "./account-info-modal";
 import DeleteAccountPage from "./delete-account-dialog";
-import { NotificationsModal } from "./notifcation-modal";
+import { INotification, NotificationsModal } from "./notifcation-modal";
 
+export type Profile = {
+  id: string;
+  username: string,
+  first_name?: string;
+  middle_name?: string;
+  last_name?: string;
+  avatar_url?: string;
+  gender: string;
+  birthday: string;
+  bio: string;
+  role?: string;
+}
 export function NavUser({ user }: { user: User | null }) {
-  const { isMobile } = useSidebar();
 
+  const { isMobile } = useSidebar();
   const [loading, setLoading] = useState(true)
   const [fullname, setFullName] = useState<string | null>(null)
   const [email, setEmail] = useState<string | null>(null)
-  const [avatar_url, setAvatarUrl] = useState<string | null>(null)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [showNotifModal, setShowNotifModal] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<INotification[]>([]);
   const [notifLoading, setNotifLoading] = useState<string | null>(null);
   const [notifPage, setNotifPage] = useState(1);
   const [showReportBug, setShowReportBug] = useState(false);
-
-  type Profile = {
-    id: string;
-    username: string,
-    first_name?: string;
-    middle_name?: string;
-    last_name?: string;
-    avatar_url?: string;
-    gender: string;
-    birthday: string;
-    bio: string;
-    role?: string;
-  }
-
   const [open, setOpen] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
 
@@ -79,28 +73,18 @@ export function NavUser({ user }: { user: User | null }) {
       ? [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(" ")
       : "";
 
-  // const paginatedNotifcations = notifications.slice(
-  //   (notifPage - 1) * notifPerpage,
-  //   notifPage * notifPerpage
-  // );
   const totalPages = Math.ceil(notifications.length / notifPerpage);
   const unreadNotifications = notifications.filter(n => !n.read);
   const readNotifications = notifications.filter(n => n.read);
 
-  // TODO: BE DELETED
-  // const heartNotification = useDesignNotifications(user?.id ?? null);
-  // const hasHeartNotifications = heartNotification.length > 0;
-
   const handleProfileClick = async () => {
     const supabase = createClient();
 
-    // Get current user
     const { data: authData, error: authError } = await supabase.auth.getUser();
     if (authError || !authData?.user?.id) return;
 
     const userId = authData.user.id;
 
-    // Redirect to your profile page
     router.push(`/profile-user/${userId}`);
   };
 
@@ -110,31 +94,18 @@ export function NavUser({ user }: { user: User | null }) {
       setLoading(false);
       return;
     }
-
-    console.log("User here no error: ",user);
+    console.log("User here no error: ", user);
     try {
       setLoading(true);
       const supabase = createClient();
 
-      // Fetch profile from 'profiles' table
       const { data: profileData, error: profileError, status } = await supabase
         .from('profiles')
-        .select(`
-          id,
-          username,
-          first_name,
-          middle_name,
-          last_name,
-          website,
-          avatar_url,
-          gender,
-          bio,
-          birthday
-        `)
+        .select(`id, username, first_name, middle_name, last_name,
+          website, avatar_url, gender, bio, birthday `)
         .eq('id', user?.id)
         .single();
 
-      // Fetch role from 'profile_details' table
       const { data: detailsData, error: detailsError } = await supabase
         .from('profile_details')
         .select('role')
@@ -142,10 +113,8 @@ export function NavUser({ user }: { user: User | null }) {
         .single();
 
       if ((profileError && status !== 406 && Object.keys(profileError).length > 0) || detailsError) {
-        // Log the full error object for debugging
         console.error("Profile Error:", JSON.stringify(profileError));
         console.error("Details Error:", JSON.stringify(detailsError));
-        // Throw only the message or stringified error
         throw new Error(profileError?.message || detailsError?.message || "Unknown error");
       }
 
@@ -166,9 +135,7 @@ export function NavUser({ user }: { user: User | null }) {
         setFullName(fullname);
       }
     } catch (err) {
-      // Log the error for debugging
       console.error("getProfile error:", err);
-      // Optionally show a toast or set an error state here
     } finally {
       setLoading(false);
     }
@@ -178,13 +145,10 @@ export function NavUser({ user }: { user: User | null }) {
     const supabase = createClient();
     const { data: notifications } = await supabase
       .from("notifications")
-      .select(`
-        *,
-        designs(title),
+      .select(`*, designs(title),
         from_user:profiles!notifications_from_user_id_fkey(
-          first_name, middle_name, last_name, avatar_url
-        )
-      `)
+        first_name, middle_name, last_name, avatar_url
+        )`)
       .eq("to_user_id", user?.id)
       .order("created_at", { ascending: false });
     setNotifications(notifications ?? []);
@@ -205,18 +169,8 @@ export function NavUser({ user }: { user: User | null }) {
       // Fetch profile from 'profiles'
       const { data: profileData } = await supabase
         .from("profiles")
-        .select(`
-          id,
-          username,
-          first_name,
-          middle_name,
-          last_name,
-          website,
-          avatar_url,
-          gender,
-          birthday,
-          bio
-        `)
+        .select(`id, username, first_name, middle_name, last_name, website,
+          avatar_url, gender, birthday, bio `)
         .eq("id", authData.user.id)
         .single();
 
@@ -308,10 +262,17 @@ export function NavUser({ user }: { user: User | null }) {
           const senderName = [sender?.first_name, sender?.middle_name, sender?.last_name]
             .filter(Boolean)
             .join(" ") || "Someone";
+
+          const actionText =
+            notif.type === "heart"
+              ? "heart your design!"
+              : notif.type === "comment"
+                ? "commented on your design!"
+                : "interacted with your design!";
           toast(
             <span className="flex items-center gap-2">
               <IconBell className="text-yellow-500" size={20} />
-              <span>{senderName} loved your design!</span>
+              <span>{senderName} {actionText}</span>
             </span>,
             {
               description: design?.title
@@ -348,9 +309,7 @@ export function NavUser({ user }: { user: User | null }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center mt-8h-32 gap-4">
-        {/* Avatar skeleton */}
         <Skeleton className="h-8 w-8 rounded-full" />
-        {/* Profile info skeleton (name + email) */}
         <div className="grid flex-1 text-left text-sm leading-tight gap-2">
           <Skeleton className="h-4 w-24 rounded" /> {/* Name skeleton */}
           <Skeleton className="h-4 w-32 rounded" /> {/* Email skeleton */}
@@ -371,7 +330,7 @@ export function NavUser({ user }: { user: User | null }) {
                 <Avatar className="h-8 w-8 rounded-bl-full ">
                   <AvatarImage
                     src={
-                      avatarPreview
+                      avatarUrl
                       ?? (profile?.avatar_url
                         ? (profile.avatar_url.startsWith("http")
                           ? profile.avatar_url
@@ -402,7 +361,7 @@ export function NavUser({ user }: { user: User | null }) {
                   <Avatar className="h-8 w-8 rounded-bl-full">
                     <AvatarImage
                       src={
-                        avatarPreview
+                        avatarUrl
                         ?? (profile?.avatar_url
                           ? (profile.avatar_url.startsWith("http")
                             ? profile.avatar_url

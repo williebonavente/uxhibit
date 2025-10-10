@@ -8,6 +8,9 @@ import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { FrameCarousel } from "@/components/carousel/frame-carousel";
 import { IconLink } from "@tabler/icons-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+
 
 type ParsedMeta = {
   fileKey: string;
@@ -24,30 +27,7 @@ export default function Evaluate() {
     cursor:
       "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='22' stroke='%23ffffff' fill='none' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 3l7 17 2-7 7-2-16-8Z'/></svg>\") 3 3, pointer",
   };
-  // OPTIONAL darker stroke for dark mode via media query (inline workaround)
-  const pointerCursorDark =
-    "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' stroke='%23ffffff' fill='none' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 3l7 17 2-7 7-2-16-8Z'/></svg>\") 2 2, pointer";
-  const selectBase =
-    "w-full appearance-none bg-transparent text-sm font-medium outline-none focus:outline-none cursor-pointer rounded-md transition-colors " +
-    // Added a bit more left padding so option text isn’t tight against the icon
-    "pl-2.5 pr-9 py-2.5 md:py-3 leading-tight";
-  // ...existing buildSelectClass stays unchanged...
 
-  const buildSelectClass = (hasValue: boolean) =>
-    [
-      selectBase,
-      "text-neutral-900 dark:text-neutral-100",
-      hasValue
-        ? "bg-white/70 dark:bg-neutral-800 shadow-sm"
-        : "bg-transparent hover:bg-white/55 dark:hover:bg-neutral-800/55",
-      "border border-transparent hover:border-neutral-300/70 dark:hover:border-neutral-600/70",
-      "focus:border-[#ED5E20]/70 focus:ring-2 focus:ring-[#ED5E20]/40 dark:focus:border-[#ED5E20]/70",
-      "focus:bg-white/85 dark:focus:bg-neutral-800/85",
-      hasValue
-        ? "hover:bg-white/80 dark:hover:bg-neutral-800/80"
-        : "placeholder:text-neutral-500 dark:placeholder:text-neutral-400",
-      "backdrop-blur-sm",
-    ].join(" ");
   const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
@@ -133,12 +113,12 @@ export default function Evaluate() {
     const frameEntries = Object.entries(parsed.frameImages || {});
     if (frameEntries.length === 0) {
       toast.error("No frames found in parsed design.");
+      setStep(2); // Revert to step 2 for better validation
       return;
     }
 
     setSubmitting(true);
     try {
-      // Save the design and let the backend handle evaluation
       const saveRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/designs`, {
         method: "POST",
         headers: {
@@ -162,12 +142,6 @@ export default function Evaluate() {
         toast.error(saved?.error || "Save failed");
         return;
       }
-
-      console.log("handleSubmit called");
-      console.log("parsed.frameImages:", parsed.frameImages);
-      console.log("frameEntries:", frameEntries);
-      console.log("Starting download/upload for frames:", frameEntries.length);
-
       // Check backend evaluation result
       if (saved.ai_evaluation && saved.ai_evaluation.frameCount > 0) {
         toast.success("Design and AI evaluation completed for all frames");
@@ -199,18 +173,16 @@ export default function Evaluate() {
       className="min-h-screen flex items-center justify-center"
       style={cardCursor}
     >
-      <div
-        className="relative z-10 p-6 md:p-10 flex flex-col gap-8"
-        style={cardCursor}
-      >
+      <div className="relative pt-2 md:pt-4 pb-6 md:pb-8 flex flex-col gap-8" style={cardCursor}>
         {/* Step Indicator */}
-        <div className="flex items-center justify-center gap-5 text-xs font-medium tracking-wide p-5 rounded-full">
+
+        <div className="flex items-center justify-center gap-5 text-xs font-medium tracking-wide p-2 rounded-full mt-0">
           {[1, 2, 3, 4].map((n, i) => (
             <div key={n} className="flex items-center gap-3">
               {/* Step Circle */}
               <span
                 className={`relative h-9 w-9 rounded-full flex items-center justify-center text-[12px] font-semibold transition-all
-                  ${step === n
+            ${step === n
                     ? "bg-[#ED5E20] text-white drop-shadow-[0_0_8px_#ED5E20] animate-pulse"
                     : step > n
                       ? "bg-[#ED5E20] text-white"
@@ -219,7 +191,6 @@ export default function Evaluate() {
               >
                 {n}
               </span>
-
               {/* Step Label */}
               <span
                 className={`hidden sm:inline text-sm ${step >= n
@@ -232,12 +203,11 @@ export default function Evaluate() {
                 {n === 3 && "Review"}
                 {n === 4 && "Evaluation"}
               </span>
-
               {/* Connector Line */}
               {i < 3 && (
                 <div
                   className={`h-0.5 w-14 rounded-full transition-colors duration-300
-                    ${step > n
+              ${step > n
                       ? "bg-[#ED5E20]"
                       : "bg-neutral-300 dark:bg-neutral-700"
                     }`}
@@ -291,42 +261,23 @@ export default function Evaluate() {
                     <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
                     <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                   </svg>
-                  <select
-                    value={age}
-                    onChange={(e) => setAge(e.target.value)}
-                    className="w-full
-                              rounded-lg
-                              bg-white dark:bg-neutral-800/70
-                              text-sm font-md
-                              text-neutral-900 dark:text-neutral-200
-                              px-3 py-2
-                              appearance-none
-                              focus:outline-none
-                              focus:ring-.5 focus:ring-[#ED5E20]
-                              transition
-                              hover:border-[#ED5E20]/50
-                              cursor-pointer"
-                  >
-                    <option value="">Select Generation</option>
-                    <option value="Gen Z">Gen Z (1997-2012)</option>
-                    <option value="Millennial">Millennial (1981-1996)</option>
-                    <option value="Gen Alpha">
-                      Gen Alpha (2013-Present)
-                    </option>
-                  </select>
-                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 dark:text-neutral-400 group-focus-within:text-[#ED5E20]">
-                    ▾
-                  </span>
+                  <Select value={age} onValueChange={setAge}>
+                    <SelectTrigger className="w-full rounded-lg bg-white dark:bg-neutral-800/70 text-sm font-medium text-neutral-900 dark:text-neutral-200 px-3 py-2">
+                      <SelectValue placeholder="Select Generation" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Gen Z">Gen Z (1997-2012)</SelectItem>
+                      <SelectItem value="Millennial">Millennial (1981-1996)</SelectItem>
+                      <SelectItem value="Gen Alpha">Gen Alpha (2013-Present)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </label>
 
               {/* Occupation */}
               <label className="group relative flex flex-col rounded-xl
-                                bg-accent dark:bg-neutral-800/60
-                                text-white
-                                p-5
-                                transition-colors 
-                                focus-within:ring-1 focus-within:ring-[#ED5E20]/70 focus-within:border-[#ED5E20 border"
+                                bg-accent dark:bg-neutral-800/60 text-white
+                                p-5 transition-colors focus-within:ring-1 focus-within:ring-[#ED5E20]/70 focus-within:border-[#ED5E20 border"
                 style={cardCursor}>
                 <span className="text-[15px] font-semibold text-[#ED5E20] mb-2">
                   Occupation
@@ -349,35 +300,18 @@ export default function Evaluate() {
                     <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
                     <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
                   </svg>
-                  <select
-                    value={occupation}
-                    onChange={(e) => setOccupation(e.target.value)}
-                    className="
-                      w-full
-                      rounded-lg
-                      bg-white dark:bg-neutral-800/70
-                      text-sm font-md
-                      text-neutral-900 dark:text-neutral-200
-                      px-3 py-2
-                      appearance-none
-                      focus:outline-none
-                      focus:ring-.5 focus:ring-[#ED5E20]
-                      transition
-                      hover:border-[#ED5E20]/50
-                      cursor-pointer"
-                  >
-                    <option value="" className="dark:text-neutral-500 dark:text-neutral-100">
-                      Select Occupation
-                    </option>
-                    <option value="Student" className="text-neutral-700">Student</option>
-                    <option value="Freelancer" className="text-neutral-700">Freelancer</option>
-                    <option value="Designer" className="text-neutral-700">Designer</option>
-                    <option value="Developer" className="text-neutral-700">Developer</option>
-                    <option value="Educator" className="text-neutral-700">Educator</option>
-                  </select>
-                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 dark:text-neutral-400 group-focus-within:text-[#ED5E20]">
-                    ▾
-                  </span>
+                  <Select value={occupation} onValueChange={setOccupation}>
+                    <SelectTrigger className="w-full rounded-lg bg-white dark:bg-neutral-800/70 text-sm font-medium text-neutral-900 dark:text-neutral-200 px-3 py-2">
+                      <SelectValue placeholder="Select Occupation" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Student">Student</SelectItem>
+                      <SelectItem value="Freelancer">Freelancer</SelectItem>
+                      <SelectItem value="Designer">Designer</SelectItem>
+                      <SelectItem value="Developer">Developer</SelectItem>
+                      <SelectItem value="Educator">Educator</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </label>
             </fieldset>
@@ -432,35 +366,42 @@ export default function Evaluate() {
                 Paste Figma Design Link
               </p>
               <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                Make sure the file is only from figma.com domain and is public or shared with you.
+                Make sure the link is only from figma.com domain and is public or shared with you.
               </p>
             </div>
 
             {/* Search Bar */}
-            <div className="sticky top-0 z-10 bg-white/80 dark:bg-[#1A1A1A] backdrop-blur-md rounded-xl shadow px-4 py-2 flex items-center gap-3 w-full mx-auto">
-              <IconLink size={20} className="text-[#ED5E20]" />
-              <input
-                type="url"
-                value={link}
-                onChange={(e) => setLink(e.target.value)}
-                placeholder="https://www.figma.com/design/..."
-                className="w-full h-14 px-4 rounded-lg bg-accent/10 dark:bg-neutral-800/60 text-sm focus:outline-none focus:ring-1 focus:ring-[#ED5E20]/50"
-              />
+            <div className="sticky top-0 bg-white/80 dark:bg-[#1A1A1A] backdrop-blur-md rounded-xl shadow px-4 py-2 w-full mx-auto">
+              <div className="flex items-center gap-3">
+                <IconLink size={20} className="text-[#ED5E20]" />
+                <Input
+                  type="url"
+                  value={link}
+                  onChange={(e) => setLink(e.target.value)}
+                  placeholder="https://www.figma.com/design/..."
+                  className="w-full h-14 px-4 rounded-lg bg-accent/10 dark:bg-neutral-800/60 text-sm focus:outline-none focus:ring-1 focus:ring-[#ED5E20]/50"
+                />
+              </div>
               {parsed && (
-                <div className="flex items-center gap-4 p-3 rounded-lg bg-accent dark:bg-neutral-800/60 border">
-                  {parsed.thumbnail && (
-                    <Image
-                      src={parsed.thumbnail}
-                      alt="thumb"
-                      width={64}
-                      height={48}
-                      className="rounded object-cover"
-                    />
-                  )}
-                  <div className="text-xs md:text-sm">
-                    <div className="font-semibold">{parsed.name}</div>
-                    <div className="opacity-70 break-all">{parsed.fileKey}</div>
+                <div className="px-6 py-6"> {/* Increased margin-top and padding */}
+                  {/* Info Section: Name and FileKey */}
+                  <div className="mb-6 p-5 rounded-lg bg-accent dark:bg-neutral-800/60 border">
+                    <div className="font-bold text-2xl md:text-xl mb-1">{parsed.name}</div>
+                    <div className="opacity-70 break-all text-sm md:text-base">{parsed.fileKey}</div>
                   </div>
+                  {/* Thumbnail Section */}
+                  {parsed.thumbnail && (
+                    <div className="flex justify-center">
+                      <Image
+                        src={parsed.thumbnail}
+                        alt="thumb"
+                        width={700}
+                        height={700}
+                        className="rounded object-cover shadow-2xl w-full max-w-[700px] h-auto"
+                        priority
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -498,27 +439,34 @@ export default function Evaluate() {
                   type="button"
                   onClick={handleParse}
                   disabled={!canParse}
-                  className={`px-6 py-2 rounded-lg text-sm font-semibold text-white cursor-pointer
-                    ${canParse
-                      ? "bg-[#ED5E20] hover:bg-orange-600"
-                      : "bg-gray-400 cursor-not-allowed"
-                    }`}
+                  className={`px-6 py-2 rounded-lg text-sm font-semibold flex items-center justify-center min-w-[120px]
+                    ${parsing
+                      ? "text-white bg-gray-400 cursor-not-allowed"
+                      : parsed
+                        ? "border-2 border-[#ED5E20] text-[#ED5E20] bg-transparent hover:bg-[#ED5E20]/10"
+                        : "text-white bg-[#ED5E20] hover:bg-orange-600"
+                    } transition-colors cursor-pointer`}
                 >
-                  {parsing ? "Parsing..." : parsed ? "Re-Parse" : "Parse"}
+                  {parsing ? (
+                    <span className="flex items-center gap-1">
+                      Parsing
+                      <span className="inline-flex">
+                        <span className="w-1.5 h-1.5 mx-0.5 bg-white rounded-full animate-bounce [animation-delay:-0.32s]"></span>
+                        <span className="w-1.5 h-1.5 mx-0.5 bg-white rounded-full animate-bounce [animation-delay:-0.16s]"></span>
+                        <span className="w-1.5 h-1.5 mx-0.5 bg-white rounded-full animate-bounce"></span>
+                      </span>
+                    </span>
+                  ) : parsed ? "Re-Parse" : "Parse"}
                 </button>
-                {/*
-                <button
-                  disabled={!parsed}
-                  onClick={() => parsed && setStep(3)}
-                  className={`px-6 py-2 rounded-lg text-sm font-semibold text-white cursor-pointer
-                    ${parsed
-                      ? "bg-[#ED5E20] hover:bg-orange-600"
-                      : "bg-gray-400 cursor-not-allowed"
-                    }`}
-                >
-                  Review
-                </button>
-                */}
+                {parsed && !parsing && (
+                  <button
+                    type="button"
+                    onClick={() => setStep(3)}
+                    className="cursor-pointer px-6 py-2 rounded-lg text-sm font-semibold text-white bg-[#ED5E20] hover:bg-orange-600 transition-colors"
+                  >
+                    Next
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -702,7 +650,7 @@ export default function Evaluate() {
                     className="absolute inset-0 rounded-xl ring-1 ring-white/30 group-hover:ring-white/50 cursor-pointer"
                   />
                   {/* Label */}
-                  <span className="relative z-10 flex items-center gap-2 cursor-pointer">
+                  <span className="relative flex items-center gap-2 cursor-pointer">
                     Evaluate
                   </span>
                 </button>
@@ -713,8 +661,8 @@ export default function Evaluate() {
 
         {/* STEP 4: Running AI Evaluation */}
         {step === 4 && (
-          <div className="space-y-5">
-            <div className="flex flex-col items-center justify-center text-center py-24 animate-pulse">
+          <div className="flex flex-col items-center justify-center text-center py-24">
+            <div className="flex flex-col items-center justify-center text-center animate-pulse mb-6">
               <Image
                 src="/images/smart-evaluation-underway.svg"
                 alt="Running evaluation illustration"

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
+import { Profile } from "./nav-user";
 
 export function AccountInfoModal({
   open,
@@ -21,8 +22,8 @@ export function AccountInfoModal({
 }: {
   open: boolean;
   setOpen: (open: boolean) => void;
-  profile: any;
-  setProfile: (profile: any) => void;
+  profile: Profile | null;
+  setProfile: (profile: Profile) => void;
   email: string | null;
   setFullName: (name: string) => void;
   setAvatarUrl: (url: string | null) => void;
@@ -32,22 +33,21 @@ export function AccountInfoModal({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [signedAvatarUrl, setSignedAvatarUrl] = useState<string | null>(null);
 
-  const [step, setStep] = useState(1);
 
   const router = useRouter();
-
-  function generateUsername(profile: any) {
-    const name = [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join("");
-    return name.toLowerCase();
+  
+  function generateUsername(profile: Profile) {
+    const fullName = [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join("");
+    return fullName.toLowerCase();
   }
 
   useEffect(() => {
     async function fetchSignedUrl() {
       if (profile?.avatar_url && !profile.avatar_url.startsWith("http")) {
         const supabase = createClient();
-        const { data, error } = await supabase.storage
+        const { data } = await supabase.storage
           .from("avatars")
-          .createSignedUrl(profile.avatar_url, 3600 * 3600); // 1 hour expiry
+          .createSignedUrl(profile.avatar_url, 3600 * 3600); 
         if (data?.signedUrl) {
           setSignedAvatarUrl(data.signedUrl);
         } else {
@@ -62,9 +62,14 @@ export function AccountInfoModal({
 
   if (!open) return null;
 
+    const fullName = [
+    profile?.first_name,
+    profile?.middle_name,
+    profile?.last_name
+  ].filter(Boolean).join(" ");
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
-      {/* Blurred, darkened background */}
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={() => setOpen(false)}
@@ -103,13 +108,13 @@ export function AccountInfoModal({
                 // Generate signed URL after upload
                 const { data } = await supabase.storage
                   .from("avatars")
-                  .createSignedUrl(filePath, 3600 * 3600); // 1 hour expiry
+                  .createSignedUrl(filePath, 3600 * 3600); 
                 imageUrl = data?.signedUrl ?? filePath;
               }
 
               let username = profile.username;
-              if (!username && profile.fullname) {
-                username = generateUsername(profile.fullname);
+              if (!username && fullName) {
+                username = generateUsername(profile);
               }
               // Update profile in DB
               const { error } = await supabase
@@ -133,7 +138,7 @@ export function AccountInfoModal({
                 .eq("profile_id", profile.id);
               if (!error && !roleError) {
                 toast.success("Profile Updated!");
-                setFullName(profile.fullname);
+                setFullName(fullName);
                 setAvatarUrl(imageUrl ?? null);
                 setOpen(false);
                 router.refresh();
@@ -166,12 +171,12 @@ export function AccountInfoModal({
                           ?? signedAvatarUrl
                           ?? undefined
                         }
-                        alt={profile?.fullname ?? email ?? "User"}
+                        alt={fullName ?? email ?? "User"}
                       />
                       <AvatarFallback className="rounded-full text-3xl sm:text-4xl bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
                         {[profile.first_name, profile.middle_name, profile.last_name]
                           .filter(Boolean)
-                          .map((n: string) => n[0])
+                          .map(n => (n ?? "")[0]) 
                           .join("")
                           .toUpperCase() || "U"}
                       </AvatarFallback>
@@ -208,7 +213,7 @@ export function AccountInfoModal({
                 <div>
                   <label>Username</label>
                   <Input
-                    value={profile.username ?? generateUsername(profile.fullname)}
+                    value={profile.username ?? generateUsername(profile)}
                     onChange={e => setProfile({ ...profile, username: e.target.value })}
                   />
                 </div>
@@ -267,7 +272,6 @@ export function AccountInfoModal({
               <div>
                 <label>Role</label>
                 <Input
-                  // value={typeof profile?.role === "string" ? profile.role : ""}
                   value={profile?.role || ""}
                   onChange={e => setProfile({ ...profile, role: e.target.value })}
                   placeholder="Role not set"

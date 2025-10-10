@@ -11,6 +11,8 @@ import {
   Clock,
 } from "lucide-react";
 
+import Image from "next/image";
+
 export default function WcagPourContent() {
   return (
     <div className="mt-5 space-y-10">
@@ -33,7 +35,7 @@ export default function WcagPourContent() {
           POUR Principles Overview
         </h2>
         <p className="mb-4">
-          Let's break down POUR. Each principle ensures your website is usable
+          Let&apos;s break down POUR. Each principle ensures your website is usable
           by all people, including those with disabilities. We'll cover what it
           means, why it matters, and practical ways to implement it.
         </p>
@@ -114,10 +116,12 @@ export default function WcagPourContent() {
               </div>
 
               {/* Image */}
-              <img
+              <Image
                 src="https://miro.medium.com/v2/resize:fit:720/format:webp/1*_HXLnIM_2VzbaYxZs3a0qw.png"
                 alt="WCAG Perceivable Principle"
                 className="w-full rounded-xl shadow-md"
+                height={405}
+                width={720}
               />
 
               {/* What Does Perceivable Mean */}
