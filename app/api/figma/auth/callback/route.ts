@@ -8,27 +8,20 @@ function generaterUsername(fullname: string) {
   return fullname.split(" ").join("").toLowerCase();
 }
 export async function GET(request: NextRequest) {
-  console.log('--- Figma OAuth Callback Start ---');
   const requestUrl = new URL(request.url);
-  console.log('Request URL:', request.url);
 
   const code = requestUrl.searchParams.get('code');
-  console.log('OAuth code from query:', code);
 
   try {
     const supabase = await createClient();
-    console.log('Supabase client created:', !!supabase);
 
     if (code) {
-      console.log('Attempting to exchange code for session...');
-      const { error, data } = await supabase.auth.exchangeCodeForSession(code);
-      console.log('Exchange result:', { error, data });
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
 
       if (error) {
         console.error('Error exchanging code for session:', error);
         throw error;
       }
-      console.log('Code exchange successful.');
     } else {
       console.warn('No code found in query parameters.');
     }
@@ -36,14 +29,12 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     
         if (user) {
-      // Try to get the profile
       const { data: profile } = await supabase
         .from("profiles")
         .select("id, username, first_name, middle_name, last_name")
         .eq("id", user.id)
         .single();
     
-      // If profile does not exist or username is empty, create/set it
       if (!profile || !profile.username) {
         // Get the full name from user metadata
         const fullname =
@@ -89,8 +80,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/auth/processing', requestUrl.origin));
   } catch (error) {
     console.error('Auth callback error:', error);
-    console.log('Redirecting to /dashboard due to error');
   } finally {
-    console.log('--- Figma OAuth Callback End ---');
   }
 }

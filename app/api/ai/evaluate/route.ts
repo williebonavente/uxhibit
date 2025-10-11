@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { evaluateFrames } from "@/lib/ai/evaluateFrames";
 import { saveDesignVersion } from "@/lib/ai/saveDesignVersion";
+import { nanoid } from "nanoid";
 export const runtime = "nodejs";
 
+const jobId = nanoid();
 export async function POST(req: Request) {
     const { url, designId, nodeId, thumbnailUrl, fallbackImageUrl, snapshot } = await req.json();
 
@@ -60,13 +62,15 @@ export async function POST(req: Request) {
         frameImages,
         user,
         designId,
+        figmaFileUrl: url,
         fileKey,
         snapshot,
         authError,
         supabase,
+        jobId,
     });
 
-    await saveDesignVersion({
+    const { versionId } = await saveDesignVersion({
         supabase,
         designId,
         fileKey,
@@ -80,7 +84,33 @@ export async function POST(req: Request) {
         user: user ?? undefined,
     });
 
+        // Before calling saveDesignVersion
+    console.log("thumbnailUrl:", thumbnailUrl);
+    console.log("fallbackImageUrl:", fallbackImageUrl);
+    console.log("frameImages:", frameImages);
+
+    if (parseData.accessibilityResults && versionId) {
+        const saveRes = await fetch(`${baseUrl}/api/saveAccessibility`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                results: parseData.accessibilityResults,
+                designVersionId: versionId,
+            }),
+        });
+        const saveData = await saveRes.json();
+
+        if (saveData.success) {
+            console.log("Accessibility results saved successfully for version:", versionId);
+        } else {
+            console.error("Failed to save accessibility results:", saveData.error);
+        }
+    }
+
+    console.log("JobId: ", jobId);
+
     return NextResponse.json({
+        jobId,
         results: frameResults,
         frameCount: frameIds.length,
         message: "AI evaluation completed for all frames and aggregate saved.",

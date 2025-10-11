@@ -1,16 +1,18 @@
 import { getNextVersion } from "@/database/actions/versions/versionHistory";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { FrameResult, PersonaSnapshot } from "./evaluateFrames";
 
 type SaveDesignVersionParams = {
-  supabase: any;
+  supabase: SupabaseClient;
   designId: string;
   fileKey: string;
   nodeId: string;
   thumbnailUrl?: string;
   fallbackImageUrl?: string;
   summary: string;
-  frameResults: any[];
+  frameResults: FrameResult[];
   total_score: number;
-  snapshot?: any;
+  snapshot?: PersonaSnapshot;
   user?: { id: string };
 };
 

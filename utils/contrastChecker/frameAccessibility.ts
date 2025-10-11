@@ -1,6 +1,6 @@
 import { getContrastRatio } from "@/utils/contrastChecker/contrastUtils";
 import { normalizeDocument, getEffectiveBackgroundColor } from "@/utils/extractor/metadataExtractor";
-import { FigmaNodesResponse, TextNode, FrameNode, RGBA } from "@/lib/declaration/figmaInfo";
+import { FigmaNodesResponse, TextNode, FrameNode } from "@/lib/declaration/figmaInfo";
 
 function mapContrastToScoreAndLevel(ratio: number, fontSize: number): { score: number; level: string } {
   const isLargeText = fontSize >= 18 || fontSize >= 14; // assuming bold weight is handled if available
@@ -43,7 +43,7 @@ export function evaluateFrameAccessibility(raw: FigmaNodesResponse) {
       );
 
       const ratio = getContrastRatio(fg, bg);
-      console.log(ratio);
+      // console.log(ratio);
       const { score, level } = mapContrastToScoreAndLevel(ratio, text.fontSize);
 
       return {

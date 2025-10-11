@@ -16,8 +16,6 @@ export type Occupation =
   | "Developer"
   | "Educator";
 
-
-// 2. Use Category for all category-based records
 export interface HeuristicCategoryWeight {
   weight: number;
   heuristics: string[];

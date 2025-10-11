@@ -1,15 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+// import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { FrameCarousel } from "@/components/carousel/frame-carousel";
 import { IconLink } from "@tabler/icons-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+import { AlertCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Progress } from "@/components/ui/progress";
 
 
 type ParsedMeta = {
@@ -28,7 +32,7 @@ export default function Evaluate() {
       "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='22' stroke='%23ffffff' fill='none' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 3l7 17 2-7 7-2-16-8Z'/></svg>\") 3 3, pointer",
   };
 
-  const router = useRouter();
+  // const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
   const supabase = createClient();
@@ -39,10 +43,15 @@ export default function Evaluate() {
   const [parsing, setParsing] = useState(false);
   const [parsed, setParsed] = useState<ParsedMeta | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [savedDesignId, setSavedDesignId] = useState<string | null>(null);
+
+  const [progress, setProgress] = useState(0);
+  const [jobId, setJobId] = useState<string>("");
 
   const canNextFrom1 = !!age && !!occupation;
   const canParse = !!link && !parsing;
 
+  const router = useRouter();
   async function handleParse() {
     if (!age || !occupation) {
       toast.error("Select parameters first.");
@@ -62,11 +71,8 @@ export default function Evaluate() {
       const data = await res.json();
 
       if (data) {
-        // console.log("Extracted metadata from Figma parse:", data.normalizedFrames);
         console.log("There is data", { data });
-        // console.log("Extracted text nodes from Figma parse", data.textNodes);
-        // console.log("Extracted contrast evaluation score parse: ", data.accessbilityScores)
-        // console.log("Extracted random sheesh", data.accessibilityResults);
+
       } else {
         console.log("No metadata found in Figma parse response.");
       }
@@ -138,10 +144,15 @@ export default function Evaluate() {
       const saved = await saveRes.json();
       console.log("Design save response:", saved);
 
+      // Set jobId for progress polling
+      setJobId(saved.jobId || saved.ai_evaluation?.jobId);
+
+
       if (!saveRes.ok || !saved?.design?.id) {
         toast.error(saved?.error || "Save failed");
         return;
       }
+      setSavedDesignId(saved.design.id);
       // Check backend evaluation result
       if (saved.ai_evaluation && saved.ai_evaluation.frameCount > 0) {
         toast.success("Design and AI evaluation completed for all frames");
@@ -167,6 +178,24 @@ export default function Evaluate() {
     setSubmitting(false);
     setParsing(false);
   }
+
+  useEffect(() => {
+    if (!jobId) return;
+    const interval = setInterval(async () => {
+      const res = await fetch(`/api/ai/evaluate/progress?jobId=${jobId}`);
+      const data = await res.json();
+      setProgress(data.progress);
+      if (data.progress >= 100) {
+        clearInterval(interval);
+        // Redirect to the evaluated design page using savedDesignId
+        if (savedDesignId) {
+          router.push(`/designs/${savedDesignId}`);
+        }
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [jobId, savedDesignId, router]);
+
 
   return (
     <div
@@ -500,7 +529,15 @@ export default function Evaluate() {
                     />
                   </div>
                 ) : (
-                  <div className="text-muted text-sm">No preview available</div>
+                  <div className={cn(
+                    "flex items-center gap-2 text-sm italic",
+                    "text-muted-foreground"
+                  )}>
+                    <AlertCircle className="h-4 w-4" />
+                    <span>Preview not available — let your imagination fill the gap.</span>
+                  </div>
+
+
                 )}
               </div>
             </div>
@@ -662,21 +699,23 @@ export default function Evaluate() {
         {/* STEP 4: Running AI Evaluation */}
         {step === 4 && (
           <div className="flex flex-col items-center justify-center text-center py-24">
-            <div className="flex flex-col items-center justify-center text-center animate-pulse mb-6">
-              <Image
-                src="/images/smart-evaluation-underway.svg"
-                alt="Running evaluation illustration"
-                height={150}
-                width={150}
-                className="object-contain mb-6"
-                priority
-              />
-              <h2 className="gradient-text text-lg font-semibold mb-2">
-                Smart Evaluation Underway!
-              </h2>
-              <p className="text-gray-500 text-sm mb-4">
-                This may take a few minutes...
-              </p>
+            <Image
+              src="/images/smart-evaluation-underway.svg"
+              alt="Running evaluation illustration"
+              height={150}
+              width={150}
+              className="object-contain mb-6"
+              priority
+            />
+            <h2 className="gradient-text text-lg font-semibold mb-2">
+              Smart Evaluation Underway!
+            </h2>
+            <p className="text-gray-500 text-sm mb-4">
+              This may take a few minutes...
+            </p>
+            <div className="w-full max-w-md mx-auto">
+              <Progress value={progress} max={100} className="mb-2" />
+              <span className="text-sm font-semibold text-[#ED5E20]">{progress}%</span>
             </div>
           </div>
         )}

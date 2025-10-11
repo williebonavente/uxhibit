@@ -1,4 +1,4 @@
-export const genSegmentParams = `{
+export const genSegmentParams = {
   "Gen Z": {
     "range": "1997-2012",
     "description": "Digital natives who expect speed, interactivity, and inclusivity. Heavy users of mobile and visually expressive platforms.",
@@ -82,4 +82,4 @@ export const genSegmentParams = `{
     },
     "evaluation_focus": "Prioritize visual learning, cognitive simplicity, and interactive accessibility."
   }
-};`
+};

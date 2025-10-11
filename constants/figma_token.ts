@@ -1,0 +1,1 @@
+export const FIGMA_TOKEN = process.env.FIGMA_ACCESS_TOKEN as string;

@@ -6,7 +6,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(_req: Request, props: Params) {
     const params = await props.params;
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { } = await supabase.auth.getUser();
     const { id } = params;
     const { data, error } = await supabase
         .from("design_versions")
@@ -20,7 +20,7 @@ export async function GET(_req: Request, props: Params) {
 export async function POST(req: Request, props: Params) {
     const params = await props.params;
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { } = await supabase.auth.getUser();
     try {
         const { id } = params;
         const { owner_id, file_key, node_id, thumbnail_url, snapshot, ai } = await req.json();

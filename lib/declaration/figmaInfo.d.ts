@@ -53,6 +53,7 @@ export interface FrameNode {
   boundingBox: BoundingBox;
   backgroundColor?: RGBA | null;
   children: (TextNode | ShapeNode)[];
+  skipAlignmentCheck?: boolean;
 }
 
 
