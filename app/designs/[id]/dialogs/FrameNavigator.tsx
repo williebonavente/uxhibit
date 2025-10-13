@@ -1,7 +1,5 @@
 import React from "react";
 
-import Image from 'next/image';
-
 interface FrameNavigatorProps {
   selectedFrameIndex: number;
   setSelectedFrameIndex: React.Dispatch<React.SetStateAction<number>>;
@@ -45,8 +43,7 @@ const FrameNavigator: React.FC<FrameNavigatorProps> = ({
       <span className="text-base font-semibold px-4 py-2 rounded-full bg-white/70 dark:bg-[#232323]/70 shadow border border-[#ED5E20]/10">
         {selectedFrameIndex === 0
           ? "Overall"
-          : sortedFrameEvaluations[selectedFrameIndex]?.node_id ||
-          `Frame ${selectedFrameIndex}`}
+          : `Frame ${selectedFrameIndex}`}
         <span className="text-gray-400 ml-2 font-normal">
           ({selectedFrameIndex + 1} / {sortedFrameEvaluations.length})
         </span>

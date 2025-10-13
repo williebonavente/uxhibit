@@ -457,7 +457,7 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
           priority
         />
         <p className="text-gray-500 text-sm mb-4">
-          Loading your designs...
+          Loading designs...
         </p>
       </div>
     );
@@ -495,7 +495,7 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
           priority
         />
         <p className="text-gray-500 text-sm mb-4">
-          Loading your designs...
+          Loading designs...
         </p>
       </div>
     );

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   RadarChart,
   PolarGrid,
@@ -9,7 +9,11 @@ import {
   Radar,
   ResponsiveContainer,
 } from "recharts";
+import { generateHeuristicReportSimple } from "@/lib/systemGeneratedReport/pdfGenerator";
+import { toast } from "sonner";
 import { IconLoader2, IconDownload } from "@tabler/icons-react";
+import { createClient } from "@/utils/supabase/client";
+
 
 const HEURISTICS = [
   { heuristic: "01", fullName: "Visibility of System Status" },
@@ -23,24 +27,111 @@ const HEURISTICS = [
   { heuristic: "09", fullName: "Help Users Recognize, Diagnose, and Recover from Errors" },
   { heuristic: "10", fullName: "Help and Documentation" },
 ];
-
-// Hardcoded demo data
-const DEMO_DATA = [
-  { heuristic: "01", name: "Visibility of System Status", value: 35, high: 10, medium: 15, low: 10, fullName: "Visibility of System Status" },
-  { heuristic: "02", name: "Match Between System and the Real World", value: 20, high: 5, medium: 10, low: 5, fullName: "Match Between System and the Real World" },
-  { heuristic: "03", name: "User Control and Freedom", value: 15, high: 3, medium: 7, low: 5, fullName: "User Control and Freedom" },
-  { heuristic: "04", name: "Consistency and Standards", value: 40, high: 15, medium: 15, low: 10, fullName: "Consistency and Standards" },
-  { heuristic: "05", name: "Error Prevention", value: 10, high: 2, medium: 4, low: 4, fullName: "Error Prevention" },
-  { heuristic: "06", name: "Recognition Rather than Recall", value: 25, high: 8, medium: 10, low: 7, fullName: "Recognition Rather than Recall" },
-  { heuristic: "07", name: "Flexibility and Efficiency of Use", value: 5, high: 1, medium: 2, low: 2, fullName: "Flexibility and Efficiency of Use" },
-  { heuristic: "08", name: "Aesthetic and Minimalist Design", value: 30, high: 12, medium: 10, low: 8, fullName: "Aesthetic and Minimalist Design" },
-  { heuristic: "09", name: "Help Users Recognize, Diagnose, and Recover from Errors", value: 12, high: 3, medium: 5, low: 4, fullName: "Help Users Recognize, Diagnose, and Recover from Errors" },
-  { heuristic: "10", name: "Help and Documentation", value: 8, high: 2, medium: 3, low: 3, fullName: "Help and Documentation" },
-];
-
 const HeuristicDashboard = () => {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-  const [heuristicData] = useState(DEMO_DATA);
+
+  type HeuristicChartData = {
+    heuristic: string;
+    name: string;
+    value: number;
+    high: number;
+    medium: number;
+    low: number;
+    fullName: string;
+  };
+
+  const [heuristicData, setHeuristicData] = useState<HeuristicChartData[]>([]);
+
+  useEffect(() => {
+    const fetchHeuristicData = async () => {
+      const supabase = createClient();
+
+      // 1. Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        toast.error("User not logged in");
+        return;
+      }
+      const currentUserId = user.id;
+
+      // 2. Get all latest versions for the user's designs
+      const { data: designs, error: designsError } = await supabase
+        .from("designs")
+        .select("current_version_id")
+        .eq("owner_id", currentUserId);
+
+      if (designsError) {
+        toast.error("Error fetching designs");
+        return;
+      }
+
+      const versionIds = (designs || []).map((d: any) => d.current_version_id).filter(Boolean);
+
+      // 3. Fetch all design_versions for these versionIds
+      const allIssues: any[] = [];
+      if (versionIds.length > 0) {
+        const { data: versionsData, error: versionsError } = await supabase
+          .from("design_versions")
+          .select("ai, ai_data")
+          .in("id", versionIds);
+
+        if (versionsError) {
+          toast.error("Error fetching design versions");
+        } else {
+          (versionsData || []).forEach((version: any, idx: number) => {
+            let aiData = version.ai_data || version.ai;
+            if (typeof aiData === "string") {
+              try { aiData = JSON.parse(aiData); } catch { aiData = {}; }
+            }
+            // Log the aiData for this version
+            console.log(`Version ${idx} aiData:`, aiData);
+
+            if (Array.isArray(aiData?.issues)) {
+              aiData.issues.forEach((issue: any) => {
+                if (issue && typeof issue.heuristic === "string") {
+                  allIssues.push(issue);
+                }
+              });
+            }
+          });
+        }
+      }
+
+      // 4. Count violations per heuristic and severity
+      const counts: Record<string, { total: number; high: number; medium: number; low: number }> = {};
+      HEURISTICS.forEach(h => {
+        counts[h.heuristic] = { total: 0, high: 0, medium: 0, low: 0 };
+      });
+
+      allIssues.forEach(issue => {
+        if (issue.heuristic) {
+          counts[issue.heuristic].total += 1;
+          const sev = (issue.severity || "low").toLowerCase();
+          if (sev === "high" || sev === "medium" || sev === "low") {
+            counts[issue.heuristic][sev as "high" | "medium" | "low"] += 1;
+          }
+        }
+      });
+
+      // 5. Build data for the chart (you can use total, or show breakdowns)
+      const chartData = HEURISTICS.map(h => ({
+        heuristic: h.heuristic,
+        name: h.fullName,
+        value: counts[h.heuristic].total,
+        high: counts[h.heuristic].high,
+        medium: counts[h.heuristic].medium,
+        low: counts[h.heuristic].low,
+        fullName: h.fullName,
+      }));
+
+      console.log("All Issues: ", allIssues);
+      console.log("Chart Data: ", chartData);
+
+      setHeuristicData(chartData);
+    };
+
+    fetchHeuristicData();
+  }, []);
 
   const getSeverityColor = (value: number) => {
     if (value <= 20) return "text-green-600 dark:text-green-400";
@@ -57,14 +148,16 @@ const HeuristicDashboard = () => {
   const handleExportReport = async () => {
     setIsGeneratingPDF(true);
     try {
-      // Simulate PDF generation
-      setTimeout(() => {
-        setIsGeneratingPDF(false);
-        alert("PDF report generated successfully (demo).");
-      }, 1000);
+      toast.success("PDF report generated successfully.");
+      await generateHeuristicReportSimple(heuristicData);
+      // Show success message (optional)
+      // TODO: Adding loading message
     } catch (error) {
-      setIsGeneratingPDF(false);
+      toast.error(error as string);
+      console.error("Error generating report:", error);
       alert("Failed to generate PDF report. Please try again.");
+    } finally {
+      setIsGeneratingPDF(false);
     }
   };
 
@@ -77,6 +170,7 @@ const HeuristicDashboard = () => {
       </div>
       <div className="p-2 m-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
         <p className="text-sm sm:text-base text-gray-700 dark:text-gray-200 w-full sm:mb-0 font-['Poppins']">
+          {/* TODO: Message is too long! */}
           This section shows which usability heuristics you&apos;re violating
           most often. The radar chart breaks down how frequently these issues
           occur in your projects, with color-coded severity levels (minor vs.
@@ -151,6 +245,7 @@ const HeuristicDashboard = () => {
                   key={index}
                   className="flex flex-row items-center justify-between p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:bg-[#ED5E20]/50 dark:hover:bg-[#ED5E20]/50 transition-colors border border-gray-100 dark:border-gray-700 cursor-pointer"
                 >
+                  {/* Number, title, and score all side by side */}
                   <span className="text-[#ED5E20] font-bold text-xs sm:text-sm min-w-[24px] text-center shrink-0">
                     {item.heuristic}.
                   </span>

@@ -38,72 +38,94 @@ export async function POST(req: Request) {
 
     // EXISTING DESIGN
     if (existing?.id) {
-      designId = existing.id;
-      console.log("Updating existing design:", designId);
-
+      let storedThumbnail = thumbnail_url || null;
+      let thumbnailPromise: Promise<any> = Promise.resolve(null);
       if (thumbnail_url) {
-        const up = await uploadThumbnailFromUrl(
-          Promise.resolve(supabase),
+        thumbnailPromise = uploadThumbnailFromUrl(
+          supabase as any,
           thumbnail_url,
           designId,
           { makePublic: false }
         );
-        storedThumbnail = up.signedUrl || up.publicUrl || up.path || storedThumbnail;
       }
 
-      const { error: uErr } = await supabase
-        .from("designs")
-        .update({ thumbnail_url: storedThumbnail })
-        .eq("id", designId);
-      if (uErr) {
-        console.error("Error updating thumbnail:", uErr.message);
-        return NextResponse.json({ error: uErr.message }, { status: 400 });
+      // Start AI evaluation in background
+      if (evaluate) {
+        (async () => {
+          await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              cookie: req.headers.get('cookie') || '',
+            },
+            body: JSON.stringify({
+              url: figma_link,
+              designId: existing.id,
+              nodeId: node_id,
+              thumbnail_url: storedThumbnail,
+              snapshot
+            })
+          });
+        })();
       }
-    } else {
-      // NEW DESIGN
-      const { data: design, error: dErr } = await supabase
-        .from("designs")
-        .insert({
-          owner_id: user.id,
-          title,
-          figma_link,
-          file_key,
-          node_id,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .select("*")
-        .single();
-      if (dErr) {
-        console.error("Error creating design:", dErr.message);
-        return NextResponse.json({ error: dErr.message }, { status: 400 });
-      }
-      designId = design.id;
-      console.log("Created new design:", designId);
 
-      if (thumbnail_url) {
-        const up = await uploadThumbnailFromUrl(
-          Promise.resolve(supabase),
-          thumbnail_url,
-          designId,
-          { makePublic: false }
-        );
-        storedThumbnail = up.signedUrl || up.publicUrl || up.path || storedThumbnail;
+      const up = await thumbnailPromise;
+      if (up) {
+        if (up.signedUrl) storedThumbnail = up.signedUrl;
+        else if (up.publicUrl) storedThumbnail = up.publicUrl;
+        else if (up.path) storedThumbnail = up.path;
 
+        // Update the design with the thumbnail URL
         const { error: thumbErr } = await supabase
           .from("designs")
           .update({ thumbnail_url: storedThumbnail })
-          .eq("id", designId);
+          .eq("id", existing.id);
         if (thumbErr) console.error("Error updating thumbnail:", thumbErr);
       }
+
+      return NextResponse.json({
+        design: {
+          id: existing.id,
+          title: existing.title,
+          figma_link,
+          thumbnail_url: storedThumbnail,
+        },
+        existed: true,
+        ai_evaluation: "processing", // Indicate processing
+      });
     }
 
-    // Call AI evaluate if requested
-    let aiEvalResult = null;
+    // NEW DESIGN
+    const { data: design, error: dErr } = await supabase
+      .from("designs")
+      .insert({
+        owner_id: user.id,
+        title,
+        figma_link,
+        file_key,
+        node_id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select("*")
+      .single();
+    if (dErr) return NextResponse.json({ error: dErr.message }, { status: 400 });
+
+    let storedThumbnail = thumbnail_url || null;
+    let thumbnailPromise: Promise<any> = Promise.resolve(null);
+    if (thumbnail_url) {
+      thumbnailPromise = uploadThumbnailFromUrl(
+        supabase as any,
+        thumbnail_url,
+        design.id,
+        { makePublic: false }
+      );
+    }
+
+    // Start AI evaluation in background
     if (evaluate) {
-      try {
-        console.log("Calling AI evaluate for design:", designId);
-        const aiResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
+      (async () => {
+        await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -117,16 +139,21 @@ export async function POST(req: Request) {
             snapshot
           })
         });
+      })();
+    }
 
-        if (aiResponse.ok) {
-          aiEvalResult = await aiResponse.json();
-          console.log("AI evaluation result:", aiEvalResult);
-        } else {
-          console.error("AI evaluate failed:", await aiResponse.text());
-        }
-      } catch (err) {
-        console.error('Error calling AI evaluate:', err);
-      }
+    const up = await thumbnailPromise;
+    if (up) {
+      if (up.signedUrl) storedThumbnail = up.signedUrl;
+      else if (up.publicUrl) storedThumbnail = up.publicUrl;
+      else if (up.path) storedThumbnail = up.path;
+
+      // Update the design with the thumbnail URL
+      const { error: thumbErr } = await supabase
+        .from("designs")
+        .update({ thumbnail_url: storedThumbnail })
+        .eq("id", design.id);
+      if (thumbErr) console.error("Error updating thumbnail:", thumbErr);
     }
 
     // Final response
@@ -137,9 +164,8 @@ export async function POST(req: Request) {
         figma_link,
         thumbnail_url: storedThumbnail,
       },
-      existed: !!existing?.id,
-      ai_evaluation: aiEvalResult,
-      jobId: aiEvalResult?.jobId,
+      existed: false,
+      ai_evaluation: "processing", // Indicate processing
     });
   } catch (e: unknown) {
     console.error("Server error:", e);

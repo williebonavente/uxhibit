@@ -23,7 +23,6 @@ function placeholder(req: Request) {
     return NextResponse.redirect(new URL("/images/design-thumbnail.png", req.url), 302);
 }
 
-
 export async function GET(req: Request) {
     if (!FIGMA_TOKEN) return NextResponse.json({ error: "Missing FIGMA_ACCESS_TOKEN" }, { status: 500 });
 
@@ -32,7 +31,6 @@ export async function GET(req: Request) {
     let fileKey = searchParams.get("fileKey") || undefined;
     let nodeId = searchParams.get("nodeId") || undefined;
     const scale = Number(searchParams.get("scale") || "2");
-
 
     // Normalize common mistake: "1-82" -> "1:82"
     if (nodeId && /^\d+-\d+$/.test(nodeId)) nodeId = nodeId.replace("-", ":");

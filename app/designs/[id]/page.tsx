@@ -26,7 +26,9 @@ import { CommentsSection } from "./comments/page";
 import { Comment } from "@/components/comments-user";
 import EvaluationParamsModal from "@/components/evaluation-params-modal";
 import DesignHeaderTitle from "@/components/arrow-back-button";
+import { handleEvalParamsSubmit, handleEvaluateWithParams } from "@/lib/reEvaluate/evaluationHandlers";
 
+// Use these functions as needed, passing the required state setters and values.
 interface FrameEvaluation {
   id: string;
   snapshot: string;
@@ -105,7 +107,7 @@ export type Design = {
   owner_id: string;
 };
 
-type EvaluateInput = {
+export type EvaluateInput = {
   designId: string;
   fileKey: string
   nodeId?: string;
@@ -113,6 +115,8 @@ type EvaluateInput = {
   fallbackImageUrl?: string;
   snapshot: Snapshot;
   url?: string;
+  frameIds?: string[];
+  versionId: string;
 }
 
 export type EvalResponse = {
@@ -148,7 +152,6 @@ export type EvalResponse = {
 
   } | null;
 };
-
 export async function evaluateDesign(input: EvaluateInput): Promise<EvalResponse> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   console.log('Calling evaluate with:', input);
@@ -197,7 +200,6 @@ export default function DesignDetailPage({
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"default" | "asc" | "desc">("default");
   const [showSortOptions, setShowSortOptions] = useState(false);
-
   const [comments, setComments] = useState<Comment[]>([]);
   const [newCommentText, setNewCommentText] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -209,7 +211,6 @@ export default function DesignDetailPage({
   const [currentUserProfile, setCurrentUserProfile] = useState<{ fullName: string; avatarUrl: string } | null>(null);
   const [showEvalParams, setShowEvalParams] = useState(false);
   const [pendingParams, setPendingParams] = useState<any>(null);
-
   const [page, setPage] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(700);
   const minSidebarWidth = 0;
@@ -221,9 +222,20 @@ export default function DesignDetailPage({
   const panStart = useRef({ x: 0, y: 0 });
   const mouseStart = useRef({ x: 0, y: 0 });
   const [sidebarTab, setSidebarTab] = useState<"ai" | "comments">("ai");
-
+  const [expectedFrameCount, setExpectedFrameCount] = useState<number>(0);
+  const [evaluatedFramesCount, setEvaluatedFramesCount] = useState<number>(0);
   const pageSize = 6;
   const sortRef = useRef<HTMLDivElement>(null);
+
+
+  // Assume you have frameIds available (from Figma or backend)
+  const frameOnlyEvaluations = frameEvaluations.filter(f => f.id !== "overallFrame");
+  const totalFrames = Array.isArray(design?.frames) ? design?.frames.length : frameOnlyEvaluations.length;
+  const evaluatedFrames = frameOnlyEvaluations.length;
+  const progressPercent = totalFrames > 0
+    ? Math.round((evaluatedFrames / totalFrames) * 100)
+    : 0;
+
 
   function startResizing(e: React.MouseEvent) {
     setIsResizing(true);
@@ -291,35 +303,95 @@ export default function DesignDetailPage({
     setShowEvalParams(true);
   }
 
-  async function handleEvalParamsSubmit(params) {
-    setShowEvalParams(false);
+  const fetchEvaluations = React.useCallback(async () => {
 
-    // Always build the snapshot from the latest params
-    const latestSnapshot = {
-      age: params.generation,
-      occupation: params.occupation,
+    const supabase = createClient();
+    console.log("[fetchEvaluations] Fetching latest version for design:", design?.id);
+
+    // 1. Fetch the latest version for this design
+    const { data: versionData, error: versionError } = await supabase
+      .from("design_versions")
+      .select(`
+        id, design_id, version, file_key, node_id, thumbnail_url, created_by,
+        ai_summary, ai_data, snapshot, created_at, updated_at, total_score
+      `)
+      .eq("design_id", design?.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (versionError) {
+      console.error("[fetchEvaluations] Failed to fetch overall evaluation:", versionError.message);
+      return;
+    }
+    if (!versionData) {
+      console.warn("[fetchEvaluations] No version data found for design:", design?.id);
+      setFrameEvaluations([]);
+      return;
+    }
+
+    console.log("[fetchEvaluations] Latest version data:", versionData);
+
+    // 2. Parse AI data for the overall frame
+    let aiData = versionData.ai_data;
+    if (typeof aiData === "string") {
+      try {
+        aiData = JSON.parse(aiData);
+      } catch (e) {
+        console.error("[fetchEvaluations] Failed to parse ai_data:", e, versionData.ai_data);
+        aiData = {};
+      }
+    }
+
+    const overall: FrameEvaluation = {
+      id: "overallFrame",
+      design_id: versionData.design_id,
+      version_id: versionData.id,
+      file_key: versionData.file_key,
+      node_id: versionData.node_id,
+      thumbnail_url: versionData.thumbnail_url,
+      owner_id: versionData.created_by,
+      ai_summary: versionData.ai_summary,
+      ai_data: aiData,
+      snapshot: versionData.snapshot,
+      created_at: versionData.created_at,
+      updated_at: versionData.updated_at,
+      total_score: versionData.total_score,
     };
 
-    await handleEvaluateWithParams({
-      ...params,
-      snapshot: latestSnapshot,
-    });
-  }
+    // 3. Fetch all frames for this version
+    console.log("[fetchEvaluations] Fetching frames for version_id:", versionData.id);
 
-  async function handleEvaluateWithParams(params) {
-    setLoadingEval(true);
-    setEvalError(null);
+    const { data: frameData, error: frameError } = await supabase
+      .from("design_frame_evaluations")
+      .select(`
+        id, design_id, version_id, file_key, node_id, thumbnail_url, owner_id,
+        ai_summary, ai_data, snapshot, created_at, updated_at
+      `)
+      .eq("design_id", design?.id)
+      .eq("version_id", versionData.id)
+      .order("created_at", { ascending: true });
 
-    try {
-      const data = await evaluateDesign(params);
-      setEvalResult(data);
-    } catch (e: any) {
-      setEvalError(e.message || "Failed to evaluate");
+    if (frameError) {
+      console.error("[fetchEvaluations] Failed to fetch frame evaluations:", frameError.message);
+      setFrameEvaluations([overall]);
+      return;
     }
-    finally {
-      setLoadingEval(false);
-    }
-  }
+
+    console.log("[fetchEvaluations] Frame data for version:", frameData);
+
+    const frames = (frameData || []).map((frame: any) => ({
+      ...frame,
+      ai_data: typeof frame.ai_data === "string" ? JSON.parse(frame.ai_data) : frame.ai_data,
+    }));
+
+    // 4. Combine overall and frames
+    const combined = [overall, ...frames];
+    setFrameEvaluations(combined);
+    console.log("[fetchEvaluations] Combined frame evaluations set:", combined);
+  }, [design?.id]);
+
+
 
 
   const sortedFrameEvaluations = React.useMemo(() => {
@@ -471,7 +543,8 @@ export default function DesignDetailPage({
         fallbackImageUrl: imageUrlForAI,
         // TODO: HERE 
         snapshot: typeof design?.snapshot === "string" ? JSON.parse(design.snapshot) : design?.snapshot,
-        url: design.figma_link
+        url: design.figma_link,
+        frameIds: design?.frames?.map(f => String(f.id)) ?? [],
       });
 
 
@@ -644,24 +717,25 @@ export default function DesignDetailPage({
   }
 
   function mapFrameToEvalResponse(frame: FrameEvaluation, frameIdx = 0): EvalResponse {
+    const aiData = frame.ai_data ?? {};
     return {
       nodeId: frame.node_id,
       imageUrl: frame.thumbnail_url,
-      summary: frame.ai_summary || frame.ai_data.summary,
+      summary: frame.ai_summary || aiData.summary || "",
       heuristics: null,
       ai_status: "ok",
-      overall_score: frame.ai_data.overall_score ?? null,
-      strengths: frame.ai_data.strengths,
-      weaknesses: frame.ai_data.weaknesses,
-      issues: (frame.ai_data.issues ?? []).map((issue, issueIdx) => ({
+      overall_score: aiData.overall_score ?? null,
+      strengths: aiData.strengths ?? [],
+      weaknesses: aiData.weaknesses ?? [],
+      issues: (aiData.issues ?? []).map((issue, issueIdx) => ({
         ...issue,
         id: `frame${frameIdx}-issue${issueIdx}`,
         suggestions: issue.suggestion,
       })),
-      category_scores: frame.ai_data.category_scores,
+      category_scores: aiData.category_scores ?? null,
       ai: {
-        ...frame.ai_data,
-        issues: (frame.ai_data.issues ?? []).map((issue, issueIdx) => ({
+        ...aiData,
+        issues: (aiData.issues ?? []).map((issue, issueIdx) => ({
           ...issue,
           id: `frame${frameIdx}-issue${issueIdx}`,
           suggestions: issue.suggestion,
@@ -903,7 +977,6 @@ export default function DesignDetailPage({
           .eq("is_active", true)
           .maybeSingle();
 
-
         const latestVersion = designData.design_versions?.[0];
         let parsedAiData = null;
         if (latestVersion?.ai_data) {
@@ -936,12 +1009,13 @@ export default function DesignDetailPage({
         // TODO: HERE FETCHING THE LATEST VERSION HERE
         const latestVersionId = latestVersion?.id;
         console.log("Latest Version Data: ", latestVersion);
+
         if (latestVersionId) {
           const { data: frameData, error: frameError } = await supabase
             .from("design_frame_evaluations")
             .select(`id, design_id, version_id, file_key, node_id, thumbnail_url, owner_id,
-              ai_summary, ai_data, snapshot, created_at, updated_at
-              `)
+      ai_summary, ai_data, snapshot, created_at, updated_at
+      `)
             .eq("design_id", normalized.id)
             .eq("version_id", latestVersionId)
             .order("created_at", { ascending: true });
@@ -954,39 +1028,35 @@ export default function DesignDetailPage({
               ai_data: typeof frame.ai_data === "string" ? JSON.parse(frame.ai_data) : frame.ai_data,
             }));
 
-            // Optionally, add the overall frame as the first item if you want
-            // setFrameEvaluations([overall, ...frames]);
-            setFrameEvaluations(frames);
+            // If you want the overall frame as index 0:
+            if (latestVersion?.ai_data) {
+              const overall: FrameEvaluation = {
+                id: "overallFrame",
+                design_id: normalized.id,
+                file_key: normalized.fileKey || "",
+                node_id: normalized.nodeId || "",
+                thumbnail_url: normalized.thumbnail || "",
+                owner_id: designData.owner_id || "",
+                total_score: latestVersion?.total_score ?? null,
+                ai_summary: latestVersion.ai_summary || parsedAiData.summary || "",
+                ai_data: {
+                  overall_score: parsedAiData.overall_score ?? latestVersion?.total_score ?? null,
+                  summary: parsedAiData.summary ?? "",
+                  strengths: parsedAiData.strengths ?? [],
+                  weaknesses: parsedAiData.weaknesses ?? [],
+                  issues: parsedAiData.issues ?? [],
+                  category_scores: parsedAiData.category_scores ?? null,
+                },
+                snapshot: latestVersion?.snapshot ?? null,
+                created_at: latestVersion.created_at,
+                updated_at: latestVersion.created_at,
+              };
+              setFrameEvaluations([overall, ...frames]);
+            } else {
+              setFrameEvaluations(frames);
+            }
             setSelectedFrameIndex(0);
           }
-        }
-
-        if (latestVersion?.ai_data) {
-          const overall: FrameEvaluation = {
-            id: "overallFrame",
-            design_id: normalized.id,
-            file_key: normalized.fileKey || "",
-            node_id: normalized.nodeId || "",
-            thumbnail_url: normalized.thumbnail || "",
-            owner_id: designData.owner_id || "",
-            total_score: latestVersion?.total_score ?? null,
-            ai_summary: latestVersion.ai_summary || parsedAiData.summary || "",
-            ai_data: {
-              overall_score: parsedAiData.overall_score ?? latestVersion?.total_score ?? null,
-              summary: parsedAiData.summary ?? "",
-              strengths: parsedAiData.strengths ?? [],
-              weaknesses: parsedAiData.weaknesses ?? [],
-              issues: parsedAiData.issues ?? [],
-              category_scores: parsedAiData.category_scores ?? null,
-            },
-            snapshot: latestVersion?.snapshot ?? null,
-            created_at: latestVersion.created_at,
-            updated_at: latestVersion.created_at,
-          };
-          setFrameEvaluations([overall]);
-          setSelectedFrameIndex(0);
-          setEvalResult(mapFrameToEvalResponse(overall));
-          setShowEval(true);
         }
 
         if (designData.thumbnail_url) {
@@ -1010,102 +1080,14 @@ export default function DesignDetailPage({
     loadDesign();
   }, [id]);
 
-
   useEffect(() => {
     if (!design?.id) {
       console.log("[fetchEvaluations] No design id, skipping.");
       return;
     }
-    const supabase = createClient();
-
-    async function fetchEvaluations() {
-      console.log("[fetchEvaluations] Fetching latest version for design:", design?.id);
-
-      // 1. Fetch the latest version for this design
-      const { data: versionData, error: versionError } = await supabase
-        .from("design_versions")
-        .select(`
-        id, design_id, version, file_key, node_id, thumbnail_url, created_by,
-        ai_summary, ai_data, snapshot, created_at, updated_at, total_score
-      `)
-        .eq("design_id", design?.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (versionError) {
-        console.error("[fetchEvaluations] Failed to fetch overall evaluation:", versionError.message);
-        return;
-      }
-      if (!versionData) {
-        console.warn("[fetchEvaluations] No version data found for design:", design?.id);
-        setFrameEvaluations([]);
-        return;
-      }
-
-      console.log("[fetchEvaluations] Latest version data:", versionData);
-
-      // 2. Parse AI data for the overall frame
-      let aiData = versionData.ai_data;
-      if (typeof aiData === "string") {
-        try {
-          aiData = JSON.parse(aiData);
-        } catch (e) {
-          console.error("[fetchEvaluations] Failed to parse ai_data:", e, versionData.ai_data);
-          aiData = {};
-        }
-      }
-
-      const overall: FrameEvaluation = {
-        id: "overallFrame",
-        design_id: versionData.design_id,
-        version_id: versionData.id,
-        file_key: versionData.file_key,
-        node_id: versionData.node_id,
-        thumbnail_url: versionData.thumbnail_url,
-        owner_id: versionData.created_by,
-        ai_summary: versionData.ai_summary,
-        ai_data: aiData,
-        snapshot: versionData.snapshot,
-        created_at: versionData.created_at,
-        updated_at: versionData.updated_at,
-        total_score: versionData.total_score,
-      };
-
-      // 3. Fetch all frames for this version
-      console.log("[fetchEvaluations] Fetching frames for version_id:", versionData.id);
-
-      const { data: frameData, error: frameError } = await supabase
-        .from("design_frame_evaluations")
-        .select(`
-        id, design_id, version_id, file_key, node_id, thumbnail_url, owner_id,
-        ai_summary, ai_data, snapshot, created_at, updated_at
-      `)
-        .eq("design_id", design?.id)
-        .eq("version_id", versionData.id)
-        .order("created_at", { ascending: true });
-
-      if (frameError) {
-        console.error("[fetchEvaluations] Failed to fetch frame evaluations:", frameError.message);
-        setFrameEvaluations([overall]);
-        return;
-      }
-
-      console.log("[fetchEvaluations] Frame data for version:", frameData);
-
-      const frames = (frameData || []).map((frame: any) => ({
-        ...frame,
-        ai_data: typeof frame.ai_data === "string" ? JSON.parse(frame.ai_data) : frame.ai_data,
-      }));
-
-      // 4. Combine overall and frames
-      const combined = [overall, ...frames];
-      setFrameEvaluations(combined);
-      console.log("[fetchEvaluations] Combined frame evaluations set:", combined);
-    }
-
     fetchEvaluations();
-  }, [design?.id]);
+  }, [design?.id, fetchEvaluations]);
+
   useEffect(() => {
     if (frameEvaluations[selectedFrameIndex]) {
       setEvalResult(mapFrameToEvalResponse(frameEvaluations[selectedFrameIndex], selectedFrameIndex));
@@ -1328,12 +1310,6 @@ export default function DesignDetailPage({
     }
   }, [design?.id, fetchComments]);
 
-  // useEffect(() => {
-  //   if (sidebarTab === "comments" && design?.id) {
-  //     fetchComments();
-  //   }
-  // }, [sidebarTab, design?.id, fetchComments]);
-
   useEffect(() => {
     if (!design?.id) {
       console.log("[Realtime] No design id, skipping subscription setup.");
@@ -1431,7 +1407,18 @@ export default function DesignDetailPage({
     }
   }, [sidebarTab]);
 
+  useEffect(() => {
+    if (!design?.id || loadingEval) return; // Don't overwrite during evaluation
+    fetchEvaluations();
+  }, [design?.id, fetchEvaluations, loadingEval]);
   console.log(evalResult?.ai?.resources);
+  console.log("frameEvaluations:", frameEvaluations);
+  console.log("design.frames:", design?.frames);
+  console.log("frameOnlyEvaluations:", frameOnlyEvaluations);
+  console.log("totalFrames:", totalFrames);
+  console.log("evaluatedFrames:", evaluatedFrames);
+  console.log("progressPercent:", progressPercent);
+
 
   if (designLoading)
     return (
@@ -1459,6 +1446,18 @@ export default function DesignDetailPage({
   const isOwner = currentUserId && design?.id && currentUserId === design?.owner_id;
   return (
     <div>
+      {/* Re-evaluat loading bar */}
+      {loadingEval && (
+        <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-50 bg-white dark:bg-[#232323] shadow-lg rounded-lg px-6 py-4 border border-orange-300 flex flex-col items-center">
+          <Spinner className="w-6 h-6 mb-2" />
+          <span className="font-semibold text-orange-600">
+            AI evaluation in progress...
+          </span>
+          <span className="text-sm text-gray-600 mt-1">
+            {evaluatedFramesCount} / {expectedFrameCount} frames evaluated ({expectedFrameCount > 0 ? Math.round((evaluatedFramesCount / expectedFrameCount) * 100) : 0}%)
+          </span>
+        </div>
+      )}
       <div className="mb-2">
         <div className="flex gap-2 items-center justify-between w-full">
           <DesignHeaderTitle
@@ -1604,12 +1603,6 @@ export default function DesignDetailPage({
                 />
 
                 <div className="flex-1 overflow-y-auto pr-5 space-y-5">
-                  {/* Loading State */}
-                  {loadingEval && (
-                    <div className="text-center text-neutral-500">
-                      Running evaluation...
-                    </div>
-                  )}
 
                   {/* Error State */}
                   {evalError && (
@@ -1628,6 +1621,7 @@ export default function DesignDetailPage({
                       selectedFrameIndex={selectedFrameIndex}
                     />
                   )}
+
                 </div>
                 {isOwner && (
                   <div className="mt-auto pt-4">
@@ -1641,7 +1635,22 @@ export default function DesignDetailPage({
                     <EvaluationParamsModal
                       open={showEvalParams}
                       onClose={() => setShowEvalParams(false)}
-                      onSubmit={handleEvalParamsSubmit}
+                      onSubmit={(params) =>
+                        handleEvalParamsSubmit(
+                          params,
+                          handleEvaluateWithParams,
+                          design,
+                          setLoadingEval,
+                          setEvalError,
+                          setEvalResult,
+                          setFrameEvaluations,
+                          setExpectedFrameCount,
+                          setEvaluatedFramesCount,
+                          fetchEvaluations,
+                          setShowEvalParams,
+                          currentUserId,
+                        )
+                      }
                       initialParams={pendingParams || {}}
                     />
                   </div>
@@ -1683,27 +1692,29 @@ export default function DesignDetailPage({
         )}
 
       </div>
-      {showVersions && (
-        <VersionHistoryModal
-          open={showVersions}
-          onClose={() => setShowVersions(false)}
-          loadingVersions={loadingVersions}
-          versions={versions}
-          page={page}
-          pageSize={pageSize}
-          setPage={setPage}
-          design={design}
-          selectedVersion={selectedVersion}
-          setSelectedVersion={setSelectedVersion}
-          fetchDesignVersions={fetchDesignVersions}
-          deleteDesignVersion={deleteDesignVersion}
-          setVersions={setVersions}
-          setVersionChanged={setVersionChanged}
-          setEvalResult={setEvalResult}
-          setShowEval={setShowEval}
-          setFrameEvaluations={setFrameEvaluations}
-        />
-      )}
-    </div>
+      {
+        showVersions && (
+          <VersionHistoryModal
+            open={showVersions}
+            onClose={() => setShowVersions(false)}
+            loadingVersions={loadingVersions}
+            versions={versions}
+            page={page}
+            pageSize={pageSize}
+            setPage={setPage}
+            design={design}
+            selectedVersion={selectedVersion}
+            setSelectedVersion={setSelectedVersion}
+            fetchDesignVersions={fetchDesignVersions}
+            deleteDesignVersion={deleteDesignVersion}
+            setVersions={setVersions}
+            setVersionChanged={setVersionChanged}
+            setEvalResult={setEvalResult}
+            setShowEval={setShowEval}
+            setFrameEvaluations={setFrameEvaluations}
+          />
+        )
+      }
+    </div >
   );
 }
