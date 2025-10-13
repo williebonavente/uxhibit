@@ -30,32 +30,20 @@ export async function POST(req: Request) {
     // EXISTING DESIGN
     if (existing?.id) {
       let storedThumbnail = thumbnail_url || null;
+      let thumbnailPromise: Promise<any> = Promise.resolve(null);
       if (thumbnail_url) {
-        const up = await uploadThumbnailFromUrl(
+        thumbnailPromise = uploadThumbnailFromUrl(
           supabase as any,
           thumbnail_url,
           existing.id,
           { makePublic: false }
         );
-        if (up.signedUrl) storedThumbnail = up.signedUrl;
-        else if (up.publicUrl) storedThumbnail = up.publicUrl;
-        else if (up.path) storedThumbnail = up.path;
       }
 
-      // Just update the thumbnail, don't mess with versions
-      const { error: uErr } = await supabase
-        .from("designs")
-        .update({
-          thumbnail_url: storedThumbnail,
-        })
-        .eq("id", existing.id);
-      if (uErr) return NextResponse.json({ error: uErr.message }, { status: 400 });
-
-      // Call AI evaluate if requested
-      let aiEvalResult = null;
+      // Start AI evaluation in background
       if (evaluate) {
-        try {
-          const aiResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
+        (async () => {
+          await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -69,16 +57,23 @@ export async function POST(req: Request) {
               snapshot
             })
           });
-
-          if (aiResponse.ok) {
-            aiEvalResult = await aiResponse.json();
-          }
-        } catch (err) {
-          console.error('Error calling AI evaluate: ', err);
-        }
+        })();
       }
 
-      // Let the caller know this design already exists
+      const up = await thumbnailPromise;
+      if (up) {
+        if (up.signedUrl) storedThumbnail = up.signedUrl;
+        else if (up.publicUrl) storedThumbnail = up.publicUrl;
+        else if (up.path) storedThumbnail = up.path;
+
+        // Update the design with the thumbnail URL
+        const { error: thumbErr } = await supabase
+          .from("designs")
+          .update({ thumbnail_url: storedThumbnail })
+          .eq("id", existing.id);
+        if (thumbErr) console.error("Error updating thumbnail:", thumbErr);
+      }
+
       return NextResponse.json({
         design: {
           id: existing.id,
@@ -87,11 +82,11 @@ export async function POST(req: Request) {
           thumbnail_url: storedThumbnail,
         },
         existed: true,
-        ai_evaluation: aiEvalResult,
+        ai_evaluation: "processing", // Indicate processing
       });
     }
 
-    // NEW DESIGN - Just create the design without version
+    // NEW DESIGN
     const { data: design, error: dErr } = await supabase
       .from("designs")
       .insert({
@@ -107,32 +102,21 @@ export async function POST(req: Request) {
       .single();
     if (dErr) return NextResponse.json({ error: dErr.message }, { status: 400 });
 
-    // Handle thumbnail upload for new design
     let storedThumbnail = thumbnail_url || null;
+    let thumbnailPromise: Promise<any> = Promise.resolve(null);
     if (thumbnail_url) {
-      const up = await uploadThumbnailFromUrl(
+      thumbnailPromise = uploadThumbnailFromUrl(
         supabase as any,
         thumbnail_url,
         design.id,
         { makePublic: false }
       );
-      if (up.signedUrl) storedThumbnail = up.signedUrl;
-      else if (up.publicUrl) storedThumbnail = up.publicUrl;
-      else if (up.path) storedThumbnail = up.path;
-
-      // Update the design with the thumbnail URL
-      const { error: thumbErr } = await supabase
-        .from("designs")
-        .update({ thumbnail_url: storedThumbnail })
-        .eq("id", design.id);
-      if (thumbErr) console.error("Error updating thumbnail:", thumbErr);
     }
 
-    // Call AI evaluate for new design
-    let aiEvalResult = null;
+    // Start AI evaluation in background
     if (evaluate) {
-      try {
-        const aiResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
+      (async () => {
+        await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -146,13 +130,21 @@ export async function POST(req: Request) {
             snapshot
           })
         });
+      })();
+    }
 
-        if (aiResponse.ok) {
-          aiEvalResult = await aiResponse.json();
-        }
-      } catch (err) {
-        console.error('Error calling AI evaluate: ', err);
-      }
+    const up = await thumbnailPromise;
+    if (up) {
+      if (up.signedUrl) storedThumbnail = up.signedUrl;
+      else if (up.publicUrl) storedThumbnail = up.publicUrl;
+      else if (up.path) storedThumbnail = up.path;
+
+      // Update the design with the thumbnail URL
+      const { error: thumbErr } = await supabase
+        .from("designs")
+        .update({ thumbnail_url: storedThumbnail })
+        .eq("id", design.id);
+      if (thumbErr) console.error("Error updating thumbnail:", thumbErr);
     }
 
     return NextResponse.json({
@@ -162,7 +154,7 @@ export async function POST(req: Request) {
         figma_link
       },
       existed: false,
-      ai_evaluation: aiEvalResult
+      ai_evaluation: "processing", // Indicate processing
     });
   } catch (e: any) {
     console.error("Server error:", e);

@@ -96,8 +96,8 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
                   ? "Overall Score"
                   : frameEvaluations[selectedFrameIndex]?.ai_summary ||
                     frameEvaluations[selectedFrameIndex]?.node_id
-                  ? `Frame ${selectedFrameIndex} Score`
-                  : "Frame Score"}
+                    ? `Frame ${selectedFrameIndex} Score`
+                    : "Frame Score"}
               </h3>
               <span className="text-md text-neutral-500">out of 100</span>
             </div>
@@ -127,7 +127,7 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
           <ul className="flex flex-col gap-3">
             {evalResult.strengths.map((s: string, i: number) => (
               <li
-                key={i}
+                key={`${s}-${i}`}
                 className="flex items-center gap-3 bg-white/90 dark:bg-[#232323]/90 rounded-lg p-3 shadow-sm"
               >
                 <span className="text-[#16A34A] dark:text-[#4ADE80] text-lg">
@@ -143,7 +143,7 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
       )}
 
       {/* Weaknesses Section */}
-      {currentFrame?.ai_data.weaknesses?.length > 0 && (
+      {Array.isArray(currentFrame?.ai_data?.weaknesses) && currentFrame.ai_data.weaknesses.length > 0 && (
         <div className="p-5 rounded-2xl bg-[#DC2626]/10 dark:bg-[#F87171]/10 mb-5 shadow-md">
           <h3 className="font-bold mb-3 text-[#DC2626] dark:text-[#F87171] text-lg flex items-center gap-2">
             <span className="text-xl">😕</span>
@@ -152,7 +152,7 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
           <ul className="flex flex-col gap-3">
             {(evalResult.weaknesses ?? []).map((w: string, i: number) => (
               <li
-                key={i}
+                key={`${w}-${i}`}
                 className="flex items-center gap-3 bg-white/90 dark:bg-[#232323]/90 rounded-lg p-3 shadow-sm"
               >
                 <span className="text-[#DC2626] dark:text-[#F87171] text-lg">
@@ -168,7 +168,7 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
       )}
 
       {/* Issues */}
-      {currentFrame?.ai_data.issues?.length > 0 && (
+      {Array.isArray(currentFrame?.ai_data?.issues) && currentFrame.ai_data.issues.length > 0 && (
         <div className="p-5 rounded-2xl bg-[#D97706]/10 dark:bg-[#FBBF24]/10 mb-5 shadow-md">
           <h3 className="font-bold mb-3 text-[#D97706] dark:text-[#FBBF24] text-lg flex items-center gap-2">
             <span className="text-xl">⚠️</span>
@@ -201,9 +201,10 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
                     "bg-[#FFD600]/10 dark:bg-[#FFD600]/5 text-[#FFD600]";
                 }
 
+                // HOTFIX: Ensure key is always unique
                 return (
                   <li
-                    key={issue.id || i}
+                    key={`${issue.id ?? 'issue'}-${i}`}
                     className="group flex flex-col gap-2 bg-white/90 dark:bg-[#232323]/90 rounded-lg p-5 shadow-sm"
                   >
                     <div className="flex items-center gap-3 flex-wrap">
@@ -236,7 +237,7 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
       )}
 
       {/* Suggestions Section */}
-      {currentFrame?.ai_data.issues?.some((issue: any) => issue.suggestion) && (
+      {Array.isArray(currentFrame?.ai_data?.issues) && currentFrame.ai_data.issues.some((issue: any) => issue.suggestion) && (
         <div className="p-5 rounded-2xl bg-[#EA580C]/10 dark:bg-[#FB923C]/10 mb-5 shadow-md">
           <h3 className="font-bold mb-3 text-[#EA580C] darkm:text-[#FB923C] text-lg flex items-center gap-2">
             <span className="text-2xl">✨</span>
@@ -247,7 +248,7 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
               .filter((issue: any) => issue.suggestion)
               .map((issue: any, i: number) => (
                 <li
-                  key={issue.id || i}
+                  key={`${issue.id ?? 'suggestion'}-${i}`}
                   className="flex items-start gap-2 bg-white/90 dark:bg-[#232323]/90 rounded-lg p-5 shadow-sm"
                 >
                   <span className="text-[#EA580C] darkm:text-[#FB923C] text-lg mt-1">
@@ -263,7 +264,7 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
       )}
 
       {/* Category Scores */}
-      {currentFrame?.ai_data.category_scores && (
+      {currentFrame?.ai_data?.category_scores && (
         <div className="p-5 rounded-2xl bg-[#9333EA]/10 dark:bg-[#C084FC]/10 mb-6 shadow-md">
           <h3 className="font-bold mb-4 text-[#9333EA] dark:text-[#C084FC] text-lg flex items-center gap-3">
             <span className="text-2xl">🏅</span>
@@ -271,7 +272,7 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
           </h3>
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {Object.entries(evalResult.category_scores ?? {}).map(
-              ([category, score]: [string, any]) => {
+              ([category, score]: [string, any], i: number) => {
                 let icon = "🟡";
                 let colorClass = "text-yellow-500";
 
@@ -285,7 +286,7 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
 
                 return (
                   <li
-                    key={category}
+                    key={`${category}-${i}`}
                     className={`flex items-center justify-between gap-3 bg-white/90 dark:bg-[#232323]/90 rounded-lg px-4 py-3 shadow-sm hover:scale-[1.02] transition-transform`}
                   >
                     <span className={`text-xl ${colorClass}`}>{icon}</span>
@@ -320,7 +321,7 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
               );
               return (
                 <li
-                  key={resource.issue_id || i}
+                  key={`${resource.issue_id ?? 'resource'}-${i}`}
                   className="bg-white/90 dark:bg-[#232323]/90 rounded-lg px-4 py-3 shadow-sm"
                 >
                   <div className="flex items-center gap-5 flex-wrap">

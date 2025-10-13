@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import TestimonialsForm from "./testimoinals-form";
 import type { Testimonial } from "../types";
 import { createClient } from "@/utils/supabase/client";
@@ -15,6 +15,15 @@ export default function TestimonialsSection({ profileId }: { profileId: string }
     const [editingTestimonial, setEditingTestimonial] = useState<Testimonial | null>(null);
 
 
+    const fetchTestimonials = useCallback(async () => {
+        setLoading(true);
+        const res = await fetch(`/api/testimonials?profileId=${profileId}`);
+        const data = await res.json();
+        setTestimonials(data);
+        setLoading(false);
+    }, [profileId]);
+
+
     useEffect(() => {
         const supabase = createClient();
         supabase.auth.getUser().then(({ data }) => {
@@ -23,15 +32,8 @@ export default function TestimonialsSection({ profileId }: { profileId: string }
     }, []);
 
     useEffect(() => {
-        async function fetchTestimonials() {
-            setLoading(true);
-            const res = await fetch(`/api/testimonials?profileId=${profileId}`);
-            const data = await res.json();
-            setTestimonials(data);
-            setLoading(false);
-        }
         fetchTestimonials();
-    }, [profileId]);
+    }, [fetchTestimonials]);
 
     function handleEdit(testimonial: Testimonial) {
         setEditingTestimonial(testimonial);
@@ -39,6 +41,7 @@ export default function TestimonialsSection({ profileId }: { profileId: string }
     }
 
     function handleTestimonialSaved(newTestimonial: Testimonial) {
+        fetchTestimonials();
         setTestimonials(prev =>
             prev.some(t => t.id === newTestimonial.id)
                 ? prev.map(t => t.id === newTestimonial.id ? newTestimonial : t)
@@ -89,49 +92,54 @@ export default function TestimonialsSection({ profileId }: { profileId: string }
                 ) : testimonials.length === 0 ? (
                     <p className="text-gray-400 italic">No testimonials yet.</p>
                 ) : (
-                    testimonials.map((t) => (
-                        <div key={t.id} className="relative group">
-                            <blockquote className="text-sm text-gray-500 dark:text-gray-300 italic border-l-4 border-green-400 pl-4 pr-12">
-                                <div className="flex justify-between items-start w-full">
-                                    <span className="block flex-1">
-                                        “{t.quote}”
-                                    </span>
-                                    {isOwner && t.created_at && (
-                                        <span className="ml-4 px-3 py-1 bg-white dark:bg-[#1A1A1A] rounded shadow text-xs text-gray-500 dark:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            Posted: {new Date(t.created_at).toLocaleString()}
-                                        </span>
+                    (
+                        testimonials
+                            .filter((t) => t.id)
+                            .filter((t, idx, arr) => arr.findIndex(x => x.id === t.id) === idx)
+                            .map((t, idx) => (
+                                <div key={t.id ?? idx} className="relative group">
+                                    <blockquote className="text-sm text-gray-500 dark:text-gray-300 italic border-l-4 border-green-400 pl-4 pr-12">
+                                        <div className="flex justify-between items-start w-full">
+                                            <span className="block flex-1">
+                                                “{t.quote}”
+                                            </span>
+                                            {isOwner && t.created_at && (
+                                                <span className="ml-4 px-3 py-1 bg-white dark:bg-[#1A1A1A] rounded shadow text-xs text-gray-500 dark:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    Posted: {new Date(t.created_at).toLocaleString()}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <footer className="mt-1 text-xs text-gray-400 flex items-center gap-2">
+                                            <Image
+                                                src={t.profiles?.avatar_url ?? "/images/default_avatar.png"}
+                                                alt={t.author}
+                                                className="w-6 h-6 rounded-full object-cover border border-gray-200 dark:border-gray-700"
+                                                height={24}
+                                                width={24}
+                                            />
+                                            {/* Name and role */}
+                                            <span>
+                                                <span className="font-semibold text-gray-700 dark:text-gray-200">{t.author}</span>
+                                                {t.role && <span className="ml-1 text-gray-400">({t.role})</span>}
+                                                {t.created_by === currentUserId && (
+                                                    <span className="ml-2 text-green-500 font-semibold">(You)</span>
+                                                )}
+                                            </span>
+                                        </footer>
+                                    </blockquote>
+                                    {/* Edit/Delete actions for testimonial author */}
+                                    {t.created_by === currentUserId && (
+                                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#1A1A1A] rounded shadow p-1 z-20">
+                                            <TestimonialOwnerActions
+                                                testimonial={t}
+                                                onEdit={handleEdit}
+                                                onDelete={handleDelete}
+                                            />
+                                        </div>
                                     )}
                                 </div>
-                                <footer className="mt-1 text-xs text-gray-400 flex items-center gap-2">
-                                    <Image
-                                        src={t.profiles?.avatar_url || "/default_avatar.png"}
-                                        alt={t.author}
-                                        className="w-6 h-6 rounded-full object-cover border border-gray-200 dark:border-gray-700"
-                                        height={24}
-                                        width={24}
-                                    />
-                                    {/* Name and role */}
-                                    <span>
-                                        <span className="font-semibold text-gray-700 dark:text-gray-200">{t.author}</span>
-                                        {t.role && <span className="ml-1 text-gray-400">({t.role})</span>}
-                                        {t.created_by === currentUserId && (
-                                            <span className="ml-2 text-green-500 font-semibold">(You)</span>
-                                        )}
-                                    </span>
-                                </footer>
-                            </blockquote>
-                            {/* Edit/Delete actions for testimonial author */}
-                            {t.created_by === currentUserId && (
-                                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#1A1A1A] rounded shadow p-1 z-20">
-                                    <TestimonialOwnerActions
-                                        testimonial={t}
-                                        onEdit={handleEdit}
-                                        onDelete={handleDelete}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    ))
+                            ))
+                    )
                 )}
             </div>
         </div>

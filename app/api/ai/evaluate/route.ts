@@ -4,8 +4,9 @@ import { evaluateFrames } from "@/lib/ai/evaluateFrames";
 import { saveDesignVersion } from "@/lib/ai/saveDesignVersion";
 export const runtime = "nodejs";
 
+
 export async function POST(req: Request) {
-    const { url, designId, nodeId, thumbnailUrl, fallbackImageUrl, snapshot } = await req.json();
+    const { url, designId, nodeId, thumbnailUrl, fallbackImageUrl, versionId, snapshot } = await req.json();
 
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -34,7 +35,6 @@ export async function POST(req: Request) {
     const frameImages = parseData.frameImages || {};
     const frameIds = Object.keys(frameImages);
 
-
     if (frameIds.length === 0) {
         return NextResponse.json({
             error: "No frames found in Figma file",
@@ -52,41 +52,41 @@ export async function POST(req: Request) {
         }, { status: 400 });
     }
 
-    // TODO:  `validResults` to be included later
+    // Start evaluation in background (do not await)
+    // `validResults`
+    (async () => {
+        const { frameResults, total_score, summary } = await evaluateFrames({
+            frameIds,
+            frameImages,
+            user,
+            designId,
+            fileKey,
+            versionId,
+            snapshot,
+            authError,
+            supabase,
+        });
 
-    const { frameResults, total_score, summary
-    } = await evaluateFrames({
-        frameIds,
-        frameImages,
-        user,
-        designId,
-        fileKey,
-        snapshot,
-        authError,
-        supabase,
-    });
+        await saveDesignVersion({
+            supabase,
+            designId,
+            fileKey,
+            nodeId,
+            thumbnailUrl,
+            fallbackImageUrl,
+            summary,
+            frameResults,
+            total_score,
+            snapshot,
+            user: user ?? undefined,
+        });
+    })();
 
-    await saveDesignVersion({
-        supabase,
-        designId,
-        fileKey,
-        nodeId,
-        thumbnailUrl,
-        fallbackImageUrl,
-        summary,
-        frameResults,
-        total_score,
-        snapshot,
-        user: user ?? undefined,
-    });
-
+    // Respond immediately
     return NextResponse.json({
-        results: frameResults,
+        status: "processing",
+        message: "AI evaluation started. Results will be available soon.",
         frameCount: frameIds.length,
-        message: "AI evaluation completed for all frames and aggregate saved.",
-        // // Watchout about this error ones
-        // accessibilityResults: parseData.accessibilityResults,
-        // accessbilityScores: parseData.accessbilityScores,
-        // normalizedFrames: parseData.normalizedFrames,
+        designId,
     });
 }
