@@ -44,6 +44,7 @@
   font-display: swap;
 }
 
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -188,7 +189,7 @@
 }
 
 .xhibit-gradient-text {
-  background: linear-gradient(to right, #FF4D00, #ED5E20, #FFA600, #FFDB97);
+  background: linear-gradient(to right, #FFA600, #FFDB97);
   background-clip: text;
   -webkit-background-clip: text;
   /* Safari/Chrome */
@@ -204,12 +205,21 @@
   letter-spacing: -0.01em;
   display: inline-block;
 }
+
 /* Tune for small phones (≈375x667) */
 @media (max-width: 390px) and (max-height: 740px) {
   .xhibit-gradient-text {
     font-size: 1.75rem;
     /* 28px */
   }
+}
+
+.gradient-text {
+  background: linear-gradient(to right, #FF4D00, #ED5E20, #FFA600, #FFDB97);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
 /* sm ≥ 640px */
@@ -249,6 +259,10 @@
   border-radius: 0.75rem;
   /* rounded-xl = 0.75rem */
   background: linear-gradient(to right, #19181D, #B22A13, #ED5E20, #FFA600);
+  /* background: linear-gradient(to right, #19181D, #B22A13, #ED5E20, #FFA600); */
+  background: url('/images/header-1.webp') no-repeat center center;
+  background-size: cover;
+  /* make sure it fills */
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -292,14 +306,16 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  
+
   /* space-x- 2 gap between children, 0.5rem*/
 }
+
 /* ...existing code... */
 .user-card-mobile {
   background-color: #FFF;
   color: #000;
-  padding: 1rem;              /* p-4 */
+  padding: 1rem;
+  /* p-4 */
   border-top-left-radius: 5rem;
   border-bottom-left-radius: 5rem;
   border-top-right-radius: 1.5rem;
@@ -308,18 +324,26 @@
   justify-content: center;
   flex-direction: row;
   align-items: center;
-  gap: 0.5rem;                /* space-x-2 */
+  gap: 0.5rem;
+  /* space-x-2 */
 }
 
 /* Hide the desktop card on mobile (you already have this) */
 @media (max-width: 639px) {
-  .user-card { display: none !important; }
+  .user-card {
+    display: none !important;
+  }
 }
 
 /* Hide the mobile card on >= sm */
 @media (min-width: 640px) {
-  .user-card-mobile { display: none !important; }
-  .user-card { display: flex; }
+  .user-card-mobile {
+    display: none !important;
+  }
+
+  .user-card {
+    display: flex;
+  }
 }
 
 
@@ -330,5 +354,193 @@
 }
 
 .text-balance {
-  text-wrap:balance;
+  text-wrap: balance;
 }
+
+/* Hide Edge's deafult password reveal icon */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.25s cubic-bezier(.4, 0, .2, 1);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom Scrollbar Styling */
+
+/* Chrome, Edge, Safari */
+::-webkit-scrollbar {
+  width: 6px;
+  /* thin scrollbar */
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  /* no background */
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #9ca3af;
+  /* gray-400 */
+  border-radius: 9999px;
+  /* fully rounded */
+  transition: background-color 0.2s ease-in-out;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #6b7280;
+  /* gray-500 on hover */
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #9ca3af transparent;
+}
+
+/* Dark Mode */
+.dark ::-webkit-scrollbar-thumb {
+  background-color: #4b5563;
+  /* gray-600 */
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: #9ca3af;
+  /* gray-400 */
+}
+
+/* Viewer styles (for .prose) */
+.prose ul {
+  list-style-type: disc;
+  padding-left: 2rem;
+}
+
+.prose ol {
+  list-style-type: decimal;
+  padding-left: 2rem;
+}
+
+.prose li {
+  margin-left: 1rem;
+}
+
+.prose p:empty {
+  min-height: 1.5em;
+}
+
+.prose h1 {
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+.prose h2 {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.prose h3 {
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+
+.prose blockquote {
+  border-left: 4px solid #ED5E20;
+  padding-left: 1em;
+  color: #555;
+  font-style: italic;
+  margin: 1em 0;
+  background: #f9f9f9;
+}
+
+
+/* Editor styles (for .ProseMirror) */
+.ProseMirror ul {
+  list-style-type: disc !important;
+  margin-left: 1.5em;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal !important;
+  margin-left: 1.5em;
+}
+
+.ProseMirror h1 {
+  font-size: 2rem !important;
+  font-weight: bold;
+  margin: 1em 0 0.5em 0;
+}
+
+.ProseMirror h2 {
+  font-size: 1.5rem !important;
+  font-weight: bold;
+  margin: 1em 0 0.5em 0;
+}
+
+.ProseMirror h3 {
+  font-size: 1.25rem !important;
+  font-weight: bold;
+  margin: 1em 0 0.5em 0;
+}
+
+/* Editor styles (for .ProseMirror) */
+.ProseMirror blockquote {
+  border-left: 4px solid #ED5E20 !important;
+  padding-left: 1em;
+  color: #555;
+  font-style: italic;
+  margin: 1em 0;
+  background: #f9f9f9;
+}
+
+.cursor-not-allowed {
+  cursor: not-allowed !important;
+}
+
+.spinner {
+  border: 3px solid #e5e7eb;
+  border-top: 3px solid #22c55e;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+

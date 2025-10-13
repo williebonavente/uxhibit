@@ -14,7 +14,7 @@ export async function uploadThumbnailFromUrl(
     const {
         bucket = "design-thumbnails",
         makePublic = false,
-        signedExpirySeconds = 3600,
+        signedExpirySeconds = 31536000,
     } = opts;
     try {
         const r = await fetch(publicUrlSource, { cache: "no-store" });

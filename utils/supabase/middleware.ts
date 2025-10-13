@@ -29,11 +29,32 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const PUBLIC_PATHS = new Set<string>(["/"]);
+  const PUBLIC_PATHS = [
+    "/",
+    "/login",
+    "/signup",
+    "/reset-password",
+    "/api/check_email",
+    "/auth/forgot-password",
+    "/auth/email-sent",
+    "/auth/testing_pass",
+    "/auth/processing",
+    // "/auth/callback",
+  ];
+
+  const PUBLIC_PREFIXES = [
+    "/_next",
+    "/images",
+    "/api/auth",
+    "/auth",
+    "/api"
+  ];
+
 
   function isPublicPath(path: string) {
-    if (PUBLIC_PATHS.has(path)) return true;
-    if (path.startsWith("/_next") || path === "/favicon.ico" || path.startsWith("/images")) return true;
+    if (PUBLIC_PATHS.includes(path)) return true;
+    if (PUBLIC_PREFIXES.some(prefix => path.startsWith(prefix))) return true;
+    if (path === "/favicon.ico") return true;
     return false;
   }
 

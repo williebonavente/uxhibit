@@ -1,8 +1,30 @@
+"use client";
+
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
+import { useEffect } from "react";
+import { LoadingButton } from "@/components/loading_props/loading-button";
 
 export default function Home() {
+  const [loadingBtn, setLoadingBtn] = useState<string | null>(null);
+
+  const handleButtonClick = async (btn: string, href: string) => {
+    setLoadingBtn(btn);
+    // Simulate async action (replace with real logic if needed)
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    window.location.href = href;
+    // setLoadingBtn(null);
+  };
+
+  useEffect(() => {
+    fetch("/api/ux_averages")
+      .then(res => res.json())
+      .then(data => {
+        // console.log("Average UX Ratings:", data);
+      });
+  }, []);
   return (
     <>
       {/* Header */}
@@ -15,37 +37,35 @@ export default function Home() {
             className="inline-flex items-center shrink-0 hover:scale-105 transition-transform"
           >
             <Image
-              src="/images/header-icon.png"
-              alt="UXhibit"
-              className="block dark:hidden w-[102px] h-[42px]"
-              width={102}
-              height={42}
-            />
-            <Image
               src="/images/dark-header-icon.png"
               alt="UXhibit (Dark)"
-              className="hidden dark:block w-[102px] h-[42px]"
+              className="w-[102px] h-[42px]"
               width={102}
               height={42}
             />
           </Link>
           {/* Right: Auth Buttons */}
           <div className="flex items-center gap-3">
-            <Link
-              href="/auth/login"
-              className=" w-full sm:w-[100px] lg:w-[120px] h-12 sm:h-[40px] lg:h-[50px] inline-flex items-center justify-center rounded-xl font-semibold text-white text-sm sm:text-base lg:text-lg bg-gradient-to-r from-[#FFDB97] via-[#FFA600] to-[#FF8700] shadow-[0_4px_18px_-4px_rgba(237,94,32,0.55)] hover:shadow-[0_6px_26px_-6px_rgba(237,94,32,0.65)] transition-all duration-300 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40 active:scale-[.97] "
+            <Button
+              className="cursor-pointer w-full sm:w-[100px] lg:w-[120px] h-12 sm:h-[40px] lg:h-[50px] inline-flex items-center justify-center rounded-xl font-semibold text-white text-sm sm:text-base lg:text-lg bg-gradient-to-r from-[#FFDB97] via-[#FFA600] to-[#FF8700] shadow-[0_4px_18px_-4px_rgba(237,94,32,0.55)] hover:shadow-[0_6px_26px_-6px_rgba(237,94,32,0.65)] transition-all duration-300 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40 active:scale-[.97]"
+              onClick={() => handleButtonClick("login", "/auth/login")}
+              disabled={loadingBtn === "login"}
+              style={loadingBtn === "login" ? { opacity: 0.7, pointerEvents: "none" } : {}}
             >
-              Log in
-            </Link>
-            <Link
-              href="/auth/signup"
-              className=" w-full sm:w-[100px] lg:w-[120px] h-12 sm:h-[40px] lg:h-[50px] inline-flex items-center justify-center rounded-xl border-2 border-white text-white font-semibold text-sm sm:text-base lg:text-lg bg-transparent hover:text-[#FF8700] hover:border-[#FF8700] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ED5E20]/50 active:scale-[.97] "
+              {loadingBtn === "login" ? "Logging in..." : "Log in"}
+            </Button>
+            <Button
+              className="cursor-pointer w-full sm:w-[100px] lg:w-[120px] h-12 sm:h-[40px] lg:h-[50px] inline-flex items-center justify-center rounded-xl border-2 border-white text-white font-semibold text-sm sm:text-base lg:text-lg bg-transparent hover:text-[#FF8700] hover:border-[#FF8700] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ED5E20]/50 active:scale-[.97]"
+              onClick={() => handleButtonClick("signup", "/auth/signup")}
+              disabled={loadingBtn === "signup"}
+              style={loadingBtn === "signup" ? { opacity: 0.7, pointerEvents: "none" } : {}}
             >
-              Sign up
-            </Link>
+              {loadingBtn === "signup" ? "Signing up..." : "Sign up"}
+            </Button>
           </div>
         </div>
       </header>
+
       {/* Background Video */}
       <div className="fixed inset-0 w-full h-full overflow-hidden -z-10">
         <video
@@ -55,7 +75,7 @@ export default function Home() {
           playsInline
           className="w-full h-full object-cover"
         >
-          <source src="/images/landing-page-bg(webm).webm" type="video/webm" />
+          <source src="/images/uxhibit-gif-3(webm).webm" type="video/webm" />
           Your browser does not support the video tag.
         </video>
         {/* gradient overlay for readability */}
@@ -94,61 +114,25 @@ export default function Home() {
           </p>
 
           {/* CTA */}
-          <Link href="/auth/login">
-            <div className="w-full flex items-center justify-center lg:justify-start">
-              <Button
-                type="submit"
-                className={`
-                  group relative inline-flex items-center justify-center
-                  w-full sm:w-[200px] h-25 lg:h-[50px]
-                  rounded-xl text-lg font-semibold tracking-wide
-                  transition-all duration-300 cursor-pointer
-                  text-white shadow-[0_4px_18px_-4px_rgba(237,94,32,0.55)]
-                  hover:shadow-[0_6px_26px_-6px_rgba(237,94,32,0.65)]
-                  active:scale-[.97]
-                  focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40 mt-10
-                `}
-              >
-                {/* Glow / gradient base */}
-                <span
-                  aria-hidden
-                  className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b]"
-                />
-
-                {/* Inner glass layer */}
-                <span
-                  aria-hidden
-                  className="absolute inset-[2px] rounded-[10px] 
-                            bg-[linear-gradient(145deg,rgba(255,255,255,0.28),rgba(255,255,255,0.07))]
-                            backdrop-blur-[2px]"
-                />
-
-                {/* Animated sheen */}
-                <span
-                  aria-hidden
-                  className="absolute -left-1 -right-1 top-0 h-full overflow-hidden rounded-xl"
-                >
-                  <span
-                    className="absolute inset-y-0 -left-full w-1/2 translate-x-0 
-                              bg-gradient-to-r from-transparent via-white/50 to-transparent
-                              opacity-0 transition-all duration-700
-                              group-hover:translate-x-[220%] group-hover:opacity-70"
-                  />
-                </span>
-
-                {/* Border ring */}
-                <span
-                  aria-hidden
-                  className="absolute inset-0 rounded-xl ring-1 ring-white/30 group-hover:ring-white/50"
-                />
-
-                {/* Label */}
-                <span className="relative z-10 flex items-center gap-2">
-                  Get Started
-                </span>
-              </Button>
-            </div>
-          </Link>
+          <LoadingButton
+            type="button"
+            className={`group relative inline-flex items-center justify-center
+              w-full sm:w-[200px] h-25 lg:h-[50px]
+              rounded-xl text-lg font-semibold tracking-wide
+              transition-all duration-300 cursor-pointer
+              text-white shadow-[0_4px_18px_-4px_rgba(237,94,32,0.55)]
+              hover:shadow-[0_6px_26px_-6px_rgba(237,94,32,0.65)]
+              active:scale-[.97]
+              focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40 mt-10
+              `}
+            loading={loadingBtn === "getstarted"}
+            loadingText="Loading..."
+            onClick={() => handleButtonClick("getstarted", "/auth/login")}
+          >
+            <span className="relative z-10 flex items-center gap-2">
+              Get Started
+            </span>
+          </LoadingButton>
         </div>
       </main>
     </>

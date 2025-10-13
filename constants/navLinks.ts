@@ -1,9 +1,7 @@
 import {
-  IconDashboard, IconChartBar, IconFolder, IconRadar, IconTrendingUp,
-  IconCompass, IconProps, IconSearch,
-  IconAB2
+  IconDashboard, IconChartBar, IconBook, IconRadar, IconTrendingUp,
+  IconCompass, IconProps, IconSearch, IconAccessible, IconBulb
 } from "@tabler/icons-react";
-import { IceCreamIcon } from "lucide-react";
 
 export interface NavMainLink {
   title: string,
@@ -23,17 +21,17 @@ export const navMain: NavMainLink[] = [
     icon: IconChartBar,
     items: [
       {
-        title: "Heuristic Violation Frequency",
+        title: "Heuristic Violation",
         url: "/analytics/heuristic-violation-frequency",
         icon: IconRadar,
       },
       {
-        title: "Usability Score Trend",
+        title: "Usability Trend",
         url: "/analytics/usability-score-trend",
         icon: IconTrendingUp,
       },
       {
-        title: "Project Performance Comparison",
+        title: "Project Comparison",
         url: "/analytics/project-performance",
         icon: IconCompass,
       },
@@ -42,7 +40,19 @@ export const navMain: NavMainLink[] = [
   {
     title: "Lessons",
     url: "/lessons",
-    icon: IconFolder
+    icon: IconBook,
+    items: [
+      {
+        title: "WCAG 2.1",
+        url: "/lessons/wcag",
+        icon: IconAccessible,
+      },
+      {
+        title: "10 Usability Heuristics",
+        url: "/lessons/usability-heuristics",
+        icon: IconBulb,
+      },
+    ]
   },
   {
     title: "Explore",

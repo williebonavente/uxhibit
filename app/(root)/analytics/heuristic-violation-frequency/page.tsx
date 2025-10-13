@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   RadarChart,
   PolarGrid,
@@ -9,78 +9,119 @@ import {
   Radar,
   ResponsiveContainer,
 } from "recharts";
-import { generateHeuristicReportSimple } from "@/lib/pdfGenerator";
+import { generateHeuristicReportSimple } from "@/lib/systemGeneratedReport/pdfGenerator";
 import { toast } from "sonner";
 import { IconLoader2, IconDownload } from "@tabler/icons-react";
+import { createClient } from "@/utils/supabase/client";
 
+
+const HEURISTICS = [
+  { heuristic: "01", fullName: "Visibility of System Status" },
+  { heuristic: "02", fullName: "Match Between System and the Real World" },
+  { heuristic: "03", fullName: "User Control and Freedom" },
+  { heuristic: "04", fullName: "Consistency and Standards" },
+  { heuristic: "05", fullName: "Error Prevention" },
+  { heuristic: "06", fullName: "Recognition Rather than Recall" },
+  { heuristic: "07", fullName: "Flexibility and Efficiency of Use" },
+  { heuristic: "08", fullName: "Aesthetic and Minimalist Design" },
+  { heuristic: "09", fullName: "Help Users Recognize, Diagnose, and Recover from Errors" },
+  { heuristic: "10", fullName: "Help and Documentation" },
+];
 const HeuristicDashboard = () => {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
-  // Data for the radar chart based on Jakob Nielsen's 10 Usability Heuristics
-  // TODO: Dynamic data
-  // The data should be coming from the backend or the result of the AI.
-  const heuristicData = [
-    {
-      heuristic: "01",
-      name: "Visibility of System Status",
-      value: 20,
-      fullName: "Visibility of System Status",
-    },
-    {
-      heuristic: "02",
-      name: "Match Between System and Real World",
-      value: 10,
-      fullName: "Match Between System and the Real World",
-    },
-    {
-      heuristic: "03",
-      name: "User Control and Freedom",
-      value: 50,
-      fullName: "User Control and Freedom",
-    },
-    {
-      heuristic: "04",
-      name: "Consistency and Standards",
-      value: 80,
-      fullName: "Consistency and Standards",
-    },
-    {
-      heuristic: "05",
-      name: "Error Prevention",
-      value: 5,
-      fullName: "Error Prevention",
-    },
-    {
-      heuristic: "06",
-      name: "Recognition Rather than Recall",
-      value: 10,
-      fullName: "Recognition Rather than Recall",
-    },
-    {
-      heuristic: "07",
-      name: "Flexibility and Efficiency of Use",
-      value: 25,
-      fullName: "Flexibility and Efficiency of Use",
-    },
-    {
-      heuristic: "08",
-      name: "Aesthetic and Minimalist Design",
-      value: 15,
-      fullName: "Aesthetic and Minimalist Design",
-    },
-    {
-      heuristic: "09",
-      name: "Help Users Recognize, Diagnose, and Recover from Errors",
-      value: 50,
-      fullName: "Help Users Recognize, Diagnose, and Recover from Errors",
-    },
-    {
-      heuristic: "10",
-      name: "Help and Documentation",
-      value: 35,
-      fullName: "Help and Documentation",
-    },
-  ];
+  const [heuristicData, setHeuristicData] = useState([]);
+
+  useEffect(() => {
+    const fetchHeuristicData = async () => {
+      const supabase = createClient();
+
+      // 1. Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        toast.error("User not logged in");
+        return;
+      }
+      const currentUserId = user.id;
+
+      // 2. Get all latest versions for the user's designs
+      const { data: designs, error: designsError } = await supabase
+        .from("designs")
+        .select("current_version_id")
+        .eq("owner_id", currentUserId);
+
+      if (designsError) {
+        toast.error("Error fetching designs");
+        return;
+      }
+
+      const versionIds = (designs || []).map((d: any) => d.current_version_id).filter(Boolean);
+
+      // 3. Fetch all design_versions for these versionIds
+      const allIssues: any[] = [];
+      if (versionIds.length > 0) {
+        const { data: versionsData, error: versionsError } = await supabase
+          .from("design_versions")
+          .select("ai, ai_data")
+          .in("id", versionIds);
+
+        if (versionsError) {
+          toast.error("Error fetching design versions");
+        } else {
+          (versionsData || []).forEach((version: any, idx: number) => {
+            let aiData = version.ai_data || version.ai;
+            if (typeof aiData === "string") {
+              try { aiData = JSON.parse(aiData); } catch { aiData = {}; }
+            }
+            // Log the aiData for this version
+            console.log(`Version ${idx} aiData:`, aiData);
+
+            if (Array.isArray(aiData?.issues)) {
+              aiData.issues.forEach((issue: any) => {
+                if (issue && typeof issue.heuristic === "string") {
+                  allIssues.push(issue);
+                }
+              });
+            }
+          });
+        }
+      }
+
+      // 4. Count violations per heuristic and severity
+      const counts: Record<string, { total: number; high: number; medium: number; low: number }> = {};
+      HEURISTICS.forEach(h => {
+        counts[h.heuristic] = { total: 0, high: 0, medium: 0, low: 0 };
+      });
+
+      allIssues.forEach(issue => {
+        if (issue.heuristic) {
+          counts[issue.heuristic].total += 1;
+          const sev = (issue.severity || "low").toLowerCase();
+          if (sev === "high" || sev === "medium" || sev === "low") {
+            counts[issue.heuristic][sev as "high" | "medium" | "low"] += 1;
+          }
+        }
+      });
+
+      // 5. Build data for the chart (you can use total, or show breakdowns)
+      const chartData = HEURISTICS.map(h => ({
+        heuristic: h.heuristic,
+        name: h.fullName,
+        value: counts[h.heuristic].total,
+        high: counts[h.heuristic].high,
+        medium: counts[h.heuristic].medium,
+        low: counts[h.heuristic].low,
+        fullName: h.fullName,
+      }));
+
+      console.log("All Issues: ", allIssues);
+      console.log("Chart Data: ", chartData);
+
+      setHeuristicData(chartData);
+    };
+
+    fetchHeuristicData();
+  }, []);
 
   const getSeverityColor = (value: number) => {
     if (value <= 20) return "text-green-600 dark:text-green-400";
@@ -113,7 +154,7 @@ const HeuristicDashboard = () => {
   return (
     <div className="space-y-5 ">
       <div className="border-b-2 p-2">
-        <h1 className="text-xl font-medium text-black dark:text-white font-['Poppins']">
+        <h1 className="text-2xl font-medium">
           Heuristic Violation Frequency
         </h1>
       </div>
@@ -129,11 +170,10 @@ const HeuristicDashboard = () => {
         <button
           onClick={handleExportReport}
           disabled={isGeneratingPDF}
-          className={`w-full sm:w-auto px-6 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors font-['Poppins'] font-medium sm:ml-6 cursor-pointer ${
-            isGeneratingPDF
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-[#ED5E20] hover:bg-[#d44e0f]"
-          } text-white`}
+          className={`w-full sm:w-auto px-6 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors font-['Poppins'] font-medium sm:ml-6 cursor-pointer ${isGeneratingPDF
+            ? "bg-gray-400 cursor-not-allowed"
+            : "bg-[#ED5E20] hover:bg-[#d44e0f]"
+            } text-white`}
         >
           <span>
             {isGeneratingPDF ? (

@@ -1,0 +1,27 @@
+.ProseMirror h1 {
+  font-size: 2rem;
+  font-weight: bold;
+  margin: 1em 0 0.5em 0;
+}
+.ProseMirror h2 {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin: 1em 0 0.5em 0;
+}
+.ProseMirror h3 {
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin: 1em 0 0.5em 0;
+}
+.ProseMirror ul,
+.ProseMirror ol {
+  margin-left: 1.5em;
+  list-style-type: disc;
+}
+.ProseMirror ol {
+  list-style-type: decimal;
+}
+
+.ProseMirror {
+  outline: none;
+}

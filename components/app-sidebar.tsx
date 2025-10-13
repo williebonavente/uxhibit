@@ -22,21 +22,25 @@ import { User } from "@supabase/supabase-js";
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
   const [user, setUser] = useState<User | null>(null);
-
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
     const supabase = createClient();
+
     const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser();
+      const { data, error } = await supabase.auth.getUser();
+      if (error) {
+        console.error("Supabase getUser error:", error);
+      }
       setUser(data?.user ?? null);
     };
     fetchUser();
 
-    // Optionally, refetch user on auth state change
+    // Refetch user on auth state change
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
@@ -45,7 +49,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       listener?.subscription.unsubscribe();
     };
   }, []);
+
   if (!mounted) return null;
+
 
   const logoSrc =
     resolvedTheme === "dark"
@@ -53,12 +59,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       : "/uxhibit-logo-light-mode.svg";
 
   return (
-    <Sidebar className="p-8" collapsible="offcanvas" {...props}>
+    <Sidebar className="p-4" collapsible="offcanvas" {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <div className="aspect-square flex justify-center items-center">
-              <Image src={logoSrc} alt="Logo" fill priority />
+              <Image src={logoSrc} alt="Logo" fill priority className="p-4" />
             </div>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -67,7 +73,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={navMain} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={user} />
+        <SidebarFooter>
+          {user ? <NavUser user={user} /> : null}
+        </SidebarFooter>
       </SidebarFooter>
     </Sidebar>
   );

@@ -1,10 +1,10 @@
 "use client";
 
 import {
-  IconCreditCard,
   IconDotsVertical,
   IconLogout,
   IconNotification,
+  IconSettings,
   IconUserCircle,
 } from "@tabler/icons-react";
 
@@ -30,78 +30,129 @@ import { toast } from "sonner";
 import { getInitials } from "@/app/(root)/dashboard/page";
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { Input } from "./ui/input";
-import { Button } from "./ui/button";
 import { type User } from "@supabase/supabase-js";
 import { Skeleton } from "./ui/skeleton";
+import { Bug, UserRound, Trash } from "lucide-react";
+import { IconBell } from "@tabler/icons-react";
+import { ReportBugModal } from "./report-bug-modal";
+import { AccountInfoModal } from "./account-info-modal";
+import DeleteAccountPage from "./delete-account-dialog";
+import { INotification, NotificationsModal } from "./notifcation-modal";
 
-
+export type Profile = {
+  id: string;
+  username: string,
+  first_name?: string;
+  middle_name?: string;
+  last_name?: string;
+  avatar_url?: string;
+  gender: string;
+  birthday: string;
+  bio: string;
+  role?: string;
+}
 export function NavUser({ user }: { user: User | null }) {
-  const { isMobile } = useSidebar();
 
+  const { isMobile } = useSidebar();
   const [loading, setLoading] = useState(true)
   const [fullname, setFullName] = useState<string | null>(null)
   const [email, setEmail] = useState<string | null>(null)
-  const [username, setUsername] = useState<string | null>(null)
-  const [website, setWebsite] = useState<string | null>(null)
-  const [age, setAge] = useState<string | null>(null)
-  const [avatar_url, setAvatarUrl] = useState<string | null>(null)
-  // Add state for pending avatar 
-  const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showNotifModal, setShowNotifModal] = useState(false);
+  const [notifications, setNotifications] = useState<INotification[]>([]);
+  const [notifLoading, setNotifLoading] = useState<string | null>(null);
+  const [notifPage, setNotifPage] = useState(1);
+  const [showReportBug, setShowReportBug] = useState(false);
   const [open, setOpen] = useState(false);
-  const [profile, setProfile] = useState<{
-    id: string,
-    username: string,
-    fullname: string;
-    avatar_url?: string;
-    age: number | string;
-    gender: string;
-    bio: string;
-  } | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
 
+  const notifPerpage = 5;
+  const fullName =
+    profile
+      ? [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(" ")
+      : "";
 
+  const totalPages = Math.ceil(notifications.length / notifPerpage);
+  const unreadNotifications = notifications.filter(n => !n.read);
+  const readNotifications = notifications.filter(n => n.read);
+
+  const handleProfileClick = async () => {
+    const supabase = createClient();
+
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData?.user?.id) return;
+
+    const userId = authData.user.id;
+
+    router.push(`/profile-user/${userId}`);
+  };
 
   const getProfile = useCallback(async () => {
+    if (!user?.id) {
+      console.error("No user or user.id found:", user);
+      setLoading(false);
+      return;
+    }
+    console.log("User here no error: ", user);
     try {
-      setLoading(true)
-      const supabase = createClient()
-      const { data, error, status } = await supabase
+      setLoading(true);
+      const supabase = createClient();
+
+      const { data: profileData, error: profileError, status } = await supabase
         .from('profiles')
-        .select(`id, username, full_name, website, avatar_url, age, gender, bio`)
+        .select(`id, username, first_name, middle_name, last_name,
+          website, avatar_url, gender, bio, birthday `)
         .eq('id', user?.id)
-        .single()
+        .single();
 
+      const { data: detailsData, error: detailsError } = await supabase
+        .from('profile_details')
+        .select('role')
+        .eq('profile_id', user?.id)
+        .single();
 
-      if (error && status !== 406 && Object.keys(error).length > 0) {
-        console.log(error);
-        throw error;
+      if ((profileError && status !== 406 && Object.keys(profileError).length > 0) || detailsError) {
+        console.error("Profile Error:", JSON.stringify(profileError));
+        console.error("Details Error:", JSON.stringify(detailsError));
+        throw new Error(profileError?.message || detailsError?.message || "Unknown error");
       }
 
-      if (data) {
+      if (profileData) {
+        const fullname = [profileData.first_name, profileData.middle_name, profileData.last_name].filter(Boolean).join(" ");
         setProfile({
-          id: data.id,
-          username: data.username,
-          fullname: data.full_name,
-          avatar_url: data.avatar_url,
-          age: data.age,
-          gender: data.gender,
-          bio: data.bio,
+          id: profileData.id,
+          username: profileData.username,
+          first_name: profileData.first_name ?? "",
+          middle_name: profileData.middle_name ?? "",
+          last_name: profileData.last_name ?? "",
+          avatar_url: profileData.avatar_url,
+          birthday: profileData.birthday,
+          gender: profileData.gender,
+          bio: profileData.bio,
+          role: typeof detailsData?.role === "string" ? detailsData.role : "",
         });
-        setFullName(data.full_name);
+        setFullName(fullname);
       }
-    } catch (error) {
-      // if (error && typeof error === "object" && Object.keys(error).length > 0) {
-      //   console.error(error);
-      //   toast.error("Error loading user data.");
-      // }
-      console.log(error);
+    } catch (err) {
+      console.error("getProfile error:", err);
     } finally {
       setLoading(false);
     }
+  }, [user]);
 
-  }, [user])
+  const getNotifications = useCallback(async () => {
+    const supabase = createClient();
+    const { data: notifications } = await supabase
+      .from("notifications")
+      .select(`*, designs(title),
+        from_user:profiles!notifications_from_user_id_fkey(
+        first_name, middle_name, last_name, avatar_url
+        )`)
+      .eq("to_user_id", user?.id)
+      .order("created_at", { ascending: false });
+    setNotifications(notifications ?? []);
+  }, [user?.id]);
 
   useEffect(() => {
     if (user?.email) {
@@ -115,25 +166,135 @@ export function NavUser({ user }: { user: User | null }) {
     const { data: authData } = await supabase.auth.getUser();
 
     if (authData?.user?.id) {
-      const { data } = await supabase
+      // Fetch profile from 'profiles'
+      const { data: profileData } = await supabase
         .from("profiles")
-        .select("id, username, full_name, website, avatar_url, age, gender, bio")
+        .select(`id, username, first_name, middle_name, last_name, website,
+          avatar_url, gender, birthday, bio `)
         .eq("id", authData.user.id)
         .single();
-      if (data) {
+
+      // Fetch role from 'profile_details'
+      const { data: detailsData } = await supabase
+        .from("profile_details")
+        .select("role")
+        .eq("profile_id", authData.user.id)
+        .single();
+
+      if (profileData) {
+        const fullname = [profileData.first_name, profileData.middle_name, profileData.last_name].filter(Boolean).join(" ");
         setProfile({
-          id: data.id,
-          username: data.username,
-          fullname: data.full_name,
-          avatar_url: data.avatar_url,
-          age: data.age,
-          gender: data.gender,
-          bio: data.bio,
+          id: profileData.id,
+          username: profileData.username,
+          first_name: profileData.first_name ?? "",
+          middle_name: profileData.middle_name ?? "",
+          last_name: profileData.last_name ?? "",
+          avatar_url: profileData.avatar_url,
+          gender: profileData.gender,
+          birthday: profileData.birthday,
+          bio: profileData.bio,
+          role: detailsData?.role ?? "",
         });
+        setFullName(fullname);
         setOpen(true);
       }
     }
   };
+
+  const handleDeleteNotification = async (notifId: string) => {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("notifications")
+      .delete()
+      .eq("id", notifId);
+    if (!error) {
+      setNotifications((prev) => prev.filter((n) => n.id !== notifId));
+      toast.success("Notification deleted.");
+    } else {
+      toast.error("Failed to delete notification.");
+    }
+  };
+
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (user?.id) {
+      getNotifications();
+    }
+  }, [user?.id, getNotifications]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel("realtime-notifications")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `to_user_id=eq.${user.id}`,
+        },
+        async (payload) => {
+          const notif = payload.new;
+          // Fetch sender name and design title
+          const { data: sender } = await supabase
+            .from("profiles")
+            .select("first_name, middle_name, last_name")
+            .eq("id", notif.from_user_id)
+            .single();
+          const { data: design } = await supabase
+            .from("designs")
+            .select("title")
+            .eq("id", notif.design_id)
+            .single();
+          const senderName = [sender?.first_name, sender?.middle_name, sender?.last_name]
+            .filter(Boolean)
+            .join(" ") || "Someone";
+
+          const actionText =
+            notif.type === "heart"
+              ? "heart your design!"
+              : notif.type === "comment"
+                ? "commented on your design!"
+                : "interacted with your design!";
+          toast(
+            <span className="flex items-center gap-2">
+              <IconBell className="text-yellow-500" size={20} />
+              <span>{senderName} {actionText}</span>
+            </span>,
+            {
+              description: design?.title
+                ? `Design: ${design.title}`
+                : undefined,
+              position: "top-center",
+              duration: 5000,
+            }
+          );
+          getNotifications();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, getNotifications]);
+
+  useEffect(() => {
+    setNotifPage(1);
+  }, [showNotifModal, notifications.length]);
 
   const router = useRouter();
   async function handleLogOut() {
@@ -143,14 +304,12 @@ export function NavUser({ user }: { user: User | null }) {
       return;
     }
     toast.success("You have been logout.");
-    router.push("/auth/login");
   }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center mt-8h-32 gap-4">
-        {/* Avatar skeleton */}
         <Skeleton className="h-8 w-8 rounded-full" />
-        {/* Profile info skeleton (name + email) */}
         <div className="grid flex-1 text-left text-sm leading-tight gap-2">
           <Skeleton className="h-4 w-24 rounded" /> {/* Name skeleton */}
           <Skeleton className="h-4 w-32 rounded" /> {/* Email skeleton */}
@@ -166,30 +325,26 @@ export function NavUser({ user }: { user: User | null }) {
             <DropdownMenuTrigger asChild>
               <SidebarMenuButton
                 size="lg"
-                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground py-7"
               >
                 <Avatar className="h-8 w-8 rounded-bl-full ">
-                  {/* <AvatarImage src={profile?.avatar_url} alt={profile?.fullname} /> */}
                   <AvatarImage
                     src={
-                      avatarPreview
+                      avatarUrl
                       ?? (profile?.avatar_url
                         ? (profile.avatar_url.startsWith("http")
                           ? profile.avatar_url
                           : `/api/avatars?path=${encodeURIComponent(profile.avatar_url)}`)
                         : undefined)
                     }
-                    alt={profile?.fullname}
+                    alt={fullName}
                   />
-                  {/* Display the the initial if the user does not have avatar */}
                   <AvatarFallback className="rounded-lg grayscale">{getInitials(fullname)}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  {/* Getting the name from the database */}
                   <span className="truncate font-medium">{fullname}</span>
                   <span className="text-muted-foreground truncate text-xs">
-                    {/* Getting the email from the database */}
-                    <span className="truncate font-medium">{profile?.username ?? email ?? profile?.fullname}</span>
+                    <span className="truncate font-medium">{profile?.username ?? email ?? fullName}</span>
                   </span>
                 </div>
                 <IconDotsVertical className="ml-auto size-4" />
@@ -201,23 +356,19 @@ export function NavUser({ user }: { user: User | null }) {
               align="end"
               sideOffset={4}
             >
-              {/* TODO:  */}
               <DropdownMenuLabel className="p-0 font-normal">
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                   <Avatar className="h-8 w-8 rounded-bl-full">
-
-                    {/* <AvatarImage 
-                      src={profile?.avatar_url ?? undefined} alt={profile?.fullname ?? email ?? "User"} /> */}
                     <AvatarImage
                       src={
-                        avatarPreview
+                        avatarUrl
                         ?? (profile?.avatar_url
                           ? (profile.avatar_url.startsWith("http")
                             ? profile.avatar_url
                             : `/api/avatars?path=${encodeURIComponent(profile.avatar_url)}`)
                           : undefined)
                       }
-                      alt={profile?.fullname}
+                      alt={fullName}
                     />
                     <AvatarFallback className="rounded-lg">{getInitials(fullname)}</AvatarFallback>
                   </Avatar>
@@ -231,15 +382,32 @@ export function NavUser({ user }: { user: User | null }) {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
-                <DropdownMenuItem onClick={handleAccountClick}>
+                <DropdownMenuItem onClick={handleProfileClick}>
                   <IconUserCircle />
-                  {/* TODO: make the functional button here */}
-                  Account
+                  My Profile
                 </DropdownMenuItem>
-                {/* removed billing */}
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowNotifModal(true)}>
                   <IconNotification />
                   Notifications
+                  {notifications.some(n => !n.read) && (
+                    <span className="ml-2 inline-block w-2 h-2 bg-red-500 rounded-full"></span>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <UserRound />
+                  About Us
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleAccountClick}>
+                  <IconSettings />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Bug />
+                  Report a Bug
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowDeleteDialog(true)}>
+                  <Trash />
+                  Delete Account
                 </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
@@ -248,230 +416,54 @@ export function NavUser({ user }: { user: User | null }) {
           </DropdownMenu>
         </SidebarMenuItem>
       </SidebarMenu>
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* Blurred, darkened background */}
-          <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => setOpen(false)}
-          />
-          {/* Centered form */}
-          <div
-            className="
-        relative z-10 bg-white dark:bg-[#141414] rounded-xl shadow-lg
-        w-full max-w-xs sm:max-w-md mx-auto
-        p-3 sm:p-8
-        overflow-y-auto max-h-[90vh]
-      "
-          >
-            {/* Adjusted font size and margin for mobile */}
-            <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4 text-center">
-              Account Information
-            </h2>
-            <p className="mb-6 text-center text-muted-foreground">
-              View and update your personal information.
-            </p>
-            {profile && (
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const supabase = createClient();
-                  let imageUrl = profile.avatar_url;
-                  //  Only upload if a new avatar is selected
-                  // if (pendingAvatar) {
-                  //   const { data, error: uploadError } = await supabase.storage
-                  //     .from("avatars")
-                  //     .upload(`${profile.id}-${pendingAvatar.name}`, pendingAvatar, {
-                  //       cacheControl: "3600",
-                  //       upsert: true,
-                  //     });
-                  //   if (uploadError) {
-                  //     toast.error(uploadError.message);
-                  //     return;
-                  //   }
-                  //   imageUrl = `${profile.id}-${pendingAvatar}`
-                  //   const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-                  //     .from("avatars")
-                  //     // TODO: 
-                  //       .createSignedUrl(`${profile.id}-${pendingAvatar.name}`, 6000 * 6000); // URL valid for 1 hour
-
-                  //   if (signedUrlError) {
-                  //     toast.error(signedUrlError.message);
-                  //     return;
-                  //   }
-                  //   imageUrl = signedUrlData?.signedUrl;
-                  // }
-
-                  if (pendingAvatar) {
-                    const filePath = `${profile.id}/${Date.now()}-${pendingAvatar.name}`;
-                    const { error: uploadError } = await supabase.storage
-                      .from("avatars")
-                      .upload(filePath, pendingAvatar, {
-                        cacheControl: "31536000",
-                        upsert: true,
-                      });
-                    if (uploadError) {
-                      toast.error(uploadError.message);
-                      return;
-                    }
-                    imageUrl = filePath;
-                  }
-
-
-                  // Update profile in DB
-                  const { error } = await supabase
-                    .from("profiles")
-                    .update({
-                      username: profile.username,
-                      full_name: profile.fullname,
-                      age: profile.age,
-                      avatar_url: imageUrl,
-                      bio: profile.bio,
-                    })
-                    .eq("id", profile.id);
-
-                  if (!error) {
-                    toast.success("Profile Updated!");
-                    setFullName(profile.fullname);
-                    setAvatarUrl(imageUrl ?? null);
-                    setOpen(false);
-                    router.refresh();
-                    getProfile();
-                    setPendingAvatar(null);
-                    setAvatarPreview(null);
-                  } else {
-                    toast.error("Failed to update profile");
-                  }
-                }}
-                className="space-y-4"
-              >
-                <div>
-                  <div>
-                    <div className="flex flex-col items-center gap-2">
-                      <div
-                        className="relative cursor-pointer group"
-                        onClick={() => document.getElementById("avatar-upload")?.click()}
-                      >
-                        <Avatar className="h-24 w-24 sm:h-32 sm:w-32 rounded-full border-4 border-gray-300 group-hover:border-blue-500 transition shadow-xl">
-                          {/* <AvatarImage src={avatarPreview ?? profile?.avatar_url} alt={profile?.fullname} /> */}
-                          <AvatarImage
-                            src={
-                              avatarPreview
-                              ?? (profile?.avatar_url
-                                ? (profile.avatar_url.startsWith("http")
-                                  ? profile.avatar_url
-                                  : `/api/avatars?path=${encodeURIComponent(profile.avatar_url)}`)
-                                : undefined)
-                            }
-                            alt={profile?.fullname ?? email ?? "User"}
-                          />
-                          <AvatarFallback className="rounded-full text-3xl sm:text-4xl bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
-                            {getInitials(profile?.fullname)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition rounded-full">
-                          <span className="text-white text-lg font-semibold">Change</span>
-                        </div>
-                      </div>
-                      <input
-                        id="avatar-upload"
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={async e => {
-                          if (e.target.files && e.target.files[0]) {
-                            const file = e.target.files[0];
-                            // Adding preview
-                            setPendingAvatar(file);
-                            setAvatarPreview(URL.createObjectURL(file));
-                          }
-                        }}
-                      />
-                    </div>
-                    {/* Bio just to replace the UI/UX Designer message */}
-                    <div>
-                      <label>Bio</label>
-                      <Input
-                        value={profile.bio ?? "UI/UX  Designer"}
-                        onChange={e => setProfile({ ...profile, bio: e.target.value })}
-                        className="mb-4"
-                      />
-                    </div>
-                  </div>
-                  <label>Username</label>
-                  <Input
-                    value={profile.username ?? "User"}
-                    onChange={e => setProfile({ ...profile, username: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label>Full Name</label>
-                  <Input
-                    value={profile.fullname}
-                    onChange={e => setProfile({ ...profile, fullname: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label>Email</label>
-                  <Input
-                    value={email ?? "Cannot fetch User email"}
-                    disabled
-                  />
-                </div>
-                <div>
-                  <label>Age</label>
-                  <Input
-                    type="number"
-                    min={10}
-                    max={80}
-                    value={profile.age === 0 ? "" : profile.age ?? ""}
-                    onChange={e => {
-                      const raw = e.target.value;
-                      if (raw === "") {
-                        setProfile({ ...profile, age: "" });
-                        return;
-                      }
-                      const value = Number(raw);
-                      // Only update if value is a valid number and in range
-                      if (!isNaN(value) && value >= 10 && value <= 80) {
-                        setProfile({ ...profile, age: value });
-                      }
-                    }}
-                    placeholder="Enter your age (10-80)"
-                  />
-                </div>
-
-                <div>
-                  <label >Gender</label>
-                  <Input
-                    value={profile.gender}
-                    onChange={e => setProfile({ ...profile, gender: e.target.value })}
-                  />
-                </div>
-
-                {/* Footer buttons are now responsive: stack on mobile, row on desktop */}
-                <footer className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-4 mt-6 sm:mt-16">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setOpen(false)}
-                    className="cursor-pointer w-full sm:w-auto"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="cursor-pointer w-full sm:w-auto bg-[#ED5E20] text-[#FFF] hover:bg-[#d44e0f] dark:bg-[#d44e0f] dark:text-[#FFF] dark:hover:bg-[#ED5E20]"
-                  >
-                    Save Changes
-                  </Button>
-                </footer>
-              </form>
-            )}
-          </div>
-        </div >
-      )
-      }
+      <ReportBugModal
+        open={showReportBug}
+        onClose={() => setShowReportBug(false)}
+        user={
+          profile
+            ? {
+              avatarUrl:
+                profile.avatar_url && profile.avatar_url.startsWith("http")
+                  ? profile.avatar_url
+                  : profile.avatar_url
+                    ? `/api/avatars?path=${encodeURIComponent(profile.avatar_url)}`
+                    : "",
+              fullName,
+            }
+            : null
+        }
+      />
+      <AccountInfoModal
+        open={open}
+        setOpen={setOpen}
+        profile={profile}
+        setProfile={setProfile}
+        email={email}
+        setFullName={setFullName}
+        setAvatarUrl={setAvatarUrl}
+        getProfile={getProfile}
+      />
+      <DeleteAccountPage
+        open={showDeleteDialog}
+        setOpen={setShowDeleteDialog}
+        userId={user?.id}
+        email={user?.email}
+      />
+      <NotificationsModal
+        open={showNotifModal}
+        onClose={() => setShowNotifModal(false)}
+        user={user}
+        notifications={notifications}
+        setNotifications={setNotifications}
+        unreadNotifications={unreadNotifications}
+        readNotifications={readNotifications}
+        notifLoading={notifLoading}
+        setNotifLoading={setNotifLoading}
+        notifPage={notifPage}
+        setNotifPage={setNotifPage}
+        totalPages={totalPages}
+        handleDeleteNotification={handleDeleteNotification}
+      />
     </>
   );
 }

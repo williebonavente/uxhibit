@@ -45,5 +45,6 @@ export async function logout() {
     if (error) {
         return { error: error.message || "Logout failed"};
     }
-    return { error: null}
+    // Redirect to login or home after logout
+    redirect('/auth/login');
 }

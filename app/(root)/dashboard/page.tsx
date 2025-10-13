@@ -3,7 +3,6 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import DesignsGallery from "@/components/designs-gallery";
 
-// Ensure per-user fresh data (already dynamic)
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
@@ -19,20 +18,23 @@ export default async function Dashboard() {
   const supabase = await createClient();
 
   const { data: auth, error: authError } = await supabase.auth.getUser();
-  if (authError || !auth?.user) redirect("/auth/login"); // keep path consistent
+  if (authError || !auth?.user) redirect("/auth/login");
 
   const userId = auth.user.id;
 
   // Fetch the profile row for this user only
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, full_name, avatar_url, bio")
+    .select("id, first_name, middle_name, last_name, avatar_url, bio")
     .eq("id", userId)
     .single();
 
-  // Fallbacks from auth.user.user_metadata if row missing
+
+  // Compose fullName from new columns, fallback to user_metadata if needed
   const fullName =
-    profile?.full_name ||
+    (profile
+      ? [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(" ")
+      : undefined) ||
     (auth.user.user_metadata.full_name as string | undefined) ||
     (auth.user.user_metadata.username as string | undefined) ||
     "User";
@@ -66,7 +68,7 @@ export default async function Dashboard() {
           </p>
         </div>
         <div className="user-card hidden sm:flex items-center gap-3 sm:gap-4 bg-white/5 rounded-xl p-2 sm:p-3 backdrop-blur supports-[backdrop-filter]:bg-white/10">
-          <Avatar className="h-24 w-24 sm:h-14 sm:w-14 md:h-16 md:w-16 rounded-bl-full shrink-0">
+          <Avatar className="h-24 w-24 sm:h-14 sm:w-14 md:h-16 md:w-16 rounded-bl-full">
             <AvatarImage
               src={
                 avatarUrl
@@ -93,7 +95,7 @@ export default async function Dashboard() {
 
         {/* Mobile */}
         <div className="user-card-mobile sm:hidden flex flex-col items-center gap-2">
-          <Avatar className="h-19 w-19 rounded-bl-full shrink-0">
+          <Avatar className="h-19 w-19 rounded-bl-full">
             <AvatarImage
               src={
                 avatarUrl
@@ -116,10 +118,9 @@ export default async function Dashboard() {
       </div>
 
       <div className="border-b-2 p-2">
-        <h1 className="text-xl font-medium">My Works</h1>
+        <h1 className="text-2xl font-medium">My Works</h1>
       </div>
-
-      <DesignsGallery />
+      <DesignsGallery profileId={profile?.id} isOwnProfile={true}/>
     </div>
   );
 }

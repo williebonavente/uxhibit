@@ -1,11 +1,12 @@
 import { createClient } from "@/utils/supabase/client";
 import { NextResponse } from "next/server";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
-export async function GET(_req: Request, { params }: Params) {
+export async function GET(_req: Request, props: Params) {
+    const params = await props.params;
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { } = await supabase.auth.getUser();
     const { id } = params;
     const { data, error } = await supabase
         .from("design_versions")
@@ -16,9 +17,10 @@ export async function GET(_req: Request, { params }: Params) {
     return NextResponse.json({ versions: data });
 }
 
-export async function POST(req: Request, { params }: Params) {
+export async function POST(req: Request, props: Params) {
+    const params = await props.params;
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { } = await supabase.auth.getUser();
     try {
         const { id } = params;
         const { owner_id, file_key, node_id, thumbnail_url, snapshot, ai } = await req.json();
@@ -48,9 +50,23 @@ export async function POST(req: Request, { params }: Params) {
             })
             .select("*")
             .single();
-        if (vErr) return NextResponse.json({ error: vErr.message }, { status: 400 });
+        if (vErr) {
+            console.error("Error inserting version:", vErr);
+            return NextResponse.json({
+                error: "Failed to create new version. Please try again."
+            }, { status: 400 });
+        }
 
-        await supabase.from("designs").update({ current_version_id: ver.id }).eq("id", id);
+
+        // Update current version
+        const { error: updateErr } = await supabase
+            .from("designs")
+            .update({ current_version_id: ver.id })
+            .eq("id", id);
+
+        if (updateErr) {
+            console.error("Error updating current version:", updateErr);
+        }
 
         return NextResponse.json({ version: ver });
     } catch (e: any) {
