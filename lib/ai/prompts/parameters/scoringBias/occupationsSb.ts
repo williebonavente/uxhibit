@@ -1,4 +1,4 @@
-export const occupationsSb = `{
+export const occupationsSb = {
   "Student": {
     "justification": "Students often prioritize clarity, guided exploration, and learnability. According to Nielsen Norman Group (2020) and ISO 9241-210 (2019), novice users benefit from visible navigation cues and consistent feedback. Therefore, scoring favors error prevention (Heuristic 05) and help/documentation (Heuristic 10)."
   },
@@ -14,4 +14,4 @@ export const occupationsSb = `{
   "Educator": {
     "justification": "Educators value accessibility, instructional clarity, and content hierarchy. Studies (W3C, 2021; ISO 9241-171) demonstrate that accessible information design enhances comprehension. Accessibility and error recovery (Heuristic 09) have increased weighting in scoring."
   }
-}`
+}

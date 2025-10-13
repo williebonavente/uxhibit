@@ -1,4 +1,4 @@
-export const occupationParams = `{
+export const occupationParams = {
     "Student": {
         "description": "Learners requiring intuitive, guided, and supportive digital environments with strong visual structure.",
         "ux_expectations": [
@@ -133,4 +133,4 @@ export const occupationParams = `{
         },
         "evaluation_focus": "Reward inclusivity, content legibility, and instructional usability."
     }
-};`
+};

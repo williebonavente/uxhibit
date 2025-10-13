@@ -7,6 +7,10 @@ import { genSegmentSb } from "./prompts/parameters/scoringBias/genSegmentSb";
 import { occupationsSb } from "./prompts/parameters/scoringBias/occupationsSb";
 import { calculateAIWeightedScoreWithHeuristics } from "../scoringMethod/calculateAIWeightedScoreWithHeuristics";
 import { Generation, Occupation } from "../scoringMethod/evaluationWeights";
+import { mapToIso9241 } from "../uxStandards/isoNielsenMapping";
+import { HeuristicScores } from "../types/isoTypesHeuristic";
+import { AccessibilityResult, LayoutResult, NormalizedFrame } from "../uxStandards/heuristicMapping";
+
 
 export type AiEvaluator = {
     overall_score: number;
@@ -19,19 +23,33 @@ export type AiEvaluator = {
         suggestion: string
     }[];
     category_scores: {
-        accessibility?: number; typography?: number; color?: number;
-        layout?: number; hierarchy?: number; usability?: number;
+        accessibility?: number;
+        typography?: number;
+        color?: number;
+        layout?: number;
+        hierarchy?: number;
+        usability?: number;
     };
 };
 
 const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY;
+
 export async function aiEvaluator(
     imageUrl: string,
     heuristics: Record<string, number>,
+    context: {
+        accessibilityResults?: AccessibilityResult[];
+        layoutResults?: LayoutResult[];
+        textNodes?: any;
+        persona?: { generation?: string; occupation?: string };
+    },
     snapshot?: Record<string, unknown>): Promise<AiEvaluator | null> {
     if (!MISTRAL_API_KEY) return null;
 
     const client = new Mistral({ apiKey: MISTRAL_API_KEY });
+    const limitedFrames = Array.isArray(context?.layoutResults)
+    ? context.layoutResults.slice(0, 5)
+    : [];
 
     // TODO: currently working on
     //     const prompt = `${aiIntroPrompt}
@@ -49,93 +67,107 @@ export async function aiEvaluator(
     //     ${evaluatorReturnValues}
     // `;
 
-    const prompt = `
-${aiIntroPrompt}
 
-Context:
-- Heuristic data: ${JSON.stringify(heuristics, null, 2)}
-${snapshot ? `- Persona context: ${JSON.stringify(snapshot, null, 2)}` : ""}
-
-Instructions:
-You are an AI UX Evaluation Engine aligned with ISO 9241-210, WCAG 2.1, and Jakob Nielsen's 10 Usability Heuristics.
-Your evaluation process must simulate the scoring logic and bias adjustments used in the system's quantitative model.
-
-Follow these steps:
-
-1. **Apply Weighted Scoring Logic**
-   Use the following computational reference:
-   \`\`\`ts
-   import { calculateAIWeightedScoreWithHeuristics } from "../core/scoring/calculateAIWeightedScoreWithHeuristics";
-   const result = calculateAIWeightedScoreWithHeuristics(heuristics, generation, occupation);
-   \`\`\`
-   - Compute weighted heuristic category averages.
-   - Apply demographic adjustments from GenSegment and Occupation bias justifications.
-   - Output category-level scores and overall weighted average.
-
-2. **Reference Demographic and Occupational Biases**
-   - Generational Segment Parameters: ${genSegmentParams}
-   - Occupational Parameters: ${occupationParams}
-   - Bias Justifications:
-     - Generational: ${genSegmentSb}
-     - Occupational: ${occupationsSb}
-
-3. **Base all explanations and scores on the following evaluation basis:**
-   ${evaluatorReturnValues}
-
-4. **Output Requirements**
-   You must return ONLY valid JSON in the format below.
-   The scores must reflect your quantitative logic and should NEVER be arbitrary. 
-   Explain in the summary why the score distribution makes sense given the persona and heuristic mapping.
-
-Return ONLY valid JSON:
-\`\`\`json
-{
-  "overall_score": number (0-100),
-  "summary": string,
-  "strengths": string[],
-  "weaknesses": string[],
-  "issues": [
+    const prompt = `${aiIntroPrompt}
+    Context:
+    - Heuristic data: ${JSON.stringify(heuristics, null, 2)}
+    - Frame analysis: ${JSON.stringify(limitedFrames, null, 2)}
+    ${snapshot ? `- Persona context: ${JSON.stringify(snapshot, null, 2)}` : ""}
+    
+    Instructions:
+    You are an AI UX Evaluation Engine aligned with ISO 9241-210, WCAG 2.1, and Jakob Nielsen's 10 Usability Heuristics.
+    Your evaluation process must simulate the scoring logic and bias adjustments used in the system's quantitative model.
+    
+    **IMPORTANT:** The scoring and feedback MUST be influenced by the persona parameters provided (generation/age and occupation). 
+    - If a persona is provided, use the matching generational segment parameters and scoring biases below to inform your evaluation and scoring.
+    - For example, if the persona is "Gen Z", apply the expectations and scoring biases for Gen Z. If the occupation is "Designer", adjust the scoring and feedback to reflect designer-specific needs and standards.
+    
+    Follow these steps:
+    
+    1. **Apply Weighted Scoring Logic**
+       Use the following computational reference:
+       \`\`\`ts
+       import { calculateAIWeightedScoreWithHeuristics } from "../core/scoring/calculateAIWeightedScoreWithHeuristics";
+       const result = calculateAIWeightedScoreWithHeuristics(heuristics, generation, occupation);
+       \`\`\`
+       - Compute weighted heuristic category averages.
+       - Apply demographic adjustments from GenSegment and Occupation bias justifications.
+       - Output category-level scores and overall weighted average.
+    
+    2. **Reference Demographic and Occupational Biases**
+       - Generational Segment Parameters: ${genSegmentParams}
+       - Occupational Parameters: ${occupationParams}
+       - Bias Justifications:
+         - Generational: ${genSegmentSb}
+         - Occupational: ${occupationsSb}
+    
+    3. **Base all explanations and scores on the following evaluation basis:**
+       ${evaluatorReturnValues}
+    
+    4. **Use the provided frame analysis and issues to inform your summary, strengths, weaknesses, and suggestions. 
+    Reference specific issues, scores, and text nodes in your feedback. Make recommendations that address the actual problems detected in the metadata.**
+    
+    5. **Output Requirements**
+       You must return ONLY valid JSON in the format below.
+       The scores must reflect your quantitative logic and should NEVER be arbitrary. 
+       Explain in the summary why the score distribution makes sense given the persona and heuristic mapping.
+    
+    Return ONLY valid JSON:
+    \`\`\`json
     {
-      "id": string,
-      "heuristic": string,
-      "severity": "low|medium|high",
-      "message": string,
-      "suggestion": string
+      "overall_score": number (0-100),
+      "summary": string,
+      "strengths": string[],
+      "weaknesses": string[],
+      "issues": [
+        {
+          "id": string,
+          "heuristic": string,
+          "severity": "low|medium|high",
+          "message": string,
+          "suggestion": string
+        }
+      ],
+      "category_scores": {
+        "accessibility": number,
+        "typography": number,
+        "color": number,
+        "layout": number,
+        "hierarchy": number,
+        "usability": number
+      },
+      "resources": [
+        {
+          "issue_id": string,
+          "title": string,
+          "url": string,
+          "description": string
+        }
+      ]
     }
-  ],
-  "category_scores": {
-    "accessibility": number,
-    "typography": number,
-    "color": number,
-    "layout": number,
-    "hierarchy": number,
-    "usability": number
-  },
-  "resources": [
-    {
-      "issue_id": string,
-      "title": string,
-      "url": string,
-      "description": string
-    }
-  ]
-}
-\`\`\`
-`;
-
+    \`\`\`
+    - Avoid generic feedback. Always reference the actual scores, issues, and text nodes provided.
+    - Example: If a layout issue is detected, specify the node and the problem.
+    `;
     const heuristicMap = heuristics;
-
-    const generation = snapshot?.age as Generation; // "Millennial", "Gen Z", "Gen Alpha"
-    const occupation = snapshot?.occupation as Occupation; // "Student", "Developer", etc.
+    const generation = snapshot?.age as Generation;
+    const occupation = snapshot?.occupation as Occupation;
 
 
     const result = calculateAIWeightedScoreWithHeuristics(heuristicMap, generation, occupation);
 
-    console.log(result);
-    // {
+    const heuristicScores: HeuristicScores = {
+        layout: heuristics.layout ?? 0,
+        typography: heuristics.typography ?? 0,
+        color: heuristics.color ?? 0,
+        accessibility: heuristics.accessibility ?? 0,
+        usability: heuristics.usability ?? 0
+    };
 
-    // Don't overlook the backtick
-    // TODO: Currently working on
+    const isoScores = mapToIso9241(heuristicScores);
+
+    console.log(result);
+
     try {
         const completion = await client.chat.complete({
             model: 'pixtral-12b',
@@ -144,9 +176,13 @@ Return ONLY valid JSON:
                 {
                     role: "user",
                     content: [
-                        { type: "text", text: prompt },
-                        { type: "image_url", imageUrl: { url: imageUrl } }
-                    ]
+                        {
+                            type: "text", text: prompt
+                        },
+                        {
+                            type: "image_url", imageUrl: { url: imageUrl }
+                        }
+                    ],
                 },
             ],
         });
@@ -156,7 +192,11 @@ Return ONLY valid JSON:
             typeof msg?.content === "string"
                 ? msg.content
                 : Array.isArray(msg?.content)
-                    ? (msg.content.find((p: any) => p.type === "text")?.text as string | undefined)
+                    ? (
+                        msg.content.find(
+                            (p) => p.type === "text" && "text" in p
+                        ) as { type: "text"; text: string } | undefined
+                    )?.text
                     : undefined;
         if (!contentStr) return null;
 
@@ -185,6 +225,7 @@ Return ONLY valid JSON:
             weaknesses: [],
             issues: [],
             category_scores: {},
+            iso_scores: isoScores,
         } as AiEvaluator;
     } catch (err: unknown) {
         console.log(err);

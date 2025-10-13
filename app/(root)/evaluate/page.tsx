@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+// import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { FrameCarousel } from "@/components/carousel/frame-carousel";
@@ -29,7 +29,7 @@ export default function Evaluate() {
       "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='22' stroke='%23ffffff' fill='none' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 3l7 17 2-7 7-2-16-8Z'/></svg>\") 3 3, pointer",
   };
 
-  const router = useRouter();
+  // const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
   const supabase = createClient();
@@ -146,6 +146,10 @@ export default function Evaluate() {
       const saved = await saveRes.json();
       console.log("Design save response:", saved);
 
+      // Set jobId for progress polling
+      setJobId(saved.jobId || saved.ai_evaluation?.jobId);
+
+
       if (!saveRes.ok || !saved?.design?.id) {
         toast.error(saved?.error || "Save failed");
         return;
@@ -203,6 +207,24 @@ export default function Evaluate() {
     setSubmitting(false);
     setParsing(false);
   }
+
+  useEffect(() => {
+    if (!jobId) return;
+    const interval = setInterval(async () => {
+      const res = await fetch(`/api/ai/evaluate/progress?jobId=${jobId}`);
+      const data = await res.json();
+      setProgress(data.progress);
+      if (data.progress >= 100) {
+        clearInterval(interval);
+        // Redirect to the evaluated design page using savedDesignId
+        if (savedDesignId) {
+          router.push(`/designs/${savedDesignId}`);
+        }
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [jobId, savedDesignId, router]);
+
 
   return (
     <div
@@ -536,7 +558,15 @@ export default function Evaluate() {
                     />
                   </div>
                 ) : (
-                  <div className="text-muted text-sm">No preview available</div>
+                  <div className={cn(
+                    "flex items-center gap-2 text-sm italic",
+                    "text-muted-foreground"
+                  )}>
+                    <AlertCircle className="h-4 w-4" />
+                    <span>Preview not available — let your imagination fill the gap.</span>
+                  </div>
+
+
                 )}
               </div>
             </div>

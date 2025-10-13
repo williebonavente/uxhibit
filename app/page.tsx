@@ -22,7 +22,7 @@ export default function Home() {
     fetch("/api/ux_averages")
       .then(res => res.json())
       .then(data => {
-        console.log("Average UX Ratings:", data);
+        // console.log("Average UX Ratings:", data);
       });
   }, []);
   return (

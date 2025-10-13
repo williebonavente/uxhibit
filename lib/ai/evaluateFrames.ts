@@ -1,4 +1,6 @@
 import { AiEvaluator, aiEvaluator } from "@/lib/ai/aiEvaluator";
+import { getHeuristicScores } from "../uxStandards/heuristicMapping";
+import { AuthError, SupabaseClient, User } from "@supabase/supabase-js";
 
 export async function evaluateFrames({
   frameIds,
@@ -58,10 +60,17 @@ export async function evaluateFrames({
   );
 
 
-  const heuristics = {};
   if (authError || !user) {
     throw new Error('Unauthorized - user not found');
   }
+  // Instead of using an image URL:
+  const figmaFileUrl = options.figmaFileUrl; // Make sure this is passed in EvaluateFramesOptions
+
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+  const res = await fetch(`${baseUrl}/api/figma/parse?url=${encodeURIComponent(figmaFileUrl)}`);
+  const figmaContext = await res.json();
+  console.log(figmaContext);
+  const heuristics = getHeuristicScores(figmaContext);
 
   const frameResults: any[] = await Promise.all(
     frameIds.map(async (nodeId, index) => {
@@ -126,6 +135,7 @@ export async function evaluateFrames({
   const summary = `Aggregate summary: ${validResults.map(r => r.ai?.summary).join(" | ")}`;
 
   return {
+    jobId,
     frameResults,
     validResults,
     total_score,

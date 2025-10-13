@@ -9,14 +9,17 @@ export async function POST(req: Request) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      console.log("Unauthorized user");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const body = await req.json();
     const { title, figma_link, file_key, node_id, thumbnail_url, snapshot, evaluate = true } = body;
 
-    if (!title) return NextResponse.json({ error: "title is required" }, { status: 400 });
-    if (!figma_link) return NextResponse.json({ error: "figma_link is required" }, { status: 400 });
+    console.log("Received design submission:", { title, figma_link, file_key, node_id });
 
+    // Check for existing design
     const { data: existing, error: existErr } = await supabase
       .from("designs")
       .select("id,title")
@@ -24,8 +27,14 @@ export async function POST(req: Request) {
       .eq("figma_link", figma_link)
       .eq("file_key", file_key)
       .maybeSingle();
-    if (existErr && existErr.code !== "PGRST116")
+
+    if (existErr && existErr.code !== "PGRST116") {
+      console.error("Error checking existing design:", existErr.message);
       return NextResponse.json({ error: existErr.message }, { status: 400 });
+    }
+
+    let designId;
+    let storedThumbnail = thumbnail_url || null;
 
     // EXISTING DESIGN
     if (existing?.id) {
@@ -35,7 +44,7 @@ export async function POST(req: Request) {
         thumbnailPromise = uploadThumbnailFromUrl(
           supabase as any,
           thumbnail_url,
-          existing.id,
+          designId,
           { makePublic: false }
         );
       }
@@ -124,9 +133,9 @@ export async function POST(req: Request) {
           },
           body: JSON.stringify({
             url: figma_link,
-            designId: design.id,
+            designId,
             nodeId: node_id,
-            thumbnailUrl: storedThumbnail,
+            thumbnail_url: storedThumbnail,
             snapshot
           })
         });
@@ -147,17 +156,22 @@ export async function POST(req: Request) {
       if (thumbErr) console.error("Error updating thumbnail:", thumbErr);
     }
 
+    // Final response
     return NextResponse.json({
       design: {
-        ...design,
+        id: designId,
+        title,
+        figma_link,
         thumbnail_url: storedThumbnail,
-        figma_link
       },
       existed: false,
       ai_evaluation: "processing", // Indicate processing
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Server error:", e);
-    return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });
+    const errorMessage = typeof e === "object" && e !== null && "message" in e
+      ? (e as { message?: string }).message
+      : "Server error";
+    return NextResponse.json({ error: errorMessage || "Server error" }, { status: 500 });
   }
 }

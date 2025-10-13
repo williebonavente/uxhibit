@@ -36,14 +36,12 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     
         if (user) {
-      // Try to get the profile
       const { data: profile } = await supabase
         .from("profiles")
         .select("id, username, first_name, middle_name, last_name")
         .eq("id", user.id)
         .single();
     
-      // If profile does not exist or username is empty, create/set it
       if (!profile || !profile.username) {
         // Get the full name from user metadata
         const fullname =
@@ -89,8 +87,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/auth/processing', requestUrl.origin));
   } catch (error) {
     console.error('Auth callback error:', error);
-    console.log('Redirecting to /dashboard due to error');
   } finally {
-    console.log('--- Figma OAuth Callback End ---');
   }
 }

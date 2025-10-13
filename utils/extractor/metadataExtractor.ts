@@ -1,11 +1,11 @@
-import { 
-    FigmaNode, 
-    TextNode, 
-    RGBA, 
-    FrameNode, 
-    ShapeNode,
-    FigmaNodesResponse,
-    NormalizedDocument
+import {
+  FigmaNode,
+  TextNode,
+  RGBA,
+  FrameNode,
+  ShapeNode,
+  FigmaNodesResponse,
+  NormalizedDocument
 } from "@/lib/declaration/figmaInfo";
 
 export function extractColor(node: FigmaNode): RGBA | null {
@@ -23,10 +23,9 @@ export function extractColor(node: FigmaNode): RGBA | null {
     const solid = node.background.find(b => b.type === "SOLID");
     if (solid && solid.color) return solid.color as RGBA;
   }
-  
-  return null; // nothing found
-}
 
+  return null;
+}
 
 export function extractTextNode(node: FigmaNode): TextNode | null {
   if (node.type !== "TEXT" || !node.characters || !node.style) return null;
@@ -45,18 +44,28 @@ export function extractTextNode(node: FigmaNode): TextNode | null {
 export function extractFrame(node: FigmaNode): FrameNode | null {
   if (node.type !== "FRAME" || !node.absoluteBoundingBox) return null;
 
-  const children = (node.children ?? []).map(child => {
-    if (child.type === "TEXT") return extractTextNode(child);
+  // Recursively extract all text nodes and shapes
+  const children: (TextNode | ShapeNode)[] = [];
+
+  function traverse(child: FigmaNode) {
+    if (child.type === "TEXT") {
+      const textNode = extractTextNode(child);
+      if (textNode) children.push(textNode);
+    }
     if (["RECTANGLE", "ELLIPSE"].includes(child.type)) {
-      return {
+      children.push({
         id: child.id,
         type: child.type as "RECTANGLE" | "ELLIPSE",
         color: extractColor(child)!,
         boundingBox: child.absoluteBoundingBox!,
-      } as ShapeNode;
+      });
     }
-    return null;
-  }).filter(Boolean) as (TextNode | ShapeNode)[];
+    if (child.children) {
+      child.children.forEach(traverse);
+    }
+  }
+
+  if (node.children) node.children.forEach(traverse);
 
   return {
     id: node.id,
@@ -80,6 +89,7 @@ export function normalizeDocument(raw: FigmaNodesResponse): NormalizedDocument {
 export function extractTextNodes(root: FigmaNode): TextNode[] {
   const results: TextNode[] = [];
   function traverse(node: FigmaNode) {
+    // console.log("Traversing node:", node.type, node.name || node.id);
     if (node.type === "TEXT" && node.characters) {
       results.push({
         id: node.id,
@@ -100,7 +110,6 @@ export function extractTextNodes(root: FigmaNode): TextNode[] {
   return results;
 }
 
-
 export function getFrameTextNodes(frameMetadata: Record<string, any>): Record<string, TextNode[]> {
   const result: Record<string, TextNode[]> = {};
 
@@ -119,13 +128,11 @@ export function getEffectiveBackgroundColor(
   siblings: (TextNode | ShapeNode)[],
   frameBg: RGBA
 ): RGBA {
-  // Ensure text has a bounding box
   if (!text.boundingBox) return frameBg;
 
   const { x, y, width, height } = text.boundingBox;
   const textCenter = { cx: x + width / 2, cy: y + height / 2 };
 
-  // Traverse from last to first (Figma’s topmost render order)
   for (let i = siblings.length - 1; i >= 0; i--) {
     const node = siblings[i];
     if ("type" in node && (node.type === "RECTANGLE" || node.type === "ELLIPSE")) {
@@ -145,6 +152,5 @@ export function getEffectiveBackgroundColor(
     }
   }
 
-  // No enclosing shape → fallback to frame background
   return frameBg;
 }

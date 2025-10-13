@@ -309,13 +309,14 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
                   console.error('Failed to clear current version:', updateError);
                   throw updateError;
                 }
+                
                 const { error: versionsError } = await supabase
                   .from("design_versions")
                   .delete()
                   .eq("design_id", id);
 
                 if (versionsError) {
-                  console.error('Failed to delete versions:', versionsError);
+                  console.error('Failed to delete versions:', versionsError.message);
                   throw versionsError;
                 }
 
