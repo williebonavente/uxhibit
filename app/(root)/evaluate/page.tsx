@@ -738,7 +738,6 @@ export default function Evaluate() {
 
         {step === 4 && (
           <div>
-            <h2 className="text-lg font-semibold mb-4">Evaluated Frames</h2>
             {evaluatedFrames.length < expectedFrameCount ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <Image
@@ -749,29 +748,40 @@ export default function Evaluate() {
                   className="object-contain mb-4"
                   priority
                 />
-                <div className="w-full max-w-md mb-4">
-                  <div className="relative h-4 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className="absolute left-0 top-0 h-4 bg-gradient-to-r from-orange-400 to-[#ED5E20] transition-all"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                  <div className="text-center text-sm mt-2 text-gray-600">
-                    {evaluatedFrames.length} / {expectedFrameCount} frames evaluated
-                  </div>
+                <div className="text-center text-lg font-semibold text-[#ED5E20] mb-2">
+                  Evaluating your design...
                 </div>
-                <p className="text-gray-500 text-sm mb-2">
-                  AI evaluation in progress. Please wait...
+                <div className="flex items-center justify-center mt-4">
+                  <span className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#ED5E20]" />
+                </div>
+                <p className="text-gray-500 text-sm mt-4">
+                  Please wait while AI evaluates all frames.
                 </p>
+                <div className="text-center text-sm mt-2 text-gray-600">
+                  {evaluatedFrames.length} / {expectedFrameCount} frames evaluated
+                </div>
               </div>
             ) : (
-              <ul>
-                {evaluatedFrames.map((frame, idx) => (
-                  <li key={`${frame.nodeId ?? 'frame'}-${idx}`}>
-                    Frame {idx + 1}: {frame.ai?.summary || "No summary"}
-                  </li>
-                ))}
-              </ul>
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="text-center text-2xl font-bold text-[#ED5E20] mb-4">
+                  🎉 All frames successfully evaluated!
+                </div>
+                <ul className="w-full max-w-lg mx-auto space-y-4">
+                  {evaluatedFrames.map((frame, idx) => (
+                    <li
+                      key={`${frame.nodeId ?? 'frame'}-${idx}`}
+                      className="bg-white dark:bg-neutral-800 rounded-lg shadow p-4 flex flex-col"
+                    >
+                      <div className="font-semibold text-[#ED5E20] mb-1">
+                        Frame {idx + 1}
+                      </div>
+                      <div className="text-sm text-gray-700 dark:text-gray-300">
+                        {frame.ai?.summary || "No summary"}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         )}

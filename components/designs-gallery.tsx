@@ -340,12 +340,7 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
                     designTitle: design?.title
                   }, deleteError.message);
                   toast.error(`Delete failed: ${deleteError.message}`);
-                } else {
-                  console.log('Design, versions, and files deleted successfully:', {
-                    designId: id,
-                    designTitle: design?.title,
-                    deletedFiles: storagePaths
-                  });
+                } else { 
                   setDesigns((d) => d.filter((x) => x.id !== id));
                   toast.success("Design deleted successfully");
                 }
