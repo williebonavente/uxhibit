@@ -167,7 +167,7 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                                     <th className="p-2 border">Score</th>
                                     <th className="p-2 border">AI Summary</th>
                                     <th className="p-2 border">Parameter</th>
-                                    <th className="p-2 border">Thumbnail</th>
+                                    {/* <th className="p-2 border">Thumbnail</th> */}
                                     <th className="p-2 border">Evaluated at</th>
                                     <th className="p-2 border text-center">Delete</th>
                                 </tr>
@@ -309,7 +309,7 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                                                 </td>
 
                                                 {/*THUMBNAIL*/}
-                                                <td className="p-2 border text-gray-700 dark:text-gray-200">
+                                                {/* <td className="p-2 border text-gray-700 dark:text-gray-200">
                                                     {v.thumbnail_url && v.thumbnail_url.startsWith("http") ? (
                                                         <Image src={v.thumbnail_url} alt="thumb"
                                                             width={70}
@@ -318,7 +318,7 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                                                     ) : (
                                                         "-"
                                                     )}
-                                                </td>
+                                                </td> */}
 
                                                 {/*EVALUATION TIME*/}
                                                 <td className="p-2 border text-gray-700 dark:text-gray-200 text-center">{v.created_at ? new Date(v.created_at).toLocaleString() : "-"}</td>

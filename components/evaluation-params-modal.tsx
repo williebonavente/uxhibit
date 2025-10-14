@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { Input } from "./ui/input";
 import {
   Select,
   SelectTrigger,
@@ -9,9 +8,9 @@ import {
 } from "@/components/ui/select";
 
 type EvaluationParams = {
-  scale?: number;
   occupation?: string;
   generation: string;
+  frameIds?: string[];
 };
 
 type EvaluationParamsModalProps = {
@@ -28,33 +27,32 @@ export default function EvaluationParamsModal({
   initialParams,
 }: EvaluationParamsModalProps) {
 
-  const [scale, setScale] = useState(initialParams.scale || 3);
   const [occupation, setOccupation] = useState(initialParams.occupation || "");
   const [generation, setGeneration] = useState(initialParams.generation || "");
   const [touched, setTouched] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setScale(initialParams.scale || 3);
       setOccupation(initialParams.occupation || "");
       setGeneration(initialParams.generation || "");
       setTouched(false);
     }
   }, [open, initialParams]);
 
-  const isValid = occupation && generation && scale >= 1 && scale <= 5;
+  const isValid = occupation && generation;
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setTouched(true);
     if (!isValid) return;
-    onSubmit({ ...initialParams, scale, occupation, generation });
+    console.log("[EvaluationParamsModal] frameIds being submitted:", initialParams.frameIds);
+    onSubmit({ ...initialParams, occupation, generation });
   }
 
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <form
+      <form
         onSubmit={handleSubmit}
         className="relative flex flex-col w-full max-w-sm sm:max-w-md md:max-w-lg
           p-6 sm:p-8 md:p-10
@@ -108,7 +106,7 @@ export default function EvaluationParamsModal({
               <span className="text-xs text-red-500 mt-2">Please select a generation.</span>
             )}
           </label>
-      
+
           {/* Occupation */}
           <label className="group relative flex flex-col rounded-xl bg-neutral-100 dark:bg-neutral-800/60 p-5 transition-colors focus-within:ring-1 focus-within:ring-[#ED5E20]/70 focus-within:border-[#ED5E20] border text-left">
             <span className="text-[15px] font-semibold text-[#ED5E20] mb-2">
@@ -149,9 +147,9 @@ export default function EvaluationParamsModal({
               <span className="text-xs text-red-500 mt-2">Please select an occupation.</span>
             )}
           </label>
-      
+
           {/* Scale */}
-          <label className="group relative flex flex-col rounded-xl bg-neutral-100 dark:bg-neutral-800/60 p-5 transition-colors focus-within:ring-1 focus-within:ring-[#ED5E20]/70 focus-within:border-[#ED5E20] border text-left">
+          {/* <label className="group relative flex flex-col rounded-xl bg-neutral-100 dark:bg-neutral-800/60 p-5 transition-colors focus-within:ring-1 focus-within:ring-[#ED5E20]/70 focus-within:border-[#ED5E20] border text-left">
             <span className="text-[15px] font-semibold text-[#ED5E20] mb-2">
               Scale
             </span>
@@ -181,7 +179,7 @@ export default function EvaluationParamsModal({
             {touched && (scale < 1 || scale > 5) && (
               <span className="text-xs text-red-500 mt-2">Scale must be between 1 and 5.</span>
             )}
-          </label>
+          </label> */}
         </fieldset>
         <div className="flex flex-col sm:flex-row justify-center gap-4">
           <button

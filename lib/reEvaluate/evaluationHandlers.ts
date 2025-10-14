@@ -6,7 +6,7 @@ let pollInterval: NodeJS.Timeout | null = null;
 
 export async function handleEvaluateWithParams(
   params: EvaluateInput,
-  design: any,
+  design: Design,
   setLoadingEval: Dispatch<SetStateAction<boolean>>,
   setEvalError: Dispatch<SetStateAction<string | null>>,
   setEvalResult: Dispatch<SetStateAction<EvalResponse | null>>,
@@ -23,7 +23,6 @@ export async function handleEvaluateWithParams(
   setExpectedFrameCount(params.frameIds ? params.frameIds.length : 0);
   setEvaluatedFramesCount(0);
 
-  // Clear any previous interval (use global pollInterval)
   if (pollInterval) {
     console.log("[handleEvaluateWithParams] Clearing previous pollInterval");
     clearInterval(pollInterval);
@@ -36,7 +35,7 @@ export async function handleEvaluateWithParams(
     try {
       const supabase = createClient();
 
-      const currentVersionId = params.versionId; // Use the new versionId from backend
+      const currentVersionId = params.versionId;
       console.log("[Polling] Using currentVersionId:", currentVersionId);
 
       const { data: frameData, error: pollError } = await supabase
@@ -50,7 +49,9 @@ export async function handleEvaluateWithParams(
       }
       console.log("[Polling] frameData:", frameData);
 
-      const count = (frameData || []).filter(f => f.id !== "overallFrame").length;
+      const count = Array.isArray(frameData)
+        ? frameData.filter((f: { id: string }) => f.id !== "overallFrame").length
+        : 0;
       setEvaluatedFramesCount(count);
       console.log(`[Polling] Evaluated frames: ${count} / ${params.frameIds ? params.frameIds.length : 0}`);
       if (count >= (params.frameIds ? params.frameIds.length : 0)) {
@@ -59,10 +60,14 @@ export async function handleEvaluateWithParams(
         setTimeout(async () => {
           setLoadingEval(false);
           await fetchEvaluations();
-        }, 2000); 
+        }, 2000);
       }
     } catch (err) {
-      console.error("[Polling] Error during polling:", err);
+      if (err instanceof Error) {
+        console.error("[Polling] Error during polling:", err.message);
+      } else {
+        console.error("[Polling] Unknown error during polling:", err);
+      }
     } finally {
       isPolling = false;
     }
@@ -72,16 +77,32 @@ export async function handleEvaluateWithParams(
     console.log("[handleEvaluateWithParams] Calling evaluateDesign with params:", params);
     const evalResult = await evaluateDesign(params);
     console.log("[handleEvaluateWithParams] evaluateDesign result:", evalResult);
-  } catch (e: any) {
-    console.error("[handleEvaluateWithParams] Evaluation error:", e);
-    setEvalError(e.message || "Failed to evaluate");
+  } catch (e) {
+    if (e instanceof Error) {
+      console.error("[handleEvaluateWithParams] Evaluation error:", e.message);
+      setEvalError(e.message || "Failed to evaluate");
+    } else {
+      console.error("[handleEvaluateWithParams] Unknown evaluation error:", e);
+      setEvalError("Failed to evaluate");
+    }
     if (pollInterval) clearInterval(pollInterval);
     setLoadingEval(false);
   }
 }
+
 export async function handleEvalParamsSubmit(
-  params: any,
-  handleEvaluateWithParams: (...args: any[]) => Promise<void>,
+  params: Record<string, unknown>,
+  handleEvaluateWithParams: (
+    params: EvaluateInput,
+    design: Design,
+    setLoadingEval: Dispatch<SetStateAction<boolean>>,
+    setEvalError: Dispatch<SetStateAction<string | null>>,
+    setEvalResult: Dispatch<SetStateAction<EvalResponse | null>>,
+    setFrameEvaluations: Dispatch<SetStateAction<any[]>>,
+    setExpectedFrameCount: Dispatch<SetStateAction<number>>,
+    setEvaluatedFramesCount: Dispatch<SetStateAction<number>>,
+    fetchEvaluations: () => Promise<void>
+  ) => Promise<void>,
   design: Design,
   setLoadingEval: React.Dispatch<React.SetStateAction<boolean>>,
   setEvalError: React.Dispatch<React.SetStateAction<string | null>>,
@@ -91,46 +112,89 @@ export async function handleEvalParamsSubmit(
   setEvaluatedFramesCount: React.Dispatch<React.SetStateAction<number>>,
   fetchEvaluations: () => Promise<void>,
   setShowEvalParams: React.Dispatch<React.SetStateAction<boolean>>,
-  currentUserId: string,
 ) {
   console.log("[handleEvalParamsSubmit] Closing modal and starting evaluation");
   setShowEvalParams(false);
 
   const latestSnapshot = {
-    age: params.generation,
-    occupation: params.occupation,
+    age: typeof params.generation === "string" ? params.generation : "",
+    occupation: typeof params.occupation === "string" ? params.occupation : "",
   };
 
   console.log("[handleEvalParamsSubmit] Params for evaluation:", { ...params, snapshot: latestSnapshot });
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-  const response = await fetch(`${baseUrl}/api/start-evaluation`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      design_id: design.id,
-      created_by: currentUserId,
-    }),
-  });
+  setLoadingEval(true);
+  setEvalError(null);
 
-  const result = await response.json();
-  const versionId = result.versionId; // This is the new version's id
+  try {
+    // Call backend to create new version and get versionId
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+    const response = await fetch(`${baseUrl}/api/start-evaluation`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        design_id: design.id,
+        created_by: design.owner_id, // or pass currentUserId if available
+      }),
+    });
 
+    const result = await response.json();
+    const versionId = result.versionId;
 
-  await handleEvaluateWithParams(
-    {
-      ...params,
-      versionId,
-      snapshot: latestSnapshot,
-    },
-    design,
-    setLoadingEval,
-    setEvalError,
-    setEvalResult,
-    setFrameEvaluations,
-    setExpectedFrameCount,
-    setEvaluatedFramesCount,
-    fetchEvaluations
-  );
+    if (!versionId || typeof versionId !== "string") {
+      setEvalError("Failed to start evaluation: missing version ID.");
+      setLoadingEval(false);
+      return;
+    }
+
+    await handleEvaluateWithParams(
+      {
+        ...(params as EvaluateInput),
+        versionId,
+        snapshot: latestSnapshot,
+      },
+      design,
+      setLoadingEval,
+      setEvalError,
+      setEvalResult,
+      setFrameEvaluations,
+      setExpectedFrameCount,
+      setEvaluatedFramesCount,
+      fetchEvaluations
+    );
+
+    // Poll for job progress until completed
+    let done = false;
+    while (!done) {
+      try {
+        const progressRes = await fetch(`${baseUrl}/api/ai/evaluate/progress?jobId=${versionId}`);
+        const progressData = await progressRes.json();
+
+        setEvaluatedFramesCount(typeof progressData.progress === "number" ? progressData.progress : 0);
+        setExpectedFrameCount(100); // or use actual frame count if available
+
+        if (progressData.status === "completed" || progressData.status === "error") {
+          done = true;
+          setLoadingEval(false);
+          await fetchEvaluations();
+        } else {
+          await new Promise(res => setTimeout(res, 2000));
+        }
+      } catch (err) {
+        if (err instanceof Error) {
+          console.error("[Polling] Error during polling:", err.message);
+        } else {
+          console.error("[Polling] Unknown error during polling:", err);
+        }
+        setLoadingEval(false);
+        done = true;
+      }
+    }
+  } catch (e) {
+    if (e instanceof Error) {
+      setEvalError(e.message || "Failed to evaluate");
+    } else {
+      setEvalError("Failed to evaluate");
+    }
+    setLoadingEval(false);
+  }
 }
-
-

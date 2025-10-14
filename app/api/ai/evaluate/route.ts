@@ -76,13 +76,18 @@ export async function POST(req: Request) {
             .eq("id", designId)
             .maybeSingle();
         if (designRow?.thumbnail_url) finalThumbnailUrl = designRow.thumbnail_url;
-        console.log("[AI Evaluate] Fetched thumbnail from DB:", finalThumbnailUrl);
     }
 
-    console.log("[AI Evaluate] Snapshot value:", snapshot);
+    await supabase
+        .from("frame_evaluation_progress")
+        .insert({
+            job_id: versionId,
+            progress: 0,
+            status: "started",
+            user_id: user?.id,
+            created_at: new Date().toISOString(),
+        });
 
-    // Start evaluation synchronously
-    console.log("[AI Evaluate] Starting frame evaluation...");
     const { frameResults, total_score, summary } = await evaluateFrames({
         frameIds,
         frameImages,
@@ -94,12 +99,33 @@ export async function POST(req: Request) {
         authError,
         supabase,
         figmaFileUrl: url,
+        onProgress: async (current, total) => {
+            await supabase
+                .from("frame_evaluation_progress")
+                .update({
+                    progress: Math.round((current / total) * 100),
+                    status: "processing",
+                    updated_at: new Date().toISOString(),
+                })
+                .eq("job_id", versionId);
+        }
     });
 
+    await supabase
+        .from("frame_evaluation_progress")
+        .update({
+            progress: 100,
+            status: "completed",
+            updated_at: new Date().toISOString(),
+        }).eq("job_id", versionId);
+
     console.log("[AI Evaluate] Frame evaluation results:", { frameResults, total_score, summary });
+    console.log()
+
 
     await saveDesignVersion({
         supabase,
+        versionId,
         designId,
         fileKey,
         nodeId,

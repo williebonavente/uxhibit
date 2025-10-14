@@ -54,7 +54,8 @@ export async function POST(req: Request) {
         snapshot: snapshot || null,
         created_by,
         created_at: new Date().toISOString(),
-        total_score: total_score || null
+        total_score: total_score || null,
+        status: "pending",
       }])
       .select("id, version")
       .single();

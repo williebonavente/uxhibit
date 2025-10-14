@@ -1,4 +1,3 @@
-import { getNextVersion } from "@/database/actions/versions/versionHistory";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 type SaveDesignVersionParams = {
@@ -9,7 +8,7 @@ type SaveDesignVersionParams = {
   thumbnailUrl?: string;
   fallbackImageUrl?: string;
   summary: string;
-  frameResults: any;
+  frameResults: any[];
   total_score: number;
   snapshot?: any;
   user?: { id: string };
@@ -17,6 +16,7 @@ type SaveDesignVersionParams = {
 
 export async function saveDesignVersion({
   supabase,
+  versionId,
   designId,
   fileKey,
   nodeId,
@@ -27,74 +27,75 @@ export async function saveDesignVersion({
   total_score,
   snapshot,
   user,
-}: SaveDesignVersionParams) {
+}: SaveDesignVersionParams & { versionId?: string }) {
   try {
-    const nextVersion = await getNextVersion(supabase, designId);
-    const upsertPayload = {
-      design_id: designId,
-      file_key: fileKey,
-      node_id: nodeId,
-      thumbnail_url: thumbnailUrl || fallbackImageUrl,
-      ai_summary: summary,
-      ai_data: frameResults,
-      total_score,
-      snapshot: (() => {
-        if (!snapshot) return null;
-        if (typeof snapshot === "string") {
-          try { return JSON.parse(snapshot); } catch { return null; }
-        }
-        return snapshot;
-      })(),
-      created_at: new Date().toISOString(),
-      version: nextVersion,
-      created_by: user?.id
-    };
-    console.log("Upserting design version with payload: ", upsertPayload);
-    const { data } = await supabase.from("design_versions")
-      .insert(upsertPayload)
-      .select();
+    if (
+      !fileKey ||
+      typeof fileKey !== "string" ||
+      !nodeId ||
+      typeof nodeId !== "string" ||
+      !(thumbnailUrl || fallbackImageUrl) ||
+      !summary ||
+      typeof summary !== "string" ||
+      !frameResults ||
+      !Array.isArray(frameResults) ||
+      frameResults.length === 0 ||
+      typeof total_score !== "number" ||
+      !user?.id ||
+      !snapshot
+    ) {
+      console.error("Aborting save: Missing or invalid required fields.", {
+        fileKey, nodeId, thumbnailUrl, summary, frameResults, total_score, snapshot, user
+      });
+      return { error: "Missing or invalid required fields." };
+    }
 
-    const { data: versionRows, error: versionError } = await supabase
-      .from("design_versions")
-      .select("id")
-      .eq("design_id", designId)
-      .eq("version", nextVersion)
-      .maybeSingle();
+    let actualVersionId = versionId;
 
-    if (versionError || !versionRows) {
-      console.error("Failed to fetch new version id:", versionError);
-      return { error: versionError };
-    } else {
-      const versionId = versionRows.id;
-      for (const frame of frameResults) {
-        const { error: frameError } = await supabase
-          .from("design_frame_evaluations")
-          .insert({
-            design_id: designId,
-            version_id: versionId,
-            file_key: fileKey,
-            node_id: frame.node_id,
-            thumbnail_url: frame.thumbnail_url,
-            ai_summary: frame.ai?.summary || null,
-            ai_data: frame.ai,
-            ai_error: frame.ai_error,
-            created_at: new Date().toISOString(),
-            snapshot: (() => {
-              if (!snapshot) return null;
-              if (typeof snapshot === "string") {
-                try { return JSON.parse(snapshot); } catch { return null; }
-              }
-              return snapshot;
-            })(),
-            owner_id: user?.id
-          });
-        if (frameError) {
-          console.error("Error inserting frame evaluation:", frameError);
-        }
-
-        console.log("Inserting frame evaluation with payload:", {
+    // If no versionId, create a new version record (first time)
+    if (!actualVersionId) {
+      const { data: versionInsert, error: versionInsertError } = await supabase
+        .from("design_versions")
+        .insert({
           design_id: designId,
-          version_id: versionId,
+          file_key: fileKey,
+          node_id: nodeId,
+          thumbnail_url: thumbnailUrl || fallbackImageUrl,
+          status: "pending",
+          created_by: user?.id,
+          created_at: new Date().toISOString(),
+          version: 1 // or use your getNextVersion logic if needed
+        })
+        .select("id")
+        .single();
+
+      if (versionInsertError || !versionInsert) {
+        console.error("Failed to create initial version:", versionInsertError);
+        return { error: versionInsertError };
+      }
+      actualVersionId = versionInsert.id;
+    }
+
+    // Update the version record with evaluation results
+    await supabase.from("design_versions")
+      .update({
+        ai_summary: summary,
+        ai_data: frameResults,
+        total_score,
+        thumbnail_url: thumbnailUrl || fallbackImageUrl,
+        snapshot: typeof snapshot === "string" ? JSON.parse(snapshot) : snapshot,
+        status: "completed",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", actualVersionId);
+
+    // Insert frame evaluations
+    for (const frame of frameResults) {
+      const { error: frameError } = await supabase
+        .from("design_frame_evaluations")
+        .insert({
+          design_id: designId,
+          version_id: actualVersionId,
           file_key: fileKey,
           node_id: frame.node_id,
           thumbnail_url: frame.thumbnail_url,
@@ -102,18 +103,36 @@ export async function saveDesignVersion({
           ai_data: frame.ai,
           ai_error: frame.ai_error,
           created_at: new Date().toISOString(),
-          snapshot: (() => {
-            if (!snapshot) return null;
-            if (typeof snapshot === "string") {
-              try { return JSON.parse(snapshot); } catch { return null; }
-            }
-            return snapshot;
-          })(),
+          snapshot: typeof snapshot === "string" ? JSON.parse(snapshot) : snapshot,
           owner_id: user?.id
         });
+      if (frameError) {
+        console.error("Error inserting frame evaluation:", frameError);
       }
-      return { versionId, data };
+      console.log("Inserting frame evaluation with payload:", {
+        design_id: designId,
+        version_id: actualVersionId,
+        file_key: fileKey,
+        node_id: frame.node_id,
+        thumbnail_url: frame.thumbnail_url,
+        ai_summary: frame.ai?.summary || null,
+        ai_data: frame.ai,
+        ai_error: frame.ai_error,
+        created_at: new Date().toISOString(),
+        snapshot: typeof snapshot === "string" ? JSON.parse(snapshot) : snapshot,
+        owner_id: user?.id
+      });
     }
+
+    console.log("[saveDesignVersion] Updated version to completed:", {
+      versionId: actualVersionId,
+      ai_summary: summary,
+      total_score,
+      frameResultsCount: frameResults.length,
+      status: "completed"
+    });
+
+    return { versionId: actualVersionId };
   } catch (err) {
     console.error("Error in Supabase save (aggregate):", err);
     return { error: err };

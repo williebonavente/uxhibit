@@ -12,6 +12,7 @@ export async function evaluateFrames({
   authError,
   supabase,
   figmaFileUrl,
+  onProgress,
 }: {
   frameIds: string[],
   frameImages: Record<string, string>,
@@ -23,6 +24,7 @@ export async function evaluateFrames({
   authError?: any,
   supabase: any,
   figmaFileUrl: string,
+  onProgress?: (current: number, total: number) => Promise<void>,
 }) {
   const frameSupabaseUrls: Record<string, string> = {};
 
@@ -119,6 +121,10 @@ export async function evaluateFrames({
           throw err;
         }
       }
+      
+      if (onProgress) {
+        await onProgress(index + 1, frameIds.length);
+      }
       return {
         node_id: nodeId,
         thumbnail_url: imageUrl,
@@ -127,17 +133,14 @@ export async function evaluateFrames({
       };
     })
   );
-  // Aggregate results
-
   const validResults = frameResults.filter(r => r.ai);
   const total_score = validResults.length
     ? Math.round(validResults.reduce((sum, r) => sum + (r.ai?.overall_score ?? 0), 0) / validResults.length)
     : 0;
   const summary = `Aggregate summary: ${validResults.map(r => r.ai?.summary).join(" | ")}`;
 
-  // Assign a jobId, e.g., using designId and versionId for uniqueness
   const jobId = `${designId}-${versionId ?? "latest"}`;
-
+  console.log("[JobId]:", jobId);
   return {
     jobId,
     frameResults,

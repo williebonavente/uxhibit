@@ -53,7 +53,11 @@ export async function deleteDesignVersion(versionId: string): Promise<void> {
 
   if (error) throw error;
 }
-export async function getNextVersion(supabase: SupabaseClient, designId: string): Promise<number> {
+
+export async function getNextVersion(
+  supabase: SupabaseClient,
+  designId: string
+): Promise<number> {
   const { data: versions, error } = await supabase
     .from("design_versions")
     .select("version")
@@ -63,7 +67,15 @@ export async function getNextVersion(supabase: SupabaseClient, designId: string)
 
   if (error) {
     console.error("Error getting next version:", error);
-    return 1;
+    // Instead of defaulting to 1, throw the error so the caller can handle it
+    throw error;
   }
-  return versions?.[0]?.version ? Number(versions[0].version) + 1 : 1;
+
+  // Defensive: Ensure versions is an array and version is a number
+  const latestVersion =
+    Array.isArray(versions) && versions.length > 0 && typeof versions[0].version === "number"
+      ? versions[0].version
+      : 0;
+
+  return latestVersion + 1;
 }
