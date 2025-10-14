@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect } from "react";
 import { LoadingButton } from "@/components/loading_props/loading-button";
 
 export default function Home() {
@@ -18,13 +17,6 @@ export default function Home() {
     // setLoadingBtn(null);
   };
 
-  useEffect(() => {
-    fetch("/api/ux_averages")
-      .then(res => res.json())
-      .then(data => {
-        // console.log("Average UX Ratings:", data);
-      });
-  }, []);
   return (
     <>
       {/* Header */}

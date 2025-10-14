@@ -22,7 +22,7 @@ export default function WcagPourContent() {
           WCAG 2.1 Accessibility: Learning POUR Principles
         </h1>
         <p className="text-start text-gray-600 dark:text-gray-300 w-full">
-          Welcome to your interactive lesson! We'll explore the four principles
+          Welcome to your interactive lesson! We&apos;ll explore the four principles
           that guide web accessibility: Perceivable, Operable, Understandable,
           and Robust. Think of me as your virtual instructor walking you through
           each concept.
@@ -36,7 +36,7 @@ export default function WcagPourContent() {
         </h2>
         <p className="mb-4">
           Let&apos;s break down POUR. Each principle ensures your website is usable
-          by all people, including those with disabilities. We'll cover what it
+          by all people, including those with disabilities. We&apos;ll cover what it
           means, why it matters, and practical ways to implement it.
         </p>
 
@@ -135,13 +135,13 @@ export default function WcagPourContent() {
                 <p className="text-gray-700 dark:text-gray-300">
                   For content to be perceivable, it must be presented in ways
                   that <strong>all users can sense and understand</strong>,
-                  regardless of disability. If information can’t be seen, heard,
-                  or otherwise detected, then it’s invisible to some users.
+                  regardless of disability. If information can&apos;t be seen, heard,
+                  or otherwise detected, then it&apos;s invisible to some users.
                   <br />
                   <br />
                   In short:{" "}
                   <strong>
-                    If users can’t perceive it, they can’t use it.
+                    If users can&apos;t perceive it, they can&apos;t use it.
                   </strong>
                 </p>
               </div>
@@ -240,7 +240,7 @@ export default function WcagPourContent() {
                     reading/order makes sense (e.g., forms, navigation).
                   </li>
                   <li>
-                    <strong>1.3.3 Sensory Characteristics:</strong> Don’t rely
+                    <strong>1.3.3 Sensory Characteristics:</strong> Don&apos;t rely
                     only on color, shape, or position (e.g., “Press the green
                     button” should also say “Press the Start button”).
                   </li>
@@ -274,7 +274,7 @@ export default function WcagPourContent() {
                 <br />
                 <ul className="list-disc pl-6 text-gray-700 dark:text-gray-300 space-y-1">
                   <li>
-                    <strong>1.4.1 Use of Color:</strong> Don’t use color alone
+                    <strong>1.4.1 Use of Color:</strong> Don&apos;t use color alone
                     to convey meaning (add icons, labels).
                   </li>
                   <li>
@@ -296,7 +296,7 @@ export default function WcagPourContent() {
                   </li>
                   <li>
                     <strong>1.4.6 Low/No Background Audio:</strong> Ensure
-                    speech isn’t drowned out by background audio.
+                    speech isn&apos;t drowned out by background audio.
                   </li>
                   <li>
                     <strong>1.4.7 Visual Presentation:</strong> Provide options
@@ -368,7 +368,7 @@ export default function WcagPourContent() {
                   <br />
                   👉 Remember:{" "}
                   <i>
-                    If a user can’t perceive it, they can’t interact with it.
+                    If a user can&apos;t perceive it, they can&apos;t interact with it.
                   </i>
                 </p>
               </div>
@@ -409,9 +409,11 @@ export default function WcagPourContent() {
               </div>
 
               {/* Image */}
-              <img
-                src="https://miro.medium.com/v2/1*ZaUc9ZP09F9so9O9TFQG_w.png"
-                alt="WCAG Operable Principle"
+              <Image
+                src="https://miro.medium.com/v2/resize:fit:720/format:webp/1*QLaQWdVMux9F2qVWLtjOgg.jpeg"
+                alt="WCAG Robust Principle"
+                width={720}
+                height={405}
                 className="w-full rounded-xl shadow-md"
               />
 
@@ -426,13 +428,13 @@ export default function WcagPourContent() {
                 <p className="text-gray-700 dark:text-gray-300">
                   For content to be operable,{" "}
                   <strong>users must be able to interact with it</strong>. If
-                  buttons, links, menus, or forms can’t be used with different
+                  buttons, links, menus, or forms can&apos;t be used with different
                   input methods (like keyboard, mouse, or touch), then some
                   users will be blocked from using the interface.
                   <br />
                   <br />
                   👉 In short:{" "}
-                  <i>If users can’t operate it, they can’t use it.</i>
+                  <i>If users can&apos;t operate it, they can&apos;t use it.</i>
                 </p>
               </div>
 
@@ -449,15 +451,15 @@ export default function WcagPourContent() {
                 <br />
                 <ul className="list-disc pl-6 text-gray-700 dark:text-gray-300 space-y-1">
                   <li>
-                    <strong>2.1.1 Keyboard</strong> – All functionality (menus,
+                    <strong>2.1.1 Keyboard</strong> - All functionality (menus,
                     forms, buttons) should work with the keyboard
                   </li>
                   <li>
-                    <strong>2.1.2 No Keyboard Trap</strong> – Users must not get
+                    <strong>2.1.2 No Keyboard Trap</strong> - Users must not get
                     stuck inside a modal or widget when navigating with Tab
                   </li>
                   <li>
-                    <strong>2.1.4 Character Key Shortcuts</strong> – Avoid
+                    <strong>2.1.4 Character Key Shortcuts</strong> - Avoid
                     single-key shortcuts that interfere with typing
                   </li>
                 </ul>
@@ -499,11 +501,11 @@ export default function WcagPourContent() {
                 <br />
                 <ul className="list-disc pl-6 text-gray-700 dark:text-gray-300 space-y-1">
                   <li>
-                    <strong>2.2.1 Timing Adjustable</strong> – If a form has a
+                    <strong>2.2.1 Timing Adjustable</strong> &ndash; If a form has a
                     timeout, allow extensions.
                   </li>
                   <li>
-                    <strong>2.2.2 Pause, Stop, Hide</strong> – Users should be
+                    <strong>2.2.2 Pause, Stop, Hide</strong> &ndash; Users should be
                     able to pause or stop auto-moving content (like carousels).
                   </li>
                 </ul>
@@ -539,11 +541,11 @@ export default function WcagPourContent() {
                 <br />
                 <ul className="list-disc pl-6 text-gray-700 dark:text-gray-300 space-y-1">
                   <li>
-                    <strong>2.3.1 Three Flashes or Below Threshold</strong> –
-                    Don’t use flashing content that could trigger seizures.
+                    <strong>2.3.1 Three Flashes or Below Threshold</strong> -
+                    Don&apos;t use flashing content that could trigger seizures.
                   </li>
                   <li>
-                    <strong>2.3.3 Animation from Interactions</strong> – Keep
+                    <strong>2.3.3 Animation from Interactions</strong> - Keep
                     animations subtle; avoid motion sickness.
                   </li>
                 </ul>
@@ -576,27 +578,27 @@ export default function WcagPourContent() {
                 <br />
                 <ul className="list-disc pl-6 text-gray-700 dark:text-gray-300 space-y-1">
                   <li>
-                    <strong>2.4.1 Bypass Blocks</strong> – Add a “Skip to
+                    <strong>2.4.1 Bypass Blocks</strong> - Add a “Skip to
                     Content” link to skip repeated navigation.
                   </li>
                   <li>
-                    <strong>2.4.2 Page Titled</strong> – Pages/screens should
+                    <strong>2.4.2 Page Titled</strong> - Pages/screens should
                     have clear, descriptive titles.
                   </li>
                   <li>
-                    <strong>2.4.3 Focus Order</strong> – Focus should follow a
+                    <strong>2.4.3 Focus Order</strong> - Focus should follow a
                     logical sequence.
                   </li>
                   <li>
-                    <strong>2.4.4 Link Purpose</strong> – Links should describe
+                    <strong>2.4.4 Link Purpose</strong> - Links should describe
                     their destination (not just “Click here”).
                   </li>
                   <li>
-                    <strong>2.4.6 Headings & Labels</strong> – Use clear section
+                    <strong>2.4.6 Headings & Labels</strong> - Use clear section
                     headers and form labels.
                   </li>
                   <li>
-                    <strong>2.4.7 Focus Visible</strong> – The active element
+                    <strong>2.4.7 Focus Visible</strong> - The active element
                     should always be visually highlighted.
                   </li>
                 </ul>
@@ -615,7 +617,7 @@ export default function WcagPourContent() {
                 <br />
                 <br />
                 <ul className="list-disc pl-6 text-gray-700 dark:text-gray-300 space-y-1">
-                  <li>Users can’t tell which input is active.</li>
+                  <li>Users can&apos;t tell which input is active.</li>
                   <li>A vague link text like “Read more.”</li>
                 </ul>
               </div>
@@ -633,20 +635,20 @@ export default function WcagPourContent() {
                 <br />
                 <ul className="list-disc pl-6 text-gray-700 dark:text-gray-300 space-y-1">
                   <li>
-                    <strong>2.5.1 Pointer Gestures</strong> – Use simple
+                    <strong>2.5.1 Pointer Gestures</strong> - Use simple
                     gestures, not complex swipes.
                   </li>
                   <li>
-                    <strong>2.5.2 Pointer Cancellation</strong> – Let users
+                    <strong>2.5.2 Pointer Cancellation</strong> - Let users
                     cancel accidental taps or drags.
                   </li>
                   <li>
-                    <strong>2.5.3 Label in Name</strong> – Accessible names
+                    <strong>2.5.3 Label in Name</strong> - Accessible names
                     should match visible labels (e.g., mic button says “Voice
                     Search”).
                   </li>
                   <li>
-                    <strong>2.5.4 Target Size</strong> – Buttons/touch targets
+                    <strong>2.5.4 Target Size</strong> - Buttons/touch targets
                     should be large enough (44x44px minimum).
                   </li>
                 </ul>
@@ -711,7 +713,7 @@ export default function WcagPourContent() {
                   <br />
                   <br />
                   👉 Remember:{" "}
-                  <i>If a user can’t operate it, they can’t use it.</i>
+                  <i>If a user can&apos;t operate it, they can&apos;t use it.</i>
                 </p>
               </div>
             </div>
@@ -750,9 +752,11 @@ export default function WcagPourContent() {
               </div>
 
               {/* Image */}
-              <img
+              <Image
                 src="https://appinventiv.com/wp-content/uploads/2019/02/Tips-to-Improve-UI-UX-Design.png"
                 alt="WCAG Understandable Principle"
+                width={1200}
+                height={675}
                 className="w-full rounded-xl shadow-md"
               />
 
@@ -767,12 +771,12 @@ export default function WcagPourContent() {
                 <p className="text-gray-700 dark:text-gray-300">
                   For content to be understandable, it must be{" "}
                   <strong>clear, consistent, and easy to use</strong>. If users
-                  can’t read, predict what will happen, or recover from errors,
+                  can&apos;t read, predict what will happen, or recover from errors,
                   they will struggle to interact with the interface.
                   <br />
                   <br />
                   👉 In short:{" "}
-                  <i>If users can’t understand it, they can’t use it.</i>
+                  <i>If users can&apos;t understand it, they can&apos;t use it.</i>
                 </p>
               </div>
 
@@ -789,25 +793,25 @@ export default function WcagPourContent() {
                 <br />
                 <ul className="list-disc pl-6 text-gray-700 dark:text-gray-300 space-y-1">
                   <li>
-                    <strong>3.1.1 Language of Page</strong> – Set the correct
+                    <strong>3.1.1 Language of Page</strong> &ndash; Set the correct
                     language for the page (e.g., {'<html lang="en">'}).
                   </li>
                   <li>
-                    <strong>3.1.2 Language of Parts</strong> – If a section uses
+                    <strong>3.1.2 Language of Parts</strong> &ndash; If a section uses
                     a different language (like a Spanish quote), mark it so
                     screen readers pronounce it correctly.
                   </li>
                   <li>
-                    <strong>3.1.3 Unusual Words</strong> – Provide definitions
+                    <strong>3.1.3 Unusual Words</strong> &ndash; Provide definitions
                     for jargon or unusual terms.
                   </li>
                   <li>
-                    <strong>3.1.4 Abbreviations</strong> – Expand or explain
+                    <strong>3.1.4 Abbreviations</strong> &ndash; Expand or explain
                     abbreviations at least once (e.g., “API (Application
                     Programming Interface)”).
                   </li>
                   <li>
-                    <strong>3.1.5 Reading Level</strong> – Use clear, simple
+                    <strong>3.1.5 Reading Level</strong> &ndash; Use clear, simple
                     language when possible. Provide summaries for complex
                     content.
                   </li>
@@ -839,29 +843,29 @@ export default function WcagPourContent() {
                     3.2 Predictable
                   </h2>
                 </div>
-                Design interfaces that behave consistently and don’t surprise
+                Design interfaces that behave consistently and don&apos;t surprise
                 the user.
                 <br />
                 <br />
                 <ul className="list-disc pl-6 text-gray-700 dark:text-gray-300 space-y-1">
                   <li>
-                    <strong>3.2.1 On Focus</strong> – Don’t trigger unexpected
+                    <strong>3.2.1 On Focus</strong> &ndash; Don&apos;t trigger unexpected
                     changes when an element receives focus.
                   </li>
                   <li>
-                    <strong>3.2.2 On Input</strong> – Avoid auto-submitting
+                    <strong>3.2.2 On Input</strong> &ndash; Avoid auto-submitting
                     forms when a field is filled without user consent.
                   </li>
                   <li>
-                    <strong>3.2.3 Consistent Navigation</strong> – Keep
+                    <strong>3.2.3 Consistent Navigation</strong> &ndash; Keep
                     menus/navigation in the same place across screens.
                   </li>
                   <li>
-                    <strong>3.2.4 Consistent Identification</strong> – Use the
+                    <strong>3.2.4 Consistent Identification</strong> &ndash; Use the
                     same icons, labels, and components consistently.
                   </li>
                   <li>
-                    <strong>3.2.5 Change on Request</strong> – Only change major
+                    <strong>3.2.5 Change on Request</strong> &ndash; Only change major
                     settings (like language or layout) when the user asks for
                     it.
                   </li>
@@ -907,27 +911,27 @@ export default function WcagPourContent() {
                 <br />
                 <ul className="list-disc pl-6 text-gray-700 dark:text-gray-300 space-y-1">
                   <li>
-                    <strong>3.3.1 Error Identification</strong> – Clearly
+                    <strong>3.3.1 Error Identification</strong> &ndash; Clearly
                     highlight fields with errors and explain the issue.
                   </li>
                   <li>
-                    <strong>3.3.2 Labels or Instructions</strong> – Provide
+                    <strong>3.3.2 Labels or Instructions</strong> &ndash; Provide
                     clear labels and instructions for inputs (e.g., “Password
                     must include at least 8 characters”).
                   </li>
                   <li>
-                    <strong>3.3.3 Error Suggestion</strong> – Suggest
+                    <strong>3.3.3 Error Suggestion</strong> &ndash; Suggest
                     corrections when possible (e.g., “Did you mean ___?”).
                   </li>
                   <li>
                     <strong>
                       3.3.4 Error Prevention (Legal, Financial, Data)
                     </strong>{" "}
-                    – Confirm before submitting important actions (like
+                    &ndash; Confirm before submitting important actions (like
                     payments).
                   </li>
                   <li>
-                    <strong>3.3.5 Help</strong> – Provide accessible help
+                    <strong>3.3.5 Help</strong> &ndash; Provide accessible help
                     options like FAQs, hints, or support links.
                   </li>
                 </ul>
@@ -998,7 +1002,7 @@ export default function WcagPourContent() {
                   <br />
                   <br />
                   👉 Remember:{" "}
-                  <i>If a user can’t understand it, they can’t use it.</i>
+                  <i>If a user can&apos;t understand it, they can&apos;t use it.</i>
                 </p>
               </div>
             </div>
@@ -1055,8 +1059,8 @@ export default function WcagPourContent() {
                   <br />
                   👉 In short:{" "}
                   <i>
-                    If technology can’t interpret your design, users relying on
-                    that technology can’t use it.
+                    If technology can&apos;t interpret your design, users relying on
+                    that technology can&apos;t use it.
                   </i>
                 </p>
               </div>
@@ -1096,7 +1100,7 @@ export default function WcagPourContent() {
                     itself as a “button” to screen readers and reflect its state
                     (pressed/unpressed).
                     <br />❌ Bad example: A clickable icon with no label or ARIA
-                    attributes—users won’t know what it does.
+                    attributes—users won&apos;t know what it does.
                     <br />
                     <br />
                   </li>
@@ -1165,16 +1169,18 @@ export default function WcagPourContent() {
                   <br />
                   👉 Remember:{" "}
                   <i>
-                    If assistive technology can’t interpret your design, users
-                    can’t use it.
+                    If assistive technology can&apos;t interpret your design, users
+                    can&apos;t use it.
                   </i>
                 </p>
               </div>
 
               {/* Image */}
-              <img
+              <Image
                 src="https://miro.medium.com/v2/resize:fit:720/format:webp/1*QLaQWdVMux9F2qVWLtjOgg.jpeg"
                 alt="WCAG Robust Principle"
+                width={720}
+                height={405}
                 className="w-full rounded-xl shadow-md"
               />
             </div>
@@ -1198,7 +1204,7 @@ export default function WcagPourContent() {
       {/* Lesson Footer */}
       <div className="text-center space-y-2">
         <p className="text-gray-600 dark:text-gray-300">
-          Congrats! You've gone through the POUR principles. Apply these lessons
+          Congrats! You&apos;ve gone through the POUR principles. Apply these lessons
           in your next web project to make it accessible to everyone.
         </p>
         <p className="text-sm text-gray-500 dark:text-gray-400">

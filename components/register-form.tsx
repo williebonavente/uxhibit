@@ -46,29 +46,6 @@ export default function RegistrationForm() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    const accepted = localStorage.getItem("termsAccepted") === "true";
-    setTermsAccepted(accepted);
-
-    const draft = localStorage.getItem("registrationDraft");
-    if (draft) {
-      const parsed = JSON.parse(draft);
-      // Merge with default values to ensure all fields are present
-      form.reset({
-        username: "",
-        first_name: "",
-        middle_name: "",
-        last_name: "",
-        birthday: "",
-        gender: "",
-        email: "",
-        password: "",
-        confirmPassword: "",
-        ...parsed,
-      });
-    }
-  }, []);
-
   const handleCheckboxChange = (checked: boolean) => {
     setTermsAccepted(checked);
     localStorage.setItem("termsAccepted", String(checked));
@@ -121,7 +98,6 @@ export default function RegistrationForm() {
       });
 
       if (error) {
-        // Supabase returns an error for existing emails.
         if (error.message.includes("already registered")) {
           toast.error("This email is already registered.");
         } else {
@@ -136,7 +112,6 @@ export default function RegistrationForm() {
       }
 
       if (!error && signUpData?.user?.id) {
-        // 1. Upsert profile_details for the new user and get the inserted row
         const { data: profileDetails, error: detailsError } = await supabase
           .from("profile_details")
           .upsert([{ profile_id: signUpData.user.id }])
@@ -144,7 +119,6 @@ export default function RegistrationForm() {
           .single();
 
         if (detailsError) {
-          // Check for foreign key violation and show a friendly message
           if (
             detailsError.message?.includes("violates foreign key constraint") ||
             detailsError.message?.includes("profile_details_profile_id_fkey")
@@ -156,7 +130,6 @@ export default function RegistrationForm() {
           return;
         }
 
-        // 2. If profile_details was created, insert profile_contacts
         if (profileDetails && profileDetails.id) {
           await supabase.from("profile_contacts").insert({
             profile_details_id: profileDetails.id,
@@ -184,6 +157,28 @@ export default function RegistrationForm() {
     cursor:
       "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' stroke='%23ffffff' fill='none' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 3l7 17 2-7 7-2-16-8Z'/></svg>\") 2 2, pointer",
   };
+  useEffect(() => {
+    const accepted = localStorage.getItem("termsAccepted") === "true";
+    setTermsAccepted(accepted);
+
+    const draft = localStorage.getItem("registrationDraft");
+    if (draft) {
+      const parsed = JSON.parse(draft);
+      // Merge with default values to ensure all fields are present
+      form.reset({
+        username: "",
+        first_name: "",
+        middle_name: "",
+        last_name: "",
+        birthday: "",
+        gender: "",
+        email: "",
+        password: "",
+        confirmPassword: "",
+        ...parsed,
+      });
+    }
+  }, [form])
 
   return (
     <div

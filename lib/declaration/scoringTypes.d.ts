@@ -1,4 +1,4 @@
-import { RGBA, TextNode, FrameNode } from "./figmaInfo";
+import { RGBA, TextNode } from "./figmaInfo";
 
 export type FrameTextMap = Record<string, {
   frameId: string;
@@ -33,7 +33,7 @@ export interface FrameScoreResult {
   frameId: string;
   frameName: string;
   scores: CategoryScores;
-  justification?: Record<string,string>; // short text explanation per category
+  justification?: Record<string,string>;
   textDetails: TextNodeDetail[];
   interactiveDetails: InteractiveNodeDetail[];
 }

@@ -58,21 +58,21 @@ export default function TermsPage() {
               Agreement to Our Legal Terms
             </h3>
             <div className="pl-7 space-y-1">
-              We are <strong>Uxhibit</strong> ("Company," "we," "us," "our").
+              We are <strong>Uxhibit</strong> (&quot;Company,&quot; &quot;we,&quot; &quot;us,&quot; &quot;our&quot;).
               <br />
               <br />
               We operate the website{" "}
               <a href="https://www.uxhibit.com" className="underline">
                 www.uxhibit.com
               </a>{" "}
-              (the <strong>"Site"</strong>) as well as other related products
+              (the <strong>&quot;Site&quot;</strong>) as well as other related products
               and services that refer to these legal terms (the{" "}
-              <strong>"Legal Terms"</strong>) (collectively, the{" "}
-              <strong>"Services"</strong>).
+              <strong>&quot;Legal Terms&quot;</strong>) (collectively, the{" "}
+              <strong>&quot;Services&quot;</strong>).
               <br />
               <br />
               Web-based design evaluation tool that uses AI (via LLMs) to give
-              UI/UX learners feedback on their designs based on Jakob Nielsen's
+              UI/UX learners feedback on their designs based on Jakob Nielsen&apos;s
               10 Usability Heuristics. It also considers demographic factors
               like age and occupation to make the feedback more tailored and
               insightful.
@@ -83,7 +83,7 @@ export default function TermsPage() {
               <br />
               <br />
               These Legal Terms constitute a legally binding agreement made
-              between you, whether personally or on behalf of an entity ("you"),
+              between you, whether personally or on behalf of an entity (&quot;you&quot;),
               and Uxhibit, concerning your access to and use of the Services.
               You agree that by accessing the Services, you have read,
               understood, and agreed to be bound by all of these Legal Terms. IF
@@ -97,7 +97,7 @@ export default function TermsPage() {
               incorporated herein by reference. We reserve the right, in our
               sole discretion, to make changes or modifications to these Legal
               Terms at any time and for any reason. We will alert you about any
-              changes by updating the "Last updated" date of these Legal Terms,
+              changes by updating the &quot;Last updated&quot; date of these Legal Terms,
               and you waive any right to receive specific notice of each such
               change. It is your responsibility to periodically review these
               Legal Terms to stay informed of updates. You will be subject to,
@@ -175,8 +175,8 @@ export default function TermsPage() {
               rights in our Services, including all source code, databases,
               functionality, software, website designs, audio, video, text,
               photographs, and graphics in the Services (collectively, the
-              "Content"), as well as the trademarks, service marks, and logos
-              contained therein (the "Marks").
+              &quot;Content&quot;), as well as the trademarks, service marks, and logos
+              contained therein (the &quot;Marks&quot;).
               <br />
               <br />
               Our Content and Marks are protected by copyright and trademark
@@ -184,8 +184,8 @@ export default function TermsPage() {
               competition laws) and treaties around the world.
               <br />
               <br />
-              The Content and Marks are provided in or through the Services "AS
-              IS" for your personal, non-commercial use or internal business
+              The Content and Marks are provided in or through the Services &quot;AS
+              IS&quot; for your personal, non-commercial use or internal business
               purpose only.
               <br />
               <br />
@@ -193,7 +193,7 @@ export default function TermsPage() {
               <br />
               <br />
               Subject to your compliance with these Legal Terms, including the{" "}
-              <strong>"PROHIBITED ACTIVITIES"</strong> section below, we grant
+              <strong>&quot;PROHIBITED ACTIVITIES&quot;</strong> section below, we grant
               you a non-exclusive, non-transferable, revocable license to
               <ol className="list-disc pl-7 space-y-1">
                 <li>access the Services; and</li>
@@ -239,7 +239,7 @@ export default function TermsPage() {
               <br />
               <br />
               Please review this section and the{" "}
-              <strong>"PROHIBITED ACTIVITIES"</strong>section carefully prior to
+              <strong>&quot;PROHIBITED ACTIVITIES&quot;</strong>section carefully prior to
               using our Services to understand the (a) rights you give us and
               (b) obligations you have when you post or upload any content
               through the Services.
@@ -247,7 +247,7 @@ export default function TermsPage() {
               <br />
               <strong>Submissions: </strong>By directly sending us any question,
               comment, suggestion, idea, feedback, or other information about
-              the Services ("Submissions"), you agree to assign to us all
+              the Services (&quot;Submissions&quot;), you agree to assign to us all
               intellectual property rights in such Submission. You agree that we
               shall own this Submission and be entitled to its unrestricted use
               and dissemination for any lawful purpose, commercial or otherwise,
@@ -262,7 +262,7 @@ export default function TermsPage() {
               including but not limited to text, writings, video, audio,
               photographs, music, graphics, comments, reviews, rating
               suggestions, personal information, or other material
-              ("Contributions"). Any Submission that is publicly posted shall
+              (&quot;Contributions&quot;). Any Submission that is publicly posted shall
               also be treated as a Contribution.
               <br />
               <br />
@@ -302,7 +302,7 @@ export default function TermsPage() {
               <ol className="list-disc pl-7 space-y-1">
                 <li>
                   confirm that you have read and agree with our{" "}
-                  <strong>"PROHIBITED ACTIVITIES"</strong>and will not post,
+                  <strong>&quot;PROHIBITED ACTIVITIES&quot;</strong>and will not post,
                   send, publish, upload, or transmit through the Services any
                   Submission nor post any Contribution that is illegal,
                   harassing, hateful, harmful, defamatory, obscene, bullying,
@@ -332,7 +332,7 @@ export default function TermsPage() {
               You are solely responsible for your Submissions and/or
               Contributions and you expressly agree to reimburse us for any and
               all losses that we may suffer because of your breach of (a) this
-              section, (b) any third party's intellectual property rights, or
+              section, (b) any third party&apos;s intellectual property rights, or
               (c) applicable law.
               <br />
               <br />
@@ -350,7 +350,7 @@ export default function TermsPage() {
               believe that any material available on or through the Services
               infringes upon any copyright you own or control, please
               immediately refer to the{" "}
-              <strong>"COPYRIGHT INFRINGEMENTS"</strong>section below.
+              <strong>&quot;COPYRIGHT INFRINGEMENTS&quot;</strong>section below.
               <br />
               <br />
             </div>
@@ -451,7 +451,7 @@ export default function TermsPage() {
                   Upload or transmit (or attempt to upload or to transmit)
                   viruses, Trojan horses, or other material, including excessive
                   use of capital letters and spamming (continuous posting of
-                  repetitive text), that interferes with any party's
+                  repetitive text), that interferes with any party&apos;s
                   uninterrupted use and enjoyment of the Services or modifies,
                   impairs, disrupts, alters, or interferes with the use,
                   features, functions, operation, or maintenance of the
@@ -475,10 +475,10 @@ export default function TermsPage() {
                   Upload or transmit (or attempt to upload or to transmit) any
                   material that acts as a passive or active information
                   collection or transmission mechanism, including without
-                  limitation, clear graphics interchange formats ("gifs"), 1x1
+                  limitation, clear graphics interchange formats (&quot;gifs&quot;), 1x1
                   pixels, web bugs, cookies, or other similar devices (sometimes
-                  referred to as "spyware" or "passive collection mechanisms" or
-                  "pcms").
+                  referred to as &quot;spyware&quot; or &quot;passive collection mechanisms&quot; or
+                  &quot;pcms&quot;).
                 </li>
                 <li>
                   Interfere with, disrupt, or create an undue burden on the
@@ -496,7 +496,7 @@ export default function TermsPage() {
                   the Services.
                 </li>
                 <li>
-                  Copy or adapt the Services' software, including but not
+                  Copy or adapt the Services&apos; software, including but not
                   limited to Flash, PHP, HTML, JavaScript, or other code.
                 </li>
                 <li>
@@ -547,7 +547,7 @@ export default function TermsPage() {
               content and materials to us or on the Services, including but not
               limited to text, writings, video, audio, photographs, graphics,
               comments, suggestions, or personal information or other material
-              (collectively. "Contributions"). Contributions may be viewable by
+              (collectively. &quot;Contributions&quot;). Contributions may be viewable by
               other users of the Services and through third-party websites. As
               such, any Contributions you transmit may be treated as
               non-confidential and non-proprietary. When you create or make
@@ -740,7 +740,7 @@ export default function TermsPage() {
             <div className="pl-7 space-y-1">
               As part of the functionality of the Services, you may link your
               account with online accounts you have with third-party service
-              providers (each such account, a "Third-Party Account") by either:
+              providers (each such account, a &quot;Third-Party Account&quot;) by either:
               (1) providing your Third-Party Account login information through
               the Services; or (2) allowing us to access your Third-Party
               Account, as is permitted under the applicable terms and conditions
@@ -755,7 +755,7 @@ export default function TermsPage() {
               to any Third-Party Accounts, you understand that (1) we may
               access, make available, and store (if applicable) any content that
               you have provided to and stored in your Third-Party Account (the
-              "Social Network Content") so that it is available on and through
+              &quot;Social Network Content&quot;) so that it is available on and through
               the Services via your account, including without limitation any
               friend lists and (2) we may submit to and receive from your
               Third-Party Account additional information to the extent you are
@@ -798,11 +798,11 @@ export default function TermsPage() {
             </h3>
             <div className="pl-7 space-y-1">
               The Services may contain (or you may be sent via the Site) links
-              to other websites ("Third-Party Websites") as well as articles,
+              to other websites (&quot;Third-Party Websites&quot;) as well as articles,
               photographs, text, graphics, pictures, designs, music, sound,
               video, information, applications, software, and other content or
-              items belonging to or originating from third parties ("Third-Party
-              Content"). Such Third-Party Websites and Third-Party Content are
+              items belonging to or originating from third parties (&quot;Third-Party
+              Content&quot;). Such Third-Party Websites and Third-Party Content are
               not investigated, monitored, or checked for accuracy,
               appropriateness, or completeness by us, and we are not responsible
               for any Third- Party Websites accessed through the Services or any
@@ -888,7 +888,7 @@ export default function TermsPage() {
               believe that any material available on or through the Services
               infringes upon any copyright you own or control, please
               immediately notify us using the contact information provided below
-              (a "Notification"). A copy of your Notification will be sent to
+              (a &quot;Notification&quot;). A copy of your Notification will be sent to
               the person who posted or stored the material addressed in the
               Notification. Please be advised that pursuant to applicable law
               you may be held liable for damages if you make material
@@ -979,8 +979,8 @@ export default function TermsPage() {
               <br />
               To expedite resolution and control the cost of any dispute,
               controversy, or claim related to these Legal Terms (each a
-              "Dispute" and collectively, the "Disputes") brought by either you
-              or us (individually, a "Party" and collectively, the "Parties"),
+              &quot;Dispute&quot; and collectively, the &quot;Disputes&quot;) brought by either you
+              or us (individually, a &quot;Party&quot; and collectively, the &quot;Parties&quot;),
               the Parties agree to first attempt to negotiate any Dispute
               (except those Disputes expressly provided below) informally for at
               least thirty (30) days before initiating arbitration. Such
@@ -1064,7 +1064,7 @@ export default function TermsPage() {
               THEREOF, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
               MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
               NON-INFRINGEMENT. WE MAKE NO WARRANTIES OR REPRESENTATIONS ABOUT
-              THE ACCURACY OR COMPLETENESS OF THE SERVICES' CONTENT OR THE
+              THE ACCURACY OR COMPLETENESS OF THE SERVICES&apos; CONTENT OR THE
               CONTENT OF ANY WEBSITES OR MOBILE APPLICATIONS LINKED TO THE
               SERVICES AND WE WILL ASSUME NO LIABILITY OR RESPONSIBILITY FOR ANY
               (1) ERRORS, MISTAKES, OR INACCURACIES OF CONTENT AND MATERIALS,
@@ -1114,7 +1114,7 @@ export default function TermsPage() {
               our subsidiaries, affiliates, and all of our respective officers,
               agents, partners, and employees, from and against any loss,
               damage, liability, claim, or demand, including reasonable
-              attorneys' fees and expenses, made by any third party due to or
+              attorneys&apos; fees and expenses, made by any third party due to or
               arising out of: (1) your Contributions; (2) use of the Services;
               (3) breach of these Legal Terms; (4) any breach of your
               representations and warranties set forth in these Legal Terms; (5)
@@ -1217,19 +1217,19 @@ export default function TermsPage() {
               Last updated 10/02/2025
               <br />
               <br />
-              This Privacy Notice for UXhibit ("<strong>we</strong>," "
-              <strong>us</strong>," or "<strong>our</strong>"), describes how
-              and why we might access, collect, store, use, and/or share ("
-              <strong>process</strong>") your personal information when you use
-              our services ("<strong>Services</strong>"), including when you:{" "}
+              This Privacy Notice for UXhibit (&quot;<strong>we</strong>,&quot; &quot;
+              <strong>us</strong>,&quot; or &quot;<strong>our</strong>&quot;), describes how
+              and why we might access, collect, store, use, and/or share (&quot;
+              <strong>process</strong>&quot;) your personal information when you use
+              our services (&quot;<strong>Services</strong>&quot;), including when you:{" "}
               <strong>Questions or concerns?</strong> Reading this Privacy
               Notice will help you understand your privacy rights and choices.
               We are responsible for making decisions about how your personal
               information is processed. If you do not agree with our policies
               and practices, please do not use our Services. as well as other
               related products and services that refer to these legal terms (the{" "}
-              <strong>"Legal Terms"</strong>) (collectively, the{" "}
-              <strong>"Services"</strong>).
+              <strong>&quot;Legal Terms&quot;</strong>) (collectively, the{" "}
+              <strong>&quot;Services&quot;</strong>).
               <br />
               <br />
             </div>
@@ -1257,7 +1257,7 @@ export default function TermsPage() {
               <strong>
                 Do we process any sensitive personal Information?
               </strong>{" "}
-              Some of the information may be considered "special" or "sensitive"
+              Some of the information may be considered &quot;special&quot; or &quot;sensitive&quot;
               in certain jurisdictions, for example your racial or ethnic
               origins, sexual orientation, and religious beliefs. We do not
               process sensitive personal information.
@@ -1692,7 +1692,7 @@ export default function TermsPage() {
                   Willie M. Bonavente
                 </li>
                 <li>
-                  Institution: Polytechnic University of the Philippines –
+                  Institution: Polytechnic University of the Philippines -
                   College of Computer and Information Science
                 </li>
                 <li>Mobile Number: 09212750244</li>

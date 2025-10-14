@@ -1,4 +1,5 @@
-import { Globe, Book, Eye, Lightbulb, Image, Keyboard } from "lucide-react";
+import { Globe, Book, Eye, Lightbulb, Image as LucideImage, Keyboard } from "lucide-react";
+import Image from "next/image";
 
 export default function WcagContent() {
   return (
@@ -113,7 +114,7 @@ export default function WcagContent() {
       {/* Visual Overview */}
       <div className="bg-white dark:bg-neutral-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 space-y-4">
         <div className="flex items-center space-x-3">
-          <Image className="w-6 h-6 text-[#ED5E20]" />
+          <LucideImage className="w-6 h-6 text-[#ED5E20]" />
           <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
             Visual Overview
           </h2>
@@ -125,9 +126,11 @@ export default function WcagContent() {
           compatibility across technologies. Together, they form a strong
           accessibility foundation.
         </p>
-        <img
+        <Image
           src="https://www.webyes.com/wp-content/uploads/2024/11/wcag-pour-accessibility-1-1024x576.jpg"
           alt="WCAG POUR Principles Diagram"
+          width={1024}
+          height={576}
           className="w-full rounded-lg shadow-sm"
         />
       </div>

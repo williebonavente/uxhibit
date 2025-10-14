@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
-import { Pencil, Trash2, Plus, ChevronLeft, ChevronRight, Loader2, X, Check } from "lucide-react";
-
+import { Pencil, Trash2, X, Check } from "lucide-react";
 
 type ProfileSkillFormProps = {
     skills: string[];
@@ -30,15 +29,8 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
 
     const ITEMS_PER_PAGE = 5;
 
-    const totalPages = Math.max(1, Math.ceil(skills.length / ITEMS_PER_PAGE));
-
-    const paginatedSkills = skills.slice(
-        (page - 1) * ITEMS_PER_PAGE,
-        page * ITEMS_PER_PAGE
-    );
     const supabase = createClient();
 
-    // Add Skill
     const handleAddSkill = async () => {
         if (!newSkill.trim()) return false;
 
@@ -122,8 +114,7 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
         }
     };
 
-    // Delete Skill
-    const handleDeleteSkill = async (skillName: string, index: number) => {
+    const handleDeleteSkill = async (skillName: string) => {
         setError(null);
 
         try {
@@ -160,8 +151,8 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
             const newTotalPages = Math.max(1, Math.ceil(updatedSkills.length / ITEMS_PER_PAGE));
             if (page > newTotalPages) setPage(newTotalPages);
 
-        } catch (err: any) {
-            setError(err.message || "Error deleting skill");
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Error deleting skill");
         }
     };
 
@@ -209,8 +200,8 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
             updatedSkills[index] = newSkillName;
             setSkills(updatedSkills);
             if (onSkillsChange) onSkillsChange(updatedSkills);
-        } catch (err: any) {
-            const message = err?.message || "Error updating skill";
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "Error updating skill";
             toast.error(message);
         } finally {
             setEditLoading(false);
@@ -219,37 +210,6 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
         }
     };
 
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-
-        if (!profileId) {
-            console.error("profileId is missing!");
-            return;
-        }
-
-        try {
-            // Save all current skills to the profile_details table
-            const skillsArray = skills.map((s) => s.trim());
-
-            const { error } = await supabase
-                .from("profile_details")
-                .update({ skills: skillsArray })
-                .eq("id", profileId);
-
-            if (error) {
-                console.error("Failed to save skills:", error);
-                toast.error("Failed to save skills. Please try again.");
-                return;
-            }
-
-            toast.success("Skills saved successfully!");
-            if (onSkillsChange) onSkillsChange(skills);
-            if (onCancel) onCancel();
-        } catch (err: unknown) {
-            console.error("Error saving skills:", err);
-            toast.error("Error saving skills. Please try again.");
-        }
-    };
 
     return (
         <div
@@ -267,6 +227,13 @@ const ProfileSkillForm: React.FC<ProfileSkillFormProps> = ({
                 <h2 className="text-2xl sm:text-3xl font-bold text-center gradient-text mb-6">
                     Manage Skills / Tools
                 </h2>
+
+                {/* Error Message */}
+                {error && (
+                    <div className="mb-4 text-red-600 dark:text-red-400 text-center font-medium">
+                        {error}
+                    </div>
+                )}
 
                 {/* Skills Table (scrollable instead of pagination) */}
                 <div className="overflow-y-auto max-h-64 mb-3 rounded-xl">

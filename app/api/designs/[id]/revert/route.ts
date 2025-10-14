@@ -3,12 +3,11 @@ import { createClient } from "@/utils/supabase/server";
 
 type Params = { params: Promise<{ id: string }> };
 
-// Body: { version_id: string } OR { version: number }
 export async function POST(req: Request, props: Params) {
     const params = await props.params;
     try {
         const supabase = await createClient();
-        const { data: user } = supabase.auth.getUser();
+        supabase.auth.getUser();
         const { id } = params;
         const body = await req.json();
 

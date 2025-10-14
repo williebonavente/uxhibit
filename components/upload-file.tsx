@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Input } from "./ui/input";
 
-type ParsedFigma = { fileKey: string; nodeId?: string; name?: string };
 
 export default function FigmaLinkUploader() {
   const router = useRouter();
@@ -19,18 +18,6 @@ export default function FigmaLinkUploader() {
   const [age, setAge] = useState("");
   const [occupation, setOccupation] = useState("");
 
-  const handleEvaluate = () => {
-    if (!uploadedLink) return;
-    if (!age || !occupation) {
-      toast.error("Select generation and occupation first.");
-      return;
-    }
-    if (!lastId) {
-      toast.error("Missing design Id.");
-      return;
-    }
-    router.push(`/designs/${lastId}`);
-  }
   function handleClear() {
     setLink?.("");
     setProgress(0);
@@ -70,10 +57,8 @@ export default function FigmaLinkUploader() {
         views: 0,
         age,
         occupation,
-        // store keys so gallery can render thumbnails automatically
         fileKey: parsed?.fileKey || null,
         nodeId: parsed?.nodeId || null,
-        // optional immediate preview if you already have one
         thumbnail: (data?.nodeImageUrl as string) || (data?.thumbnailUrl as string) || null,
         createdAt: new Date().toISOString(),
       };
@@ -95,7 +80,6 @@ export default function FigmaLinkUploader() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            // owner_id: ownerId, // TODO: inject from your auth/session
             title: newDesign.project_name,
             figma_link: link,
             file_key: newDesign.fileKey,

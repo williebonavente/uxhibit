@@ -63,19 +63,6 @@ export default function ProfileContact({
         (!email && !website && !openTo) &&
         (!extraFields || extraFields.length === 0);
 
-    function renderIcon(icon: string) {
-        switch (icon) {
-            case "Users":
-                return <Users size={24} className="text-green-400" />;
-            case "Mail":
-                return <Mail size={24} className="text-orange-400" />;
-            case "Globe":
-                return <Globe size={24} className="text-blue-400" />;
-            default:
-                return <span style={{ fontSize: 24 }}>{icon}</span>; // For emoji
-        }
-    }
-
     return (
         <div className="flex-1 bg-white dark:bg-[#1A1A1A]/25 rounded-xl p-5 shadow-md relative group">
             <h2 className="text-xl font-semibold text-[#1A1A1A] dark:text-white mb-5 flex items-center gap-2">

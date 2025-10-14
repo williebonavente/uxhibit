@@ -15,7 +15,6 @@ import {
   ListOrdered,
   Quote,
   Minus,
-  Type,
   AlignLeft,
   AlignCenter,
   AlignRight,

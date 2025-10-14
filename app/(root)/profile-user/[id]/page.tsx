@@ -2,10 +2,6 @@ import { createClient } from "@/utils/supabase/client";
 import { notFound } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  Accessibility,
-  Star,
-  FileText,
-  Check,
 } from "lucide-react";
 import { getInitials } from "../../dashboard/page";
 import { ProfileSkillRow } from "@/lib/declaration/profileTypes";
@@ -16,7 +12,6 @@ import ProfileCareerHighlightsClient from "@/components/profile_management/caree
 import ProfileContactClient from "@/components/profile_management/contacts/profile-contact-cilent";
 import ProfileStatsGridContainer from "@/components/profile_management/profie-stats/profile-stats-grid-container";
 import ProfileOwnershipCheckSection from "@/components/profile_management/profile-owner-check/profile-ownership-check-section";
-import ProfileRoleClient from "@/components/profile_management/role/profile-role-client";
 import PortfolioSection from "@/components/profile_management/portfolios/portfolio-section";
 import TestimonialsSection from "@/components/profile_management/testimonials/testimonials-section";
 
@@ -99,15 +94,6 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
   .eq("user_id", profile.id);
 
   if (caseStudiesError) console.error("Case Studies error", caseStudiesError);
-  // TODO: TO BE IMPLEMENTED LATER
-  // const metrics = [
-  //   { label: "Avg. Accessibility Score", value: "98/100" },
-  //   { label: "User Satisfaction", value: "4.8/5" },
-  //   { label: "Designs Published", value: 27 },
-  //   { label: "WCAG Success Criteria Met", value: "100%" },
-  // ];
-
-  // console.error("currentUser.id:", currentUser?.user?.id, "profileId:", profile.id);
 
   return (
     <div className="bg-transparent lg:p-10">
@@ -181,51 +167,6 @@ export default async function ProfilePage(propsPromise: Promise<ProfilePages>) {
           caseStudies={caseStudies ?? []}
           profileId={profile?.id}
         />
-
-        {/*TODO: To be implemented later Impact Metrics */}
-        {/* <div className="bg-white dark:bg-[#1A1A1A]/25 rounded-xl p-5 shadow-md">
-          <h2 className="text-xl font-semibold mb-5 text-[#1A1A1A] dark:text-white">
-            Impact Metrics
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              {
-                label: "Accessibility Score",
-                value: "98/100",
-                icon: <Accessibility size={25} className="text-white" />,
-              },
-              {
-                label: "User Satisfaction",
-                value: "4.8/5",
-                icon: <Star size={25} className="text-white" />,
-              },
-              {
-                label: "Designs Published",
-                value: 27,
-                icon: <FileText size={25} className="text-white" />,
-              },
-              {
-                label: "WCAG Criteria Met",
-                value: "100%",
-                icon: <Check size={25} className="text-white" />,
-              },
-            ].map((metric, i) => (
-              <div key={i} className="flex items-center gap-4">
-                <div className="bg-[#ED5E20] p-3 rounded-full shrink-0">
-                  {metric.icon}
-                </div>
-                <div>
-                  <p className="text-xl font-bold text-[#1A1A1A] dark:text-white">
-                    {metric.value}
-                  </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-300">
-                    {metric.label}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div> */}
 
           {/*TODO: TO BE IMPLEMENTED  */}
         {/* Testimonials & Contact */}

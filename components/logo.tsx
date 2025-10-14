@@ -2,6 +2,7 @@
 
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 
 export default function Logo() {
   const { resolvedTheme } = useTheme();
@@ -16,5 +17,12 @@ export default function Logo() {
       ? "/uxhibit-logo-light-mode.svg"
       : "/uxhibit-logo-dark-mode.svg";
 
-  return <img src={logoSrc} alt="Logo" className="h-8 w-auto" />;
+  <Image
+    src={logoSrc}
+    alt="Logo"
+    width={120}
+    height={32}
+    className="h-8 w-auto"
+    priority
+  />
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   RadarChart,
   PolarGrid,
@@ -10,20 +10,20 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { IconLoader2, IconDownload } from "@tabler/icons-react";
-import { createClient } from "@/utils/supabase/client";
+// import { createClient } from "@/utils/supabase/client";
 
-const HEURISTICS = [
-  { heuristic: "01", fullName: "Visibility of System Status" },
-  { heuristic: "02", fullName: "Match Between System and the Real World" },
-  { heuristic: "03", fullName: "User Control and Freedom" },
-  { heuristic: "04", fullName: "Consistency and Standards" },
-  { heuristic: "05", fullName: "Error Prevention" },
-  { heuristic: "06", fullName: "Recognition Rather than Recall" },
-  { heuristic: "07", fullName: "Flexibility and Efficiency of Use" },
-  { heuristic: "08", fullName: "Aesthetic and Minimalist Design" },
-  { heuristic: "09", fullName: "Help Users Recognize, Diagnose, and Recover from Errors" },
-  { heuristic: "10", fullName: "Help and Documentation" },
-];
+// const HEURISTICS = [
+//   { heuristic: "01", fullName: "Visibility of System Status" },
+//   { heuristic: "02", fullName: "Match Between System and the Real World" },
+//   { heuristic: "03", fullName: "User Control and Freedom" },
+//   { heuristic: "04", fullName: "Consistency and Standards" },
+//   { heuristic: "05", fullName: "Error Prevention" },
+//   { heuristic: "06", fullName: "Recognition Rather than Recall" },
+//   { heuristic: "07", fullName: "Flexibility and Efficiency of Use" },
+//   { heuristic: "08", fullName: "Aesthetic and Minimalist Design" },
+//   { heuristic: "09", fullName: "Help Users Recognize, Diagnose, and Recover from Errors" },
+//   { heuristic: "10", fullName: "Help and Documentation" },
+// ];
 
 // Hardcoded demo data
 const DEMO_DATA = [
@@ -66,6 +66,7 @@ const HeuristicDashboard = () => {
     } catch (error) {
       setIsGeneratingPDF(false);
       alert("Failed to generate PDF report. Please try again.");
+      throw error;
     }
   };
 

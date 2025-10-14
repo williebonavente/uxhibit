@@ -88,7 +88,7 @@ export default function ProfileAboutSectionClient({
       const { data: { user } } = await supabase.auth.getUser();
 
       // Use maybeSingle to avoid error if no row exists
-      const { data: profileDetails, error } = await supabase
+      const { data: profileDetails } = await supabase
         .from("profile_details")
         .select("profile_id")
         .eq("profile_id", profileId)
@@ -97,10 +97,6 @@ export default function ProfileAboutSectionClient({
       const ownerCheck = Boolean(user && profileDetails && user.id === profileDetails.profile_id);
       setIsOwner(ownerCheck);
 
-      // Log as requested
-      // console.log("isOwner:", ownerCheck);
-      // console.log("contact:", null); // You can replace null with actual contact data if available
-      // console.log("isEditing:", false); // Or use your state if you have one
     }
     checkOwner();
   }, [profileId, supabase]);

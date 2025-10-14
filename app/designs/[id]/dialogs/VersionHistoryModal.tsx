@@ -76,6 +76,7 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
             try {
                 aiData = JSON.parse(aiData);
             } catch (e) {
+                console.log(e);
                 aiData = {};
             }
         }

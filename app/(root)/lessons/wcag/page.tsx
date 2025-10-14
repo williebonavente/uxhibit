@@ -3,11 +3,7 @@
 import { useState } from "react";
 import {
   IconBook,
-  IconAccessible,
   IconEye,
-  IconKeyboard,
-  IconFileText,
-  IconChecklist,
   IconChevronDown
 } from "@tabler/icons-react";
 

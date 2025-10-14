@@ -1,14 +1,12 @@
 import React from "react";
 import { useState } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { useRouter } from "next/navigation";
 import {
     IconHistory,
     IconSearch,
     IconFilter,
     IconSortAscending,
     IconSortDescending,
-    IconArrowLeft,
     IconSend,
 } from "@tabler/icons-react";
 import { Menu, MessageSquare } from "lucide-react";
@@ -57,7 +55,6 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
     setSortOrder,
     sortRef,
     design,
-    selectedVersion,
     publishProject,
     unpublishProject,
     syncPublishedState,

@@ -34,68 +34,6 @@ export default function ProjectPerformanceComparisonPage() {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [projectData, setProjectData] = useState<ProjectData[]>([]);
 
-  // Sample data for the project performance table
-  //TODO: Data fetching needed
-  // const projectData: ProjectData[] = [
-  //   {
-  //     title: "Project 07",
-  //     score: 95,
-  //     submissionDate: "June 10, 2025",
-  //     feedbackItems: 12,
-  //     severity: "Minor",
-  //     dateSort: new Date("2025-06-10"),
-  //   },
-  //   {
-  //     title: "Project 06",
-  //     score: 70,
-  //     submissionDate: "June 01, 2025",
-  //     feedbackItems: 13,
-  //     severity: "Minor",
-  //     dateSort: new Date("2025-06-01"),
-  //   },
-  //   {
-  //     title: "Project 05",
-  //     score: 65,
-  //     submissionDate: "May 25, 2025",
-  //     feedbackItems: 14,
-  //     severity: "Minor",
-  //     dateSort: new Date("2025-05-25"),
-  //   },
-  //   {
-  //     title: "Project 04",
-  //     score: 50,
-  //     submissionDate: "May 12, 2025",
-  //     feedbackItems: 15,
-  //     severity: "Major",
-  //     dateSort: new Date("2025-05-12"),
-  //   },
-  //   {
-  //     title: "Project 03",
-  //     score: 40,
-  //     submissionDate: "April 10, 2025",
-  //     feedbackItems: 16,
-  //     severity: "Major",
-  //     dateSort: new Date("2025-04-10"),
-  //   },
-  //   {
-  //     title: "Project 02",
-  //     score: 20,
-  //     submissionDate: "March 18, 2025",
-  //     feedbackItems: 17,
-  //     severity: "Major",
-  //     dateSort: new Date("2025-03-18"),
-  //   },
-  //   {
-  //     title: "Project 01",
-  //     score: 25,
-  //     submissionDate: "March 20, 2025",
-  //     feedbackItems: 18,
-  //     severity: "Major",
-  //     dateSort: new Date("2025-03-20"),
-  //   },
-  // ];
-
-
   useEffect(() => {
     const fetchProjectData = async () => {
       const supabase = createClient();
@@ -268,8 +206,8 @@ export default function ProjectPerformanceComparisonPage() {
     // Apply sorting
     if (sortConfig !== null) {
       filtered.sort((a, b) => {
-        let aValue: any = a[sortConfig.key as keyof ProjectData];
-        let bValue: any = b[sortConfig.key as keyof ProjectData];
+        const aValue: any = a[sortConfig.key as keyof ProjectData];
+        const bValue: any = b[sortConfig.key as keyof ProjectData];
 
         if (aValue < bValue) {
           return sortConfig.direction === "asc" ? -1 : 1;

@@ -17,9 +17,6 @@ export default function ProfileSkills({
   skills,
   profileId,
   isOwner,
-  onAddSkill,
-  onDeleteSkill,
-  onEditSkill,
 }: ProfileSkillsProps) {
   const [showManage, setShowManage] = useState(false);
   const [localSkills, setLocalSkills] = useState<string[]>(skills);
