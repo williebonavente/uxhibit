@@ -189,9 +189,12 @@ export default function Evaluate() {
 
         const data = await res.json();
         console.log(`[handleSubmit] Evaluation response data:`, data);
-
         const expectedIds = Object.keys(parsed.frameImages || {});
-        frames = (data.results || []).filter((f: EvalResponse) => expectedIds.includes(f.nodeId));
+        console.log("Raw results: ", data.results);
+        console.log("Expected frame IDs: ", expectedIds);
+        frames = (data.results || []).filter((f: any) =>
+          expectedIds.includes(f.nodeId || f.node_id)
+        );
         console.log(`[handleSubmit] Evaluated frames count: ${frames.length} / ${expectedIds.length}`, frames);
 
         setEvaluatedFrames(frames);
