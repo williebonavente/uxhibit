@@ -64,7 +64,6 @@ export async function evaluateFrames({
   if (authError || !user) {
     throw new Error('Unauthorized - user not found');
   }
-  // Instead of using an image URL:
   figmaFileUrl = figmaFileUrl;
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";

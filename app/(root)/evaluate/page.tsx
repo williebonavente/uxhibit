@@ -92,11 +92,15 @@ export default function Evaluate() {
   }
 
   async function handleSubmit() {
+    console.log("[handleSubmit] Started");
+
     if (!parsed) {
+      console.log("[handleSubmit] No parsed design");
       toast.error("No parsed design");
       return;
     }
     if (!age || !occupation) {
+      console.log("[handleSubmit] Parameters missing", { age, occupation });
       toast.error("Parameters missing");
       return;
     }
@@ -104,13 +108,19 @@ export default function Evaluate() {
     const {
       data: { session },
     } = await supabase.auth.getSession();
+    console.log("[handleSubmit] Supabase session", session);
+
     if (!session?.user) {
+      console.log("[handleSubmit] Sign in required");
       toast.error("Sign in required.");
       return;
     }
 
     const frameEntries = Object.entries(parsed.frameImages || {});
+    console.log("[handleSubmit] Frame entries", frameEntries);
+
     if (frameEntries.length === 0) {
+      console.log("[handleSubmit] No frames found in parsed design");
       toast.error("No frames found in parsed design.");
       setStep(2);
       return;
@@ -121,6 +131,17 @@ export default function Evaluate() {
 
     setSubmitting(true);
     try {
+      console.log("[handleSubmit] Saving design to API", {
+        title: parsed.name,
+        figma_link: link,
+        file_key: parsed.fileKey,
+        node_id: parsed.nodeId,
+        thumbnail_url: parsed.thumbnail,
+        age,
+        occupation,
+        snapshot: { age, occupation },
+      });
+
       const saveRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/designs`, {
         method: "POST",
         headers: {
@@ -137,31 +158,46 @@ export default function Evaluate() {
           snapshot: { age, occupation },
         }),
       });
-      const saved = await saveRes.json();
+      console.log("[handleSubmit] Save response status", saveRes.status);
 
+      const saved = await saveRes.json();
+      console.log("[handleSubmit] Save response data", saved);
 
       if (!saveRes.ok || !saved?.design?.id) {
+        console.log("[handleSubmit] Save failed", saved?.error);
         toast.error(saved?.error || "Save failed");
         return;
       }
 
       setSavedDesignId(saved.design.id);
+      console.log("[handleSubmit] Saved design ID", saved.design.id);
 
       let pollCount = 0;
       let frames: EvalResponse[] = [];
       while (pollCount < 60) {
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+        console.log(`[handleSubmit] Polling evaluation (attempt ${pollCount + 1}) for design ID: ${saved.design.id}`);
         const res = await fetch(`${baseUrl}/api/designs/${saved.design.id}/evaluations?ts=${Date.now()}`);
+        console.log(`[handleSubmit] Evaluation response status: ${res.status}`);
+
         if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          console.log("[handleSubmit] Failed to fetch evaluation results", errorData);
           toast.error("Failed to fetch evaluation results.");
           break;
         }
+
         const data = await res.json();
+        console.log(`[handleSubmit] Evaluation response data:`, data);
+
         const expectedIds = Object.keys(parsed.frameImages || {});
         frames = (data.results || []).filter((f: EvalResponse) => expectedIds.includes(f.nodeId));
+        console.log(`[handleSubmit] Evaluated frames count: ${frames.length} / ${expectedIds.length}`, frames);
+
         setEvaluatedFrames(frames);
 
         if (frames.length === expectedIds.length) {
+          console.log("[handleSubmit] All frames evaluated, redirecting...");
           toast.success("Design and AI evaluation completed for all frames");
           router.push(`/designs/${saved.design.id}`);
           return;
@@ -173,15 +209,20 @@ export default function Evaluate() {
 
       // After timeout, redirect anyway
       if (frames.length < frameEntries.length) {
+        console.log("[handleSubmit] Timeout: Not all frames evaluated", {
+          framesEvaluated: frames.length,
+          expected: frameEntries.length,
+        });
         toast.warning("Design saved, but AI evaluation did not complete.");
         router.push(`/designs/${saved.design.id}`);
       }
 
     } catch (error) {
-      console.error("Submit failed:", error);
+      console.error("[handleSubmit] Submit failed:", error);
       toast.error("Submit failed");
     } finally {
       setSubmitting(false);
+      console.log("[handleSubmit] Finished");
     }
   }
 
