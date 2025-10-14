@@ -23,7 +23,7 @@ type DesignRow = {
   id: string;
   title: string;
   thumbnail_url: string | null;
-  thumbnail_storage_path: string | null; // This is the original storage path
+  thumbnail_storage_path: string | null;
   file_key: string | null;
   node_id: string | null;
   current_version_id: string | null;

@@ -194,24 +194,6 @@ export default function Evaluate() {
     setParsing(false);
   }
 
-  useEffect(() => {
-    if (!jobId) return;
-    const interval = setInterval(async () => {
-      const res = await fetch(`/api/ai/evaluate/progress?jobId=${jobId}`);
-      const data = await res.json();
-      setProgress(data.progress);
-      if (data.progress >= 100) {
-        clearInterval(interval);
-        // Redirect to the evaluated design page using savedDesignId
-        if (savedDesignId) {
-          router.push(`/designs/${savedDesignId}`);
-        }
-      }
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [jobId, savedDesignId, router]);
-
-
   return (
     <div
       className="min-h-screen flex items-center justify-center"
@@ -685,7 +667,6 @@ export default function Evaluate() {
                     aria-hidden
                     className="absolute inset-[2px] rounded-[10px] bg-[linear-gradient(145deg,rgba(255,255,255,0.28),rgba(255,255,255,0.07))] backdrop-blur-[2px] cursor-pointer"
                   />
-
                   {/* Animated sheen */}
                   {!submitting && (
                     <span
@@ -695,7 +676,6 @@ export default function Evaluate() {
                       <span className="absolute inset-y-0 -left-full w-1/2 translate-x-0 bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70" />
                     </span>
                   )}
-
                   {/* Border ring */}
                   <span
                     aria-hidden
@@ -751,6 +731,11 @@ export default function Evaluate() {
           </div>
         )}
       </div>
+      {savedDesignId && (
+        <div className="mt-4 text-sm text-gray-500">
+          Design ID: <span className="font-mono">{savedDesignId}</span>
+        </div>
+      )}
     </div>
   );
 }

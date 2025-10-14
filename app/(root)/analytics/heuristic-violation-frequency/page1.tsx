@@ -42,10 +42,10 @@ const HeuristicDashboard = () => {
 
   const [heuristicData, setHeuristicData] = useState<HeuristicChartData[]>([]);
 
-  useEffect(() => {
+    useEffect(() => {
     const fetchHeuristicData = async () => {
       const supabase = createClient();
-
+  
       // 1. Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) {
@@ -53,41 +53,45 @@ const HeuristicDashboard = () => {
         return;
       }
       const currentUserId = user.id;
-
+  
       // 2. Get all latest versions for the user's designs
       const { data: designs, error: designsError } = await supabase
         .from("designs")
         .select("current_version_id")
         .eq("owner_id", currentUserId);
-
+  
       if (designsError) {
         toast.error("Error fetching designs");
         return;
       }
-
-      const versionIds = (designs || []).map((d: any) => d.current_version_id).filter(Boolean);
-
+  
+      type DesignRow = { current_version_id: string };
+      const versionIds = (designs as DesignRow[] || []).map((d) => d.current_version_id).filter(Boolean);
+  
       // 3. Fetch all design_versions for these versionIds
-      const allIssues: any[] = [];
+      type DesignVersion = { ai?: unknown; ai_data?: unknown };
+      type AIssue = { heuristic: string; severity: "high" | "medium" | "low" };
+  
+      const allIssues: AIssue[] = [];
       if (versionIds.length > 0) {
         const { data: versionsData, error: versionsError } = await supabase
           .from("design_versions")
           .select("ai, ai_data")
           .in("id", versionIds);
-
+  
         if (versionsError) {
           toast.error("Error fetching design versions");
         } else {
-          (versionsData || []).forEach((version: any, idx: number) => {
-            let aiData = version.ai_data || version.ai;
+          (versionsData as DesignVersion[] || []).forEach((version, idx) => {
+            let aiData = version.ai_data ?? version.ai;
             if (typeof aiData === "string") {
               try { aiData = JSON.parse(aiData); } catch { aiData = {}; }
             }
             // Log the aiData for this version
             console.log(`Version ${idx} aiData:`, aiData);
-
-            if (Array.isArray(aiData?.issues)) {
-              aiData.issues.forEach((issue: any) => {
+  
+            if (Array.isArray((aiData as { issues?: AIssue[] })?.issues)) {
+              (aiData as { issues: AIssue[] }).issues.forEach((issue) => {
                 if (issue && typeof issue.heuristic === "string") {
                   allIssues.push(issue);
                 }
@@ -96,13 +100,13 @@ const HeuristicDashboard = () => {
           });
         }
       }
-
+  
       // 4. Count violations per heuristic and severity
       const counts: Record<string, { total: number; high: number; medium: number; low: number }> = {};
       HEURISTICS.forEach(h => {
         counts[h.heuristic] = { total: 0, high: 0, medium: 0, low: 0 };
       });
-
+  
       allIssues.forEach(issue => {
         if (issue.heuristic) {
           counts[issue.heuristic].total += 1;
@@ -112,7 +116,7 @@ const HeuristicDashboard = () => {
           }
         }
       });
-
+  
       // 5. Build data for the chart (you can use total, or show breakdowns)
       const chartData = HEURISTICS.map(h => ({
         heuristic: h.heuristic,
@@ -123,13 +127,13 @@ const HeuristicDashboard = () => {
         low: counts[h.heuristic].low,
         fullName: h.fullName,
       }));
-
+  
       console.log("All Issues: ", allIssues);
       console.log("Chart Data: ", chartData);
-
+  
       setHeuristicData(chartData);
     };
-
+  
     fetchHeuristicData();
   }, []);
 
