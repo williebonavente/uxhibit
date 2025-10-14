@@ -9,7 +9,7 @@ import { calculateAIWeightedScoreWithHeuristics } from "../scoringMethod/calcula
 import { Generation, Occupation } from "../scoringMethod/evaluationWeights";
 import { mapToIso9241 } from "../uxStandards/isoNielsenMapping";
 import { HeuristicScores } from "../types/isoTypesHeuristic";
-import { AccessibilityResult, LayoutResult, NormalizedFrame } from "../uxStandards/heuristicMapping";
+import { AccessibilityResult, LayoutResult } from "../uxStandards/heuristicMapping";
 
 
 export type AiEvaluator = {
@@ -48,8 +48,8 @@ export async function aiEvaluator(
 
     const client = new Mistral({ apiKey: MISTRAL_API_KEY });
     const limitedFrames = Array.isArray(context?.layoutResults)
-    ? context.layoutResults.slice(0, 5)
-    : [];
+        ? context.layoutResults.slice(0, 5)
+        : [];
 
     // TODO: currently working on
     //     const prompt = `${aiIntroPrompt}
@@ -149,9 +149,13 @@ export async function aiEvaluator(
     - Avoid generic feedback. Always reference the actual scores, issues, and text nodes provided.
     - Example: If a layout issue is detected, specify the node and the problem.
     `;
+    console.log("Snapshot received: ", snapshot);
     const heuristicMap = heuristics;
     const generation = snapshot?.age as Generation;
     const occupation = snapshot?.occupation as Occupation;
+
+    console.log("Generation: ", generation);
+    console.log("Occupation: ", occupation);
 
 
     const result = calculateAIWeightedScoreWithHeuristics(heuristicMap, generation, occupation);

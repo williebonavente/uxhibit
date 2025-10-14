@@ -1,6 +1,5 @@
 import { AiEvaluator, aiEvaluator } from "@/lib/ai/aiEvaluator";
 import { getHeuristicScores } from "../uxStandards/heuristicMapping";
-import { AuthError, SupabaseClient, User } from "@supabase/supabase-js";
 
 export async function evaluateFrames({
   frameIds,
@@ -12,6 +11,7 @@ export async function evaluateFrames({
   snapshot,
   authError,
   supabase,
+  figmaFileUrl,
 }: {
   frameIds: string[],
   frameImages: Record<string, string>,
@@ -22,6 +22,7 @@ export async function evaluateFrames({
   snapshot?: any,
   authError?: any,
   supabase: any,
+  figmaFileUrl: string,
 }) {
   const frameSupabaseUrls: Record<string, string> = {};
 
@@ -64,7 +65,7 @@ export async function evaluateFrames({
     throw new Error('Unauthorized - user not found');
   }
   // Instead of using an image URL:
-  const figmaFileUrl = options.figmaFileUrl; // Make sure this is passed in EvaluateFramesOptions
+  figmaFileUrl = figmaFileUrl;
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
   const res = await fetch(`${baseUrl}/api/figma/parse?url=${encodeURIComponent(figmaFileUrl)}`);
@@ -79,7 +80,8 @@ export async function evaluateFrames({
       let ai_error: string | undefined;
 
       try {
-        ai = await aiEvaluator(imageUrl, heuristics, snapshot);
+        ai = await aiEvaluator(imageUrl, heuristics, {}, snapshot);
+        console.log("I am just adding the console.log to check the snapshot: ", snapshot)
         if (!ai) ai_error = "mistral_skipped_or_empty";
         if (ai && Array.isArray(ai.issues)) {
           ai.issues = ai.issues.map((issue, issueIdx) => ({
@@ -111,8 +113,8 @@ export async function evaluateFrames({
             created_at: new Date().toISOString(),
             owner_id: user.id
           },
-          { onConflict: ['design_id', 'node_id']}
-        );
+            { onConflict: ['design_id', 'node_id'] }
+          );
         } catch (err) {
           console.log(err);
           throw err;
@@ -133,6 +135,9 @@ export async function evaluateFrames({
     ? Math.round(validResults.reduce((sum, r) => sum + (r.ai?.overall_score ?? 0), 0) / validResults.length)
     : 0;
   const summary = `Aggregate summary: ${validResults.map(r => r.ai?.summary).join(" | ")}`;
+
+  // Assign a jobId, e.g., using designId and versionId for uniqueness
+  const jobId = `${designId}-${versionId ?? "latest"}`;
 
   return {
     jobId,

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import Image from "next/image";
-// import { useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { FrameCarousel } from "@/components/carousel/frame-carousel";
@@ -11,8 +11,8 @@ import { IconLink } from "@tabler/icons-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { EvalResponse } from "@/app/designs/[id]/page";
-
-
+import { AlertCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 type ParsedMeta = {
   fileKey: string;
   nodeId?: string;
@@ -29,7 +29,7 @@ export default function Evaluate() {
       "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='22' stroke='%23ffffff' fill='none' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 3l7 17 2-7 7-2-16-8Z'/></svg>\") 3 3, pointer",
   };
 
-  // const router = useRouter();
+  const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
   const supabase = createClient();
@@ -69,12 +69,6 @@ export default function Evaluate() {
         body: JSON.stringify({ url: link }),
       });
       const data = await res.json();
-
-      if (data) {
-        console.log("There is data", { data });
-      } else {
-        console.log("No metadata found in Figma parse response.");
-      }
 
       if (!res.ok) {
         toast.error(data?.error || "Parse failed");
@@ -144,10 +138,6 @@ export default function Evaluate() {
         }),
       });
       const saved = await saveRes.json();
-      console.log("Design save response:", saved);
-
-      // Set jobId for progress polling
-      setJobId(saved.jobId || saved.ai_evaluation?.jobId);
 
 
       if (!saveRes.ok || !saved?.design?.id) {
@@ -159,7 +149,7 @@ export default function Evaluate() {
 
       let pollCount = 0;
       let frames: EvalResponse[] = [];
-      while (pollCount < 60) { // up to 2 minutes
+      while (pollCount < 60) {
         const res = await fetch(`/api/designs/${saved.design.id}/evaluations?ts=${Date.now()}`);
         if (!res.ok) {
           toast.error("Failed to fetch evaluation results.");
@@ -169,10 +159,6 @@ export default function Evaluate() {
         const expectedIds = Object.keys(parsed.frameImages || {});
         frames = (data.results || []).filter((f: EvalResponse) => expectedIds.includes(f.node_id));
         setEvaluatedFrames(frames);
-
-        console.log("Filtered polling evaluation results:", frames);
-        console.log("Expected frame IDs:", expectedIds);
-        console.log("Expected frame count:", expectedIds.length);
 
         if (frames.length === expectedIds.length) {
           toast.success("Design and AI evaluation completed for all frames");
@@ -207,24 +193,6 @@ export default function Evaluate() {
     setSubmitting(false);
     setParsing(false);
   }
-
-  useEffect(() => {
-    if (!jobId) return;
-    const interval = setInterval(async () => {
-      const res = await fetch(`/api/ai/evaluate/progress?jobId=${jobId}`);
-      const data = await res.json();
-      setProgress(data.progress);
-      if (data.progress >= 100) {
-        clearInterval(interval);
-        // Redirect to the evaluated design page using savedDesignId
-        if (savedDesignId) {
-          router.push(`/designs/${savedDesignId}`);
-        }
-      }
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [jobId, savedDesignId, router]);
-
 
   return (
     <div

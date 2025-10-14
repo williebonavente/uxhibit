@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { evaluateFrames } from "@/lib/ai/evaluateFrames";
 import { saveDesignVersion } from "@/lib/ai/saveDesignVersion";
-import { nanoid } from "nanoid";
 export const runtime = "nodejs";
 
 
@@ -53,10 +52,20 @@ export async function POST(req: Request) {
         }, { status: 400 });
     }
 
-    // Start evaluation in background (do not await)
-    // `validResults`
+    let finalThumbnailUrl = thumbnailUrl;
+    if (!finalThumbnailUrl) {
+        const { data: designRow } = await supabase
+            .from("designs")
+            .select("thumbnail_url")
+            .eq("id", designId)
+            .maybeSingle();
+        if (designRow?.thumbnail_url) finalThumbnailUrl = designRow.thumbnail_url;
+    }
+
+    console.log("Snapshot should have a value here: ", snapshot);
+
     (async () => {
-        const { frameResults, total_score, summary } = await evaluateFrames({
+        const { frameResults, total_score, summary, } = await evaluateFrames({
             frameIds,
             frameImages,
             user,
@@ -66,6 +75,8 @@ export async function POST(req: Request) {
             snapshot,
             authError,
             supabase,
+            figmaFileUrl: url,
+
         });
 
         await saveDesignVersion({
@@ -73,7 +84,7 @@ export async function POST(req: Request) {
             designId,
             fileKey,
             nodeId,
-            thumbnailUrl,
+            thumbnailUrl: finalThumbnailUrl,
             fallbackImageUrl,
             summary,
             frameResults,

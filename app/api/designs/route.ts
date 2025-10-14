@@ -17,8 +17,6 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { title, figma_link, file_key, node_id, thumbnail_url, snapshot, evaluate = true } = body;
 
-    console.log("Received design submission:", { title, figma_link, file_key, node_id });
-
     // Check for existing design
     const { data: existing, error: existErr } = await supabase
       .from("designs")
@@ -33,12 +31,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: existErr.message }, { status: 400 });
     }
 
-    let designId;
-    let storedThumbnail = thumbnail_url || null;
+    let designId: string | undefined;
+    let storedThumbnail: any = thumbnail_url || null;
 
     // EXISTING DESIGN
     if (existing?.id) {
-      let storedThumbnail = thumbnail_url || null;
+      designId = existing.id;
       let thumbnailPromise: Promise<any> = Promise.resolve(null);
       if (thumbnail_url) {
         thumbnailPromise = uploadThumbnailFromUrl(
@@ -47,6 +45,20 @@ export async function POST(req: Request) {
           designId,
           { makePublic: false }
         );
+      }
+
+      const up = await thumbnailPromise;
+      if (up) {
+        if (up.signedUrl) storedThumbnail = up.signedUrl;
+        else if (up.publicUrl) storedThumbnail = up.publicUrl;
+        else if (up.path) storedThumbnail = up.path;
+
+        // Update the design with the thumbnail URL
+        const { error: thumbErr } = await supabase
+          .from("designs")
+          .update({ thumbnail_url: storedThumbnail })
+          .eq("id", existing.id);
+        if (thumbErr) console.error("Error updating thumbnail:", thumbErr);
       }
 
       // Start AI evaluation in background
@@ -67,20 +79,6 @@ export async function POST(req: Request) {
             })
           });
         })();
-      }
-
-      const up = await thumbnailPromise;
-      if (up) {
-        if (up.signedUrl) storedThumbnail = up.signedUrl;
-        else if (up.publicUrl) storedThumbnail = up.publicUrl;
-        else if (up.path) storedThumbnail = up.path;
-
-        // Update the design with the thumbnail URL
-        const { error: thumbErr } = await supabase
-          .from("designs")
-          .update({ thumbnail_url: storedThumbnail })
-          .eq("id", existing.id);
-        if (thumbErr) console.error("Error updating thumbnail:", thumbErr);
       }
 
       return NextResponse.json({
@@ -111,7 +109,8 @@ export async function POST(req: Request) {
       .single();
     if (dErr) return NextResponse.json({ error: dErr.message }, { status: 400 });
 
-    let storedThumbnail = thumbnail_url || null;
+    designId = design.id;
+    storedThumbnail = thumbnail_url || null;
     let thumbnailPromise: Promise<any> = Promise.resolve(null);
     if (thumbnail_url) {
       thumbnailPromise = uploadThumbnailFromUrl(
@@ -120,6 +119,20 @@ export async function POST(req: Request) {
         design.id,
         { makePublic: false }
       );
+    }
+
+    const up = await thumbnailPromise;
+    if (up) {
+      if (up.signedUrl) storedThumbnail = up.signedUrl;
+      else if (up.publicUrl) storedThumbnail = up.publicUrl;
+      else if (up.path) storedThumbnail = up.path;
+
+      // Update the design with the thumbnail URL
+      const { error: thumbErr } = await supabase
+        .from("designs")
+        .update({ thumbnail_url: storedThumbnail })
+        .eq("id", design.id);
+      if (thumbErr) console.error("Error updating thumbnail:", thumbErr);
     }
 
     // Start AI evaluation in background
@@ -140,20 +153,6 @@ export async function POST(req: Request) {
           })
         });
       })();
-    }
-
-    const up = await thumbnailPromise;
-    if (up) {
-      if (up.signedUrl) storedThumbnail = up.signedUrl;
-      else if (up.publicUrl) storedThumbnail = up.publicUrl;
-      else if (up.path) storedThumbnail = up.path;
-
-      // Update the design with the thumbnail URL
-      const { error: thumbErr } = await supabase
-        .from("designs")
-        .update({ thumbnail_url: storedThumbnail })
-        .eq("id", design.id);
-      if (thumbErr) console.error("Error updating thumbnail:", thumbErr);
     }
 
     // Final response

@@ -3,7 +3,7 @@ import { normalizeDocument, getEffectiveBackgroundColor } from "@/utils/extracto
 import { FigmaNodesResponse, TextNode, FrameNode } from "@/lib/declaration/figmaInfo";
 
 function mapContrastToScoreAndLevel(ratio: number, fontSize: number): { score: number; level: string } {
-  const isLargeText = fontSize >= 18 || fontSize >= 14; // assuming bold weight is handled if available
+  const isLargeText = fontSize >= 18 || fontSize >= 14;
 
   if (ratio >= 7) {
     return { score: 100, level: "AAA" };
