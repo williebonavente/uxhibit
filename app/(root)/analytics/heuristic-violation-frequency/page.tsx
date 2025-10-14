@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   RadarChart,
   PolarGrid,
@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { IconLoader2, IconDownload } from "@tabler/icons-react";
+import { createClient } from "@/utils/supabase/client";
 
 const HEURISTICS = [
   { heuristic: "01", fullName: "Visibility of System Status" },

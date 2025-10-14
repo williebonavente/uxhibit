@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+// import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { FrameCarousel } from "@/components/carousel/frame-carousel";
@@ -193,6 +193,24 @@ export default function Evaluate() {
     setSubmitting(false);
     setParsing(false);
   }
+
+  useEffect(() => {
+    if (!jobId) return;
+    const interval = setInterval(async () => {
+      const res = await fetch(`/api/ai/evaluate/progress?jobId=${jobId}`);
+      const data = await res.json();
+      setProgress(data.progress);
+      if (data.progress >= 100) {
+        clearInterval(interval);
+        // Redirect to the evaluated design page using savedDesignId
+        if (savedDesignId) {
+          router.push(`/designs/${savedDesignId}`);
+        }
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [jobId, savedDesignId, router]);
+
 
   return (
     <div
