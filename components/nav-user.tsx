@@ -94,7 +94,6 @@ export function NavUser({ user }: { user: User | null }) {
       setLoading(false);
       return;
     }
-    console.log("User here no error: ", user);
     try {
       setLoading(true);
       const supabase = createClient();

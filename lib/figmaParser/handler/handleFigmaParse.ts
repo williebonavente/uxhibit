@@ -57,7 +57,6 @@ export async function handleFigmaParse(url: string) {
             }
         }
     }
-    // Parallelize image and metadata fetches
     const [nodeImageUrl, frameImageUrl, metadataJson] = await Promise.all([
         parsed.nodeId ? fetchFigmaImage(parsed.fileKey, parsed.nodeId) : Promise.resolve(null),
         extractedFrameId ? fetchFigmaImage(parsed.fileKey, extractedFrameId) : Promise.resolve(null),

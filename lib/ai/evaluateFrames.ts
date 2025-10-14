@@ -67,7 +67,7 @@ export async function evaluateFrames({
   // Instead of using an image URL:
   figmaFileUrl = figmaFileUrl;
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const res = await fetch(`${baseUrl}/api/figma/parse?url=${encodeURIComponent(figmaFileUrl)}`);
   const figmaContext = await res.json();
   console.log(figmaContext);

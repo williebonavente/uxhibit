@@ -82,13 +82,13 @@ const HeuristicDashboard = () => {
         if (versionsError) {
           toast.error("Error fetching design versions");
         } else {
-          (versionsData as DesignVersion[] || []).forEach((version, idx) => {
+          (versionsData as DesignVersion[] || []).forEach((version) => {
             let aiData = version.ai_data ?? version.ai;
             if (typeof aiData === "string") {
               try { aiData = JSON.parse(aiData); } catch { aiData = {}; }
             }
             // Log the aiData for this version
-            console.log(`Version ${idx} aiData:`, aiData);
+            // console.log(`Version ${idx} aiData:`, aiData);
   
             if (Array.isArray((aiData as { issues?: AIssue[] })?.issues)) {
               (aiData as { issues: AIssue[] }).issues.forEach((issue) => {

@@ -3,8 +3,6 @@ import { createClient } from "@/utils/supabase/server";
 import { evaluateFrames } from "@/lib/ai/evaluateFrames";
 import { saveDesignVersion } from "@/lib/ai/saveDesignVersion";
 export const runtime = "nodejs";
-
-
 export async function POST(req: Request) {
     const { url, designId, nodeId, thumbnailUrl, fallbackImageUrl, versionId, snapshot } = await req.json();
 
@@ -15,7 +13,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Missing Figma URL" }, { status: 400 });
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const parseRes = await fetch(`${baseUrl}/api/figma/parse`, {
         method: "POST",
         headers: {

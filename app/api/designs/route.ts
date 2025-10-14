@@ -31,7 +31,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: existErr.message }, { status: 400 });
     }
 
-    let designId: string | undefined;
+    let designId: string;
     let storedThumbnail: any = thumbnail_url || null;
 
     // EXISTING DESIGN
@@ -89,7 +89,7 @@ export async function POST(req: Request) {
           thumbnail_url: storedThumbnail,
         },
         existed: true,
-        ai_evaluation: "processing", // Indicate processing
+        ai_evaluation: "processing",
       });
     }
 
@@ -155,7 +155,6 @@ export async function POST(req: Request) {
       })();
     }
 
-    // Final response
     return NextResponse.json({
       design: {
         id: designId,
@@ -164,7 +163,7 @@ export async function POST(req: Request) {
         thumbnail_url: storedThumbnail,
       },
       existed: false,
-      ai_evaluation: "processing", // Indicate processing
+      ai_evaluation: "processing",
     });
   } catch (e: unknown) {
     console.error("Server error:", e);
