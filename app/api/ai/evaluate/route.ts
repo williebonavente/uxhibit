@@ -81,42 +81,40 @@ export async function POST(req: Request) {
 
     console.log("[AI Evaluate] Snapshot value:", snapshot);
 
-    // Start evaluation asynchronously
-    (async () => {
-        console.log("[AI Evaluate] Starting frame evaluation...");
-        const { frameResults, total_score, summary } = await evaluateFrames({
-            frameIds,
-            frameImages,
-            user,
-            designId,
-            fileKey,
-            versionId,
-            snapshot,
-            authError,
-            supabase,
-            figmaFileUrl: url,
-        });
+    // Start evaluation synchronously
+    console.log("[AI Evaluate] Starting frame evaluation...");
+    const { frameResults, total_score, summary } = await evaluateFrames({
+        frameIds,
+        frameImages,
+        user,
+        designId,
+        fileKey,
+        versionId,
+        snapshot,
+        authError,
+        supabase,
+        figmaFileUrl: url,
+    });
 
-        console.log("[AI Evaluate] Frame evaluation results:", { frameResults, total_score, summary });
+    console.log("[AI Evaluate] Frame evaluation results:", { frameResults, total_score, summary });
 
-        await saveDesignVersion({
-            supabase,
-            designId,
-            fileKey,
-            nodeId,
-            thumbnailUrl: finalThumbnailUrl,
-            fallbackImageUrl,
-            summary,
-            frameResults,
-            total_score,
-            snapshot,
-            user: user ?? undefined,
-        });
+    await saveDesignVersion({
+        supabase,
+        designId,
+        fileKey,
+        nodeId,
+        thumbnailUrl: finalThumbnailUrl,
+        fallbackImageUrl,
+        summary,
+        frameResults,
+        total_score,
+        snapshot,
+        user: user ?? undefined,
+    });
 
-        console.log("[AI Evaluate] Design version saved for designId:", designId);
-    })();
+    console.log("[AI Evaluate] Design version saved for designId:", designId);
 
-    // Respond immediately
+    // Respond after the evaluatoin is complete
     console.log("[AI Evaluate] Responding immediately: processing started");
     return NextResponse.json({
         status: "processing",
