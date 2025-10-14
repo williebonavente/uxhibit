@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { createClient } from '@/utils/supabase/server';
 
 const FIGMA_API = "https://api.figma.com/v1";
 
@@ -23,7 +22,7 @@ export async function POST(req: Request) {
             scale = 2,
             format = "png",
             upload = false,
-            designId
+            // designId
         } = body;
         if (!fileKey) return NextResponse.json({ error: "fileKey required" }, { status: 400 });
 
@@ -90,7 +89,6 @@ export async function POST(req: Request) {
 
         // Initialize Supabase only if uploading
         // TODO: to be implemented
-
 
         return NextResponse.json({
             count: collected.length,

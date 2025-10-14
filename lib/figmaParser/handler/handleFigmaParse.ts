@@ -13,156 +13,158 @@ import { FIGMA_TOKEN } from "@/constants/figma_token";
 import { LayoutCheckResult } from "@/lib/declaration/figmaLayout";
 import { checkLayout } from "@/utils/extractor/frameLayoutChecker";
 
-
 export async function handleFigmaParse(url: string) {
-  if (!FIGMA_TOKEN) return NextResponse.json({ error: "Missing FIGMA_ACCESS_TOKEN" }, { status: 500 });
-  const parsed = parseFigmaUrl(url);
-  if (!parsed) return NextResponse.json({ error: "Invalid Figma URL" }, { status: 400 });
+    if (!FIGMA_TOKEN) return NextResponse.json({ error: "Missing FIGMA_ACCESS_TOKEN" }, { status: 500 });
+    const parsed = parseFigmaUrl(url);
+    if (!parsed) return NextResponse.json({ error: "Invalid Figma URL" }, { status: 400 });
 
-  // File metadata
-  const fileRes = await fetch(`https://api.figma.com/v1/files/${parsed.fileKey}`, {
-    headers: { "X-Figma-Token": FIGMA_TOKEN },
-    cache: "no-store",
-  });
-  if (!fileRes.ok) {
-    const detail = await fileRes.text().catch(() => "");
-    return NextResponse.json(
-      { error: "Figma file fetch failed", status: fileRes.status, detail, fileKey: parsed.fileKey },
-      { status: fileRes.status }
-    );
-  }
-  const fileJson = await fileRes.json();
-  let targetPages: FigmaNode[] = [];
-  const pages: FigmaNode[] = fileJson?.document?.children ?? [];
-
-  if (parsed.nodeId) {
-    targetPages = pages.filter((page: FigmaNode) => {
-      function containsNode(node: FigmaNode): boolean {
-        if (node.id === parsed?.nodeId) return true;
-        if (node.children) return node.children.some(containsNode);
-        return false;
-      }
-      return containsNode(page);
+    // File metadata
+    const fileRes = await fetch(`https://api.figma.com/v1/files/${parsed.fileKey}`, {
+        headers: { "X-Figma-Token": FIGMA_TOKEN },
+        cache: "no-store",
     });
-  } else {
-    targetPages = pages.length > 0 ? [pages[0]] : [];
-  }
-
-  let extractedFrameId: string | null = null;
-  if (parsed.nodeId) {
-    for (const page of pages) {
-      const parentFrame = findParentFrame(page, parsed.nodeId);
-      if (parentFrame) {
-        extractedFrameId = parentFrame.id;
-        break;
-      }
+    if (!fileRes.ok) {
+        const detail = await fileRes.text().catch(() => "");
+        return NextResponse.json(
+            { error: "Figma file fetch failed", status: fileRes.status, detail, fileKey: parsed.fileKey },
+            { status: fileRes.status }
+        );
     }
-  }
+    const fileJson = await fileRes.json();
+    let targetPages: FigmaNode[] = [];
+    const pages: FigmaNode[] = fileJson?.document?.children ?? [];
 
-  const nodeImageUrl = parsed.nodeId ? await fetchFigmaImage(parsed.fileKey, parsed.nodeId) : null;
-  const frameImageUrl = extractedFrameId ? await fetchFigmaImage(parsed.fileKey, extractedFrameId) : null;
+    if (parsed.nodeId) {
+        targetPages = pages.filter((page: FigmaNode) => {
+            function containsNode(node: FigmaNode): boolean {
+                if (node.id === parsed?.nodeId) return true;
+                if (node.children) return node.children.some(containsNode);
+                return false;
+            }
+            return containsNode(page);
+        });
+    } else {
+        targetPages = pages.length > 0 ? [pages[0]] : [];
+    }
 
-  const { ids: allFrameIds, themedIds } = targetPages.reduce(
-    (acc: { ids: string[]; themedIds: string[] }, page: FigmaNode) => {
-      const { ids, themedIds } = collectReasonableFrameIds(page, [], []);
-      acc.ids.push(...ids);
-      acc.themedIds.push(...themedIds);
-      return acc;
-    },
-    { ids: [], themedIds: [] }
-  );
+    let extractedFrameId: string | null = null;
+    if (parsed.nodeId) {
+        for (const page of pages) {
+            const parentFrame = findParentFrame(page, parsed.nodeId);
+            if (parentFrame) {
+                extractedFrameId = parentFrame.id;
+                break;
+            }
+        }
+    }
+    // Parallelize image and metadata fetches
+    const [nodeImageUrl, frameImageUrl, metadataJson] = await Promise.all([
+        parsed.nodeId ? fetchFigmaImage(parsed.fileKey, parsed.nodeId) : Promise.resolve(null),
+        extractedFrameId ? fetchFigmaImage(parsed.fileKey, extractedFrameId) : Promise.resolve(null),
+        // We'll fetch metadata only if there are frame IDs, but assign below
+        Promise.resolve(null)
+    ]);
 
-  let frameImages: Record<string, string> = {};
-  if (allFrameIds.length > 0) {
-    const idsParam = allFrameIds.map(encodeURIComponent).join(",");
-    const imgRes = await fetch(
-      `https://api.figma.com/v1/images/${parsed.fileKey}?ids=${idsParam}&format=png&scale=2`,
-      { headers: { "X-Figma-Token": FIGMA_TOKEN } }
+    const { ids: allFrameIds, themedIds } = targetPages.reduce(
+        (acc: { ids: string[]; themedIds: string[] }, page: FigmaNode) => {
+            const { ids, themedIds } = collectReasonableFrameIds(page, [], []);
+            acc.ids.push(...ids);
+            acc.themedIds.push(...themedIds);
+            return acc;
+        },
+        { ids: [], themedIds: [] }
     );
 
-    if (imgRes.ok) {
-      const imgJson = await imgRes.json();
-      frameImages = imgJson.images || {};
+    let frameImages: Record<string, string> = {};
+    if (allFrameIds.length > 0) {
+        const idsParam = allFrameIds.map(encodeURIComponent).join(",");
+        const imgRes = await fetch(
+            `https://api.figma.com/v1/images/${parsed.fileKey}?ids=${idsParam}&format=png&scale=0.75`,
+            { headers: { "X-Figma-Token": FIGMA_TOKEN } }
+        );
+
+        if (imgRes.ok) {
+            const imgJson = await imgRes.json();
+            frameImages = imgJson.images || {};
+        }
     }
-  }
 
-  let frameMetadata: Record<string, any> = {};
-  let frameAccessibility: any[] = [];
-  let allTextNodes: Record<string, TextNode[]> = {};
-  let accessibilityResults: any = null;
+    let frameMetadata: Record<string, any> = {};
+    let frameAccessibility: any[] = [];
+    let allTextNodes: Record<string, TextNode[]> = {};
+    let accessibilityResults: any = null;
 
-  if (allFrameIds.length > 0) {
-    const metadataJson = await fetchFigmaNodeData(parsed.fileKey, allFrameIds);
-    frameMetadata = metadataJson?.nodes || {};
+    // Fetch metadata in parallel if there are frame IDs
+    let actualMetadataJson = metadataJson;
+    if (allFrameIds.length > 0) {
+        actualMetadataJson = await fetchFigmaNodeData(parsed.fileKey, allFrameIds);
+        frameMetadata = actualMetadataJson?.nodes || {};
 
-    // Accessibility evaluation
-    accessibilityResults = evaluateFrameAccessibility({
-      name: fileJson?.name ?? "",
-      role: fileJson?.role ?? "",
-      nodes: frameMetadata,
+        // Accessibility evaluation
+        accessibilityResults = evaluateFrameAccessibility({
+            name: fileJson?.name ?? "",
+            role: fileJson?.role ?? "",
+            nodes: frameMetadata,
+        });
+
+        // Build FrameTextMap (text nodes grouped with bg color)
+        const frameTextMap = getFrameTextMap(frameMetadata);
+        const frameScores = evaluateFrameScores(frameTextMap);
+
+        const groupedTextNodes: Record<string, any[]> = {};
+        Object.values(frameTextMap).forEach(f => groupedTextNodes[f.frameId] = f.textNodes);
+
+        // assign variables to include in response
+        frameAccessibility = frameScores;
+        allTextNodes = groupedTextNodes;
+    }
+
+    const normalized = normalizeDocument({
+        name: fileJson?.name ?? "",
+        role: fileJson?.role ?? "",
+        nodes: frameMetadata,
     });
 
-    // Build FrameTextMap (text nodes grouped with bg color)
-    const frameTextMap = getFrameTextMap(frameMetadata);
-    const frameScores = evaluateFrameScores(frameTextMap);
+    // Evaluate layout for each frame
+    const layoutResults: Record<string, LayoutCheckResult> = {};
+    if (normalized.frames) {
+        normalized.frames.forEach(frame => {
+            layoutResults[frame.id] = checkLayout(frame);
+        });
+    }
 
-    const groupedTextNodes: Record<string, any[]> = {};
-    Object.values(frameTextMap).forEach(f => groupedTextNodes[f.frameId] = f.textNodes);
+    // Merge layout results into accessibilityResults, and other properties
+    if (Array.isArray(accessibilityResults)) {
+        accessibilityResults.forEach(result => {
+            const layout = layoutResults[result.frameId];
+            if (layout) {
+                result.layoutScore = layout.score;
+                result.layoutIssues = layout.issues;
+                result.layoutSummary = layout.summary;
+            }
+        });
+    }
 
-    // assign variables to include in response
-    frameAccessibility = frameScores;
-    allTextNodes = groupedTextNodes;
-
-  }
-
-  const normalized = normalizeDocument({
-    name: fileJson?.name ?? "",
-    role: fileJson?.role ?? "",
-    nodes: frameMetadata,
-  });
-
-  // Evaluate layout for each frame
-  const layoutResults: Record<string, LayoutCheckResult> = {};
-  if (normalized.frames) {
-    normalized.frames.forEach(frame => {
-      layoutResults[frame.id] = checkLayout(frame);
+    return NextResponse.json({
+        fileKey: parsed.fileKey,
+        nodeId: parsed.nodeId ?? null,
+        name: fileJson?.name ?? null,
+        lastModified: fileJson?.lastModified ?? null,
+        thumbnailUrl: fileJson?.thumbnailUrl ?? null,
+        nodeImageUrl,
+        frameImages,
+        themedFrameIds: themedIds,
+        type: parsed.nodeId ? "single-node" : "multi-frame",
+        message: parsed.nodeId
+            ? "Parsed a single node image."
+            : "Parsed all frame images in the file.",
+        extractedFrameId,
+        extractedFrameImageUrl: frameImageUrl,
+        frameMetadata,
+        normalizedFrames: normalized.frames ?? [],
+        textNodes: allTextNodes ?? {},
+        accessbilityScores: frameAccessibility ?? [],
+        accessibilityResults: accessibilityResults ?? {},
+        layoutResults,
     });
-  }
-
-
-  // Merge layout results into accessibilityResults, and other properties
-  if (Array.isArray(accessibilityResults)) {
-    accessibilityResults.forEach(result => {
-      const layout = layoutResults[result.frameId];
-      if (layout) {
-        result.layoutScore = layout.score;
-        result.layoutIssues = layout.issues;
-        result.layoutSummary = layout.summary;
-      }
-    });
-  }
-
-
-  return NextResponse.json({
-    fileKey: parsed.fileKey,
-    nodeId: parsed.nodeId ?? null,
-    name: fileJson?.name ?? null,
-    lastModified: fileJson?.lastModified ?? null,
-    thumbnailUrl: fileJson?.thumbnailUrl ?? null,
-    nodeImageUrl,
-    frameImages,
-    themedFrameIds: themedIds,
-    type: parsed.nodeId ? "single-node" : "multi-frame",
-    message: parsed.nodeId
-      ? "Parsed a single node image."
-      : "Parsed all frame images in the file.",
-    extractedFrameId,
-    extractedFrameImageUrl: frameImageUrl,
-    frameMetadata,
-    normalizedFrames: normalized.frames ?? [],
-    textNodes: allTextNodes ?? {},
-    accessbilityScores: frameAccessibility ?? [],
-    accessibilityResults: accessibilityResults ?? {},
-    layoutResults,
-  });
 }

@@ -229,12 +229,7 @@ export default function LoginForm() {
                         placeholder="Email"
                         type="email"
                         autoComplete="email"
-                        className="
-                                  w-full h-12 
-                                  sm:h-[45px] sm:text-sm 
-                                  lg:h-[55px] lg:text-md 
-                                  xl:h-[55px] xl:text-lg
-                                  "
+                        className="w-full h-11 sm:h-12 text-sm sm:text-base mb-2 border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
                         {...field}
                       />
                     </FormControl>
@@ -254,12 +249,7 @@ export default function LoginForm() {
                         id="password"
                         placeholder="Password"
                         autoComplete="current-password"
-                        className="w-full h-12 
-                                  sm:h-[45px] sm:text-sm 
-                                  lg:h-[55px] lg:text-md 
-                                  xl:h-[55px] xl:text-lg
-                                  input-colored 
-                                  "
+                        className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
                         {...field}
                       />
                     </FormControl>

@@ -1,6 +1,5 @@
 import { getNextVersion } from "@/database/actions/versions/versionHistory";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { FrameResult, PersonaSnapshot } from "./evaluateFrames";
 
 type SaveDesignVersionParams = {
   supabase: SupabaseClient;
@@ -10,9 +9,9 @@ type SaveDesignVersionParams = {
   thumbnailUrl?: string;
   fallbackImageUrl?: string;
   summary: string;
-  frameResults: FrameResult[];
+  frameResults: any;
   total_score: number;
-  snapshot?: PersonaSnapshot;
+  snapshot?: any;
   user?: { id: string };
 };
 
@@ -50,6 +49,7 @@ export async function saveDesignVersion({
       version: nextVersion,
       created_by: user?.id
     };
+    console.log("Upserting design version with payload: ", upsertPayload);
     const { data } = await supabase.from("design_versions")
       .insert(upsertPayload)
       .select();
@@ -91,6 +91,26 @@ export async function saveDesignVersion({
         if (frameError) {
           console.error("Error inserting frame evaluation:", frameError);
         }
+
+        console.log("Inserting frame evaluation with payload:", {
+          design_id: designId,
+          version_id: versionId,
+          file_key: fileKey,
+          node_id: frame.node_id,
+          thumbnail_url: frame.thumbnail_url,
+          ai_summary: frame.ai?.summary || null,
+          ai_data: frame.ai,
+          ai_error: frame.ai_error,
+          created_at: new Date().toISOString(),
+          snapshot: (() => {
+            if (!snapshot) return null;
+            if (typeof snapshot === "string") {
+              try { return JSON.parse(snapshot); } catch { return null; }
+            }
+            return snapshot;
+          })(),
+          owner_id: user?.id
+        });
       }
       return { versionId, data };
     }

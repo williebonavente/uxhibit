@@ -10,12 +10,9 @@ import { FrameCarousel } from "@/components/carousel/frame-carousel";
 import { IconLink } from "@tabler/icons-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { EvalResponse } from "@/app/designs/[id]/page";
 import { AlertCircle } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { Progress } from "@/components/ui/progress";
-
-
+import { cn } from "@/lib/utils";
 type ParsedMeta = {
   fileKey: string;
   nodeId?: string;
@@ -32,7 +29,7 @@ export default function Evaluate() {
       "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='22' stroke='%23ffffff' fill='none' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 3l7 17 2-7 7-2-16-8Z'/></svg>\") 3 3, pointer",
   };
 
-  // const router = useRouter();
+  const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
   const supabase = createClient();
@@ -43,15 +40,18 @@ export default function Evaluate() {
   const [parsing, setParsing] = useState(false);
   const [parsed, setParsed] = useState<ParsedMeta | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [savedDesignId, setSavedDesignId] = useState<string | null>(null);
+  const [evaluatedFrames, setEvaluatedFrames] = useState<EvalResponse[]>([]);
 
-  const [progress, setProgress] = useState(0);
-  const [jobId, setJobId] = useState<string>("");
+  const [savedDesignId, setSavedDesignId] = useState<string | null>(null);
+  const [expectedFrameCount, setExpectedFrameCount] = useState<number>(0);
 
   const canNextFrom1 = !!age && !!occupation;
   const canParse = !!link && !parsing;
 
-  const router = useRouter();
+  const progress = expectedFrameCount > 0
+    ? Math.round((evaluatedFrames.length / expectedFrameCount) * 100)
+    : 0;
+
   async function handleParse() {
     if (!age || !occupation) {
       toast.error("Select parameters first.");
@@ -69,13 +69,6 @@ export default function Evaluate() {
         body: JSON.stringify({ url: link }),
       });
       const data = await res.json();
-
-      if (data) {
-        console.log("There is data", { data });
-
-      } else {
-        console.log("No metadata found in Figma parse response.");
-      }
 
       if (!res.ok) {
         toast.error(data?.error || "Parse failed");
@@ -119,9 +112,12 @@ export default function Evaluate() {
     const frameEntries = Object.entries(parsed.frameImages || {});
     if (frameEntries.length === 0) {
       toast.error("No frames found in parsed design.");
-      setStep(2); // Revert to step 2 for better validation
+      setStep(2);
       return;
     }
+
+    setExpectedFrameCount(frameEntries.length);
+    setStep(4); // Show progress bar UI
 
     setSubmitting(true);
     try {
@@ -142,25 +138,44 @@ export default function Evaluate() {
         }),
       });
       const saved = await saveRes.json();
-      console.log("Design save response:", saved);
-
-      // Set jobId for progress polling
-      setJobId(saved.jobId || saved.ai_evaluation?.jobId);
 
 
       if (!saveRes.ok || !saved?.design?.id) {
         toast.error(saved?.error || "Save failed");
         return;
       }
+
       setSavedDesignId(saved.design.id);
-      // Check backend evaluation result
-      if (saved.ai_evaluation && saved.ai_evaluation.frameCount > 0) {
-        toast.success("Design and AI evaluation completed for all frames");
-      } else {
-        toast.warning("Design saved, but AI evaluation did not complete.");
+
+      let pollCount = 0;
+      let frames: EvalResponse[] = [];
+      while (pollCount < 60) {
+        const res = await fetch(`/api/designs/${saved.design.id}/evaluations?ts=${Date.now()}`);
+        if (!res.ok) {
+          toast.error("Failed to fetch evaluation results.");
+          break;
+        }
+        const data = await res.json();
+        const expectedIds = Object.keys(parsed.frameImages || {});
+        frames = (data.results || []).filter((f: EvalResponse) => expectedIds.includes(f.node_id));
+        setEvaluatedFrames(frames);
+
+        if (frames.length === expectedIds.length) {
+          toast.success("Design and AI evaluation completed for all frames");
+          router.push(`/designs/${saved.design.id}`);
+          return;
+        }
+
+        await new Promise(res => setTimeout(res, 2000));
+        pollCount++;
       }
 
-      router.push(`/designs/${saved.design.id}`);
+      // After timeout, redirect anyway
+      if (frames.length < frameEntries.length) {
+        toast.warning("Design saved, but AI evaluation did not complete.");
+        router.push(`/designs/${saved.design.id}`);
+      }
+
     } catch (error) {
       console.error("Submit failed:", error);
       toast.error("Submit failed");
@@ -652,7 +667,7 @@ export default function Evaluate() {
                   disabled={submitting}
                   onClick={() => {
                     handleSubmit();
-                    setStep(4);
+                    // setStep(4);
                   }}
                   className="group relative inline-flex items-center justify-center
                   px-9 py-2.5 rounded-xl text-sm text-white font-semibold tracking-wide
@@ -696,27 +711,43 @@ export default function Evaluate() {
           </div>
         )}
 
-        {/* STEP 4: Running AI Evaluation */}
         {step === 4 && (
-          <div className="flex flex-col items-center justify-center text-center py-24">
-            <Image
-              src="/images/smart-evaluation-underway.svg"
-              alt="Running evaluation illustration"
-              height={150}
-              width={150}
-              className="object-contain mb-6"
-              priority
-            />
-            <h2 className="gradient-text text-lg font-semibold mb-2">
-              Smart Evaluation Underway!
-            </h2>
-            <p className="text-gray-500 text-sm mb-4">
-              This may take a few minutes...
-            </p>
-            <div className="w-full max-w-md mx-auto">
-              <Progress value={progress} max={100} className="mb-2" />
-              <span className="text-sm font-semibold text-[#ED5E20]">{progress}%</span>
-            </div>
+          <div>
+            <h2 className="text-lg font-semibold mb-4">Evaluated Frames</h2>
+            {evaluatedFrames.length < expectedFrameCount ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Image
+                  src="/images/smart-evaluation-underway.svg"
+                  alt="Running evaluation illustration"
+                  height={120}
+                  width={120}
+                  className="object-contain mb-4"
+                  priority
+                />
+                <div className="w-full max-w-md mb-4">
+                  <div className="relative h-4 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="absolute left-0 top-0 h-4 bg-gradient-to-r from-orange-400 to-[#ED5E20] transition-all"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                  <div className="text-center text-sm mt-2 text-gray-600">
+                    {evaluatedFrames.length} / {expectedFrameCount} frames evaluated
+                  </div>
+                </div>
+                <p className="text-gray-500 text-sm mb-2">
+                  AI evaluation in progress. Please wait...
+                </p>
+              </div>
+            ) : (
+              <ul>
+                {evaluatedFrames.map((frame, idx) => (
+                  <li key={`${frame.node_id ?? 'frame'}-${idx}`}>
+                    Frame {idx + 1}: {frame.ai?.summary || "No summary"}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
       </div>

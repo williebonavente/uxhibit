@@ -44,7 +44,7 @@ type UserAvatarProps = {
 }
 export const UserAvatar: React.FC<UserAvatarProps> = ({ avatarPath, alt, className }) => (
   <Image
-    src={avatarPath || "/iamges/default_avatar.png"}
+    src={avatarPath || "/images/default_avatar.png"}
     alt={alt}
     className={`rounded-full ${className ?? ""}`}
     width={40}

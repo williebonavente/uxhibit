@@ -345,6 +345,18 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                                                                                         try {
                                                                                             await deleteDesignVersion(v.id);
                                                                                             setVersions(versions.filter(ver => ver.id !== v.id));
+                                                                                            // If the deleted version was the current one, select the latest remaining version
+                                                                                            if (design.current_version_id === v.id) {
+                                                                                                const remainingVersions = versions.filter(ver => ver.id !== v.id);
+                                                                                                const latestVersion = remainingVersions.sort((a, b) =>
+                                                                                                    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                                                                                                )[0];
+
+                                                                                                if (latestVersion) {
+                                                                                                    setSelectedVersion(latestVersion);
+                                                                                                    design.current_version_id = latestVersion.id;
+                                                                                                }
+                                                                                            }
                                                                                             setVersionChanged((v) => v + 1);
                                                                                             toast.success(
                                                                                                 <span>

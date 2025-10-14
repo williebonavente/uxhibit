@@ -2,12 +2,11 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { evaluateFrames } from "@/lib/ai/evaluateFrames";
 import { saveDesignVersion } from "@/lib/ai/saveDesignVersion";
-import { nanoid } from "nanoid";
 export const runtime = "nodejs";
 
-const jobId = nanoid();
+
 export async function POST(req: Request) {
-    const { url, designId, nodeId, thumbnailUrl, fallbackImageUrl, snapshot } = await req.json();
+    const { url, designId, nodeId, thumbnailUrl, fallbackImageUrl, versionId, snapshot } = await req.json();
 
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -36,7 +35,6 @@ export async function POST(req: Request) {
     const frameImages = parseData.frameImages || {};
     const frameIds = Object.keys(frameImages);
 
-
     if (frameIds.length === 0) {
         return NextResponse.json({
             error: "No frames found in Figma file",
@@ -54,69 +52,53 @@ export async function POST(req: Request) {
         }, { status: 400 });
     }
 
-    // TODO:  `validResults` to be included later
-
-    const { frameResults, total_score, summary
-    } = await evaluateFrames({
-        frameIds,
-        frameImages,
-        user,
-        designId,
-        figmaFileUrl: url,
-        fileKey,
-        snapshot,
-        authError,
-        supabase,
-        jobId,
-    });
-
-    const { versionId } = await saveDesignVersion({
-        supabase,
-        designId,
-        fileKey,
-        nodeId,
-        thumbnailUrl,
-        fallbackImageUrl,
-        summary,
-        frameResults,
-        total_score,
-        snapshot,
-        user: user ?? undefined,
-    });
-
-        // Before calling saveDesignVersion
-    console.log("thumbnailUrl:", thumbnailUrl);
-    console.log("fallbackImageUrl:", fallbackImageUrl);
-    console.log("frameImages:", frameImages);
-
-    if (parseData.accessibilityResults && versionId) {
-        const saveRes = await fetch(`${baseUrl}/api/saveAccessibility`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                results: parseData.accessibilityResults,
-                designVersionId: versionId,
-            }),
-        });
-        const saveData = await saveRes.json();
-
-        if (saveData.success) {
-            console.log("Accessibility results saved successfully for version:", versionId);
-        } else {
-            console.error("Failed to save accessibility results:", saveData.error);
-        }
+    let finalThumbnailUrl = thumbnailUrl;
+    if (!finalThumbnailUrl) {
+        const { data: designRow } = await supabase
+            .from("designs")
+            .select("thumbnail_url")
+            .eq("id", designId)
+            .maybeSingle();
+        if (designRow?.thumbnail_url) finalThumbnailUrl = designRow.thumbnail_url;
     }
 
-    console.log("JobId: ", jobId);
+    console.log("Snapshot should have a value here: ", snapshot);
 
+    (async () => {
+        const { frameResults, total_score, summary, } = await evaluateFrames({
+            frameIds,
+            frameImages,
+            user,
+            designId,
+            fileKey,
+            versionId,
+            snapshot,
+            authError,
+            supabase,
+            figmaFileUrl: url,
+
+        });
+
+        await saveDesignVersion({
+            supabase,
+            designId,
+            fileKey,
+            nodeId,
+            thumbnailUrl: finalThumbnailUrl,
+            fallbackImageUrl,
+            summary,
+            frameResults,
+            total_score,
+            snapshot,
+            user: user ?? undefined,
+        });
+    })();
+
+    // Respond immediately
     return NextResponse.json({
-        jobId,
-        results: frameResults,
+        status: "processing",
+        message: "AI evaluation started. Results will be available soon.",
         frameCount: frameIds.length,
-        message: "AI evaluation completed for all frames and aggregate saved.",
-        // // Watchout about this error ones
-        // accessibilityResults: parseData.accessibilityResults,
-        // accessbilityScores: parseData.accessbilityScores,
-        // normalizedFrames: parseData.normalizedFrames,
+        designId,
     });
 }
