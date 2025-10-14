@@ -58,7 +58,8 @@ export default function DeleteAccountPage({
                         e.preventDefault();
                         setIsDeleting(true);
                         try {
-                            const res = await fetch("/api/delete_user", {
+                            const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+                            const res = await fetch(`${baseUrl}/api/delete_user`, {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({ userId, password, email }),

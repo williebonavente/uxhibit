@@ -117,7 +117,8 @@ export default function CreateFeaturedWorkModal({
     const fetchFigmaMeta = async (figmaUrl: string) => {
         setImporting(true);
         try {
-            const res = await fetch("/api/figma/parse", {
+            const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+            const res = await fetch(`${baseUrl}/api/figma/parse`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ url: figmaUrl }),

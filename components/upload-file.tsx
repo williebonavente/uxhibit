@@ -34,7 +34,8 @@ export default function FigmaLinkUploader() {
     setProgress(10);
 
     try {
-      const res = await fetch("/api/figma/parse", {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+      const res = await fetch(`${baseUrl}/api/figma/parse`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: link }),
@@ -75,8 +76,8 @@ export default function FigmaLinkUploader() {
           return;
         }
 
-
-        const saveRes = await fetch("/api/designs", {
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+        const saveRes = await fetch(`${baseUrl}/api/designs`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

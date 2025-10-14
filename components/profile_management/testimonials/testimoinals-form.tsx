@@ -25,7 +25,8 @@ export default function TestimonialsForm({
 
     try {
       const method = initialData?.id ? "PUT" : "POST";
-      const url = "/api/testimonials";
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+      const url = `${baseUrl}/api/testimonials`;
       const payload = initialData?.id
         ? { id: initialData.id, quote, profile_id: profileId }
         : { quote, profile_id: profileId };

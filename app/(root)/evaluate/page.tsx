@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -150,14 +150,15 @@ export default function Evaluate() {
       let pollCount = 0;
       let frames: EvalResponse[] = [];
       while (pollCount < 60) {
-        const res = await fetch(`/api/designs/${saved.design.id}/evaluations?ts=${Date.now()}`);
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+        const res = await fetch(`${baseUrl}/api/designs/${saved.design.id}/evaluations?ts=${Date.now()}`);
         if (!res.ok) {
           toast.error("Failed to fetch evaluation results.");
           break;
         }
         const data = await res.json();
         const expectedIds = Object.keys(parsed.frameImages || {});
-        frames = (data.results || []).filter((f: EvalResponse) => expectedIds.includes(f.node_id));
+        frames = (data.results || []).filter((f: EvalResponse) => expectedIds.includes(f.nodeId));
         setEvaluatedFrames(frames);
 
         if (frames.length === expectedIds.length) {
@@ -722,7 +723,7 @@ export default function Evaluate() {
             ) : (
               <ul>
                 {evaluatedFrames.map((frame, idx) => (
-                  <li key={`${frame.node_id ?? 'frame'}-${idx}`}>
+                  <li key={`${frame.nodeId ?? 'frame'}-${idx}`}>
                     Frame {idx + 1}: {frame.ai?.summary || "No summary"}
                   </li>
                 ))}

@@ -102,7 +102,8 @@ export async function handleEvalParamsSubmit(
   };
 
   console.log("[handleEvalParamsSubmit] Params for evaluation:", { ...params, snapshot: latestSnapshot });
-  const response = await fetch("/api/start-evaluation", {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+  const response = await fetch(`${baseUrl}/api/start-evaluation`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
