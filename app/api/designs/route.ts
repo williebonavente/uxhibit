@@ -61,24 +61,28 @@ export async function POST(req: Request) {
         if (thumbErr) console.error("Error updating thumbnail:", thumbErr);
       }
 
-      // Start AI evaluation in background
+      // Start AI evaluation synchronously
       if (evaluate) {
-        (async () => {
-          await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              cookie: req.headers.get('cookie') || '',
-            },
-            body: JSON.stringify({
-              url: figma_link,
-              designId: existing.id,
-              nodeId: node_id,
-              thumbnail_url: storedThumbnail,
-              snapshot
-            })
-          });
-        })();
+        console.log("Starting AI evaluation for existing design:", designId);
+        const evalRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            cookie: req.headers.get('cookie') || '',
+          },
+          body: JSON.stringify({
+            url: figma_link,
+            designId: existing.id,
+            nodeId: node_id,
+            thumbnail_url: storedThumbnail,
+            snapshot
+          })
+        });
+        console.log("AI evaluation response status:", evalRes.status);
+        if (!evalRes.ok) {
+          const detail = await evalRes.text();
+          console.error("AI evaluation failed:", detail);
+        }
       }
 
       return NextResponse.json({
@@ -135,24 +139,28 @@ export async function POST(req: Request) {
       if (thumbErr) console.error("Error updating thumbnail:", thumbErr);
     }
 
-    // Start AI evaluation in background
+    // Start AI evaluation synchronously
     if (evaluate) {
-      (async () => {
-        await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            cookie: req.headers.get('cookie') || '',
-          },
-          body: JSON.stringify({
-            url: figma_link,
-            designId,
-            nodeId: node_id,
-            thumbnail_url: storedThumbnail,
-            snapshot
-          })
-        });
-      })();
+      console.log("Starting AI evaluation for new design:", designId);
+      const evalRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          cookie: req.headers.get('cookie') || '',
+        },
+        body: JSON.stringify({
+          url: figma_link,
+          designId,
+          nodeId: node_id,
+          thumbnail_url: storedThumbnail,
+          snapshot
+        })
+      });
+      console.log("AI evaluation response status:", evalRes.status);
+      if (!evalRes.ok) {
+        const detail = await evalRes.text();
+        console.error("AI evaluation failed:", detail);
+      }
     }
 
     return NextResponse.json({
