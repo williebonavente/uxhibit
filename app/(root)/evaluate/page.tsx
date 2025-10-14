@@ -48,10 +48,6 @@ export default function Evaluate() {
   const canNextFrom1 = !!age && !!occupation;
   const canParse = !!link && !parsing;
 
-  const progress = expectedFrameCount > 0
-    ? Math.round((evaluatedFrames.length / expectedFrameCount) * 100)
-    : 0;
-
   async function handleParse() {
     if (!age || !occupation) {
       toast.error("Select parameters first.");
@@ -127,7 +123,7 @@ export default function Evaluate() {
     }
 
     setExpectedFrameCount(frameEntries.length);
-    setStep(4); // Show progress bar UI
+    setStep(4);
 
     setSubmitting(true);
     try {
@@ -210,7 +206,6 @@ export default function Evaluate() {
         pollCount++;
       }
 
-      // After timeout, redirect anyway
       if (frames.length < frameEntries.length) {
         console.log("[handleSubmit] Timeout: Not all frames evaluated", {
           framesEvaluated: frames.length,
@@ -754,9 +749,6 @@ export default function Evaluate() {
                   <p className="text-gray-500 text-sm mb-4">
                     This may take a few minutes...
                   </p>
-                  <div className="text-center text-sm mt-2 text-gray-600">
-                    {evaluatedFrames.length} / {expectedFrameCount} frames evaluated
-                  </div>
                 </div>
               </div>
             ) : (
@@ -764,16 +756,14 @@ export default function Evaluate() {
                 <div className="text-center text-2xl font-bold text-[#ED5E20] mb-4">
                   🎉 All frames successfully evaluated!
                 </div>
+                <div className="text-center text-base text-gray-700 dark:text-gray-300 mt-2">
+                  Design <span className="font-mono text-[#ED5E20]">{savedDesignId}</span> has been saved and evaluated.
+                </div>
               </div>
             )}
           </div>
         )}
       </div>
-      {savedDesignId && (
-        <div className="mt-4 text-sm text-gray-500">
-          Design ID: <span className="font-mono">{savedDesignId}</span>
-        </div>
-      )}
     </div>
   );
 }
