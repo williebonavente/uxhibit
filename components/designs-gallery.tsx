@@ -50,7 +50,7 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
   const filteredDesigns = designs.filter((d) => {
     if (filter === "published") return d.is_published;
     if (filter === "unpublished") return !d.is_published;
-    return true; // "all"
+    return true; 
   });
   const supabase = createClient();
 
@@ -147,7 +147,7 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
     });
     setDesigns(withThumbs);
     setLoading(false);
-  }, [supabase, resolveThumbnail, currentUserId]);
+  }, [supabase, resolveThumbnail, currentUserId, profileId]);
 
   useEffect(() => {
     if (currentUserId) {

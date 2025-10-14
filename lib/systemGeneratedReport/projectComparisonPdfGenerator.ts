@@ -149,7 +149,7 @@ export const generateProjectComparisonReport = async (
 ) => {
   try {
     const pdf = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = pdf.internal.pageSize.getWidth();
+    // const pageWidth = pdf.internal.pageSize.getWidth();
     
     // Add title
     pdf.setFontSize(20);

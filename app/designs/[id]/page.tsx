@@ -237,7 +237,7 @@ export default function DesignDetailPage({
     : 0;
 
 
-  function startResizing(e: React.MouseEvent) {
+  function startResizing() {
     setIsResizing(true);
   }
 
@@ -269,7 +269,7 @@ export default function DesignDetailPage({
     mouseStart.current = { x: e.clientX, y: e.clientY };
   }
 
-  function handlePanMove(e: MouseEvent) {
+  const handlePanMove = React.useCallback((e: MouseEvent) => {
     if (!isPanning) return;
     const dx = e.clientX - mouseStart.current.x;
     const dy = e.clientY - mouseStart.current.y;
@@ -277,7 +277,7 @@ export default function DesignDetailPage({
       x: panStart.current.x + dx,
       y: panStart.current.y + dy,
     });
-  }
+  }, [isPanning, mouseStart, panStart, setPan]);
 
   function handlePanEnd() {
     setIsPanning(false);
@@ -541,10 +541,10 @@ export default function DesignDetailPage({
         nodeId: design.nodeId,
         scale: 3,
         fallbackImageUrl: imageUrlForAI,
-        // TODO: HERE 
         snapshot: typeof design?.snapshot === "string" ? JSON.parse(design.snapshot) : design?.snapshot,
         url: design.figma_link,
         frameIds: design?.frames?.map(f => String(f.id)) ?? [],
+        versionId: design.current_version_id || "",
       });
 
 
