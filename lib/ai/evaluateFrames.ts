@@ -74,6 +74,8 @@ export async function evaluateFrames({
   console.log(figmaContext);
   const heuristics = getHeuristicScores(figmaContext);
 
+  console.log("[evaluateFrames] frameIds: ", frameIds);
+
   const frameResults: any[] = await Promise.all(
     frameIds.map(async (nodeId, index) => {
       const imageUrl = frameSupabaseUrls[nodeId] || frameImages[nodeId];
@@ -121,7 +123,7 @@ export async function evaluateFrames({
           throw err;
         }
       }
-      
+
       if (onProgress) {
         await onProgress(index + 1, frameIds.length);
       }

@@ -120,8 +120,7 @@ export async function POST(req: Request) {
         }).eq("job_id", versionId);
 
     console.log("[AI Evaluate] Frame evaluation results:", { frameResults, total_score, summary });
-    console.log()
-
+    console.log("[Backend] Updating frame_evaluation_progress for job_id:", versionId);
 
     await saveDesignVersion({
         supabase,

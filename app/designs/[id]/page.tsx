@@ -150,6 +150,13 @@ export type EvalResponse = {
 
   } | null;
 };
+
+type ProgressPayload = {
+  progress?: number;
+  status?: string;
+  [key: string]: any;
+};
+
 export async function evaluateDesign(input: EvaluateInput): Promise<EvalResponse[]> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   console.log('Calling evaluate with:', input);
@@ -1023,13 +1030,11 @@ export default function DesignDetailPage({
           published_at: publishedData?.published_at ?? "",
           figma_link: designData.figma_link || "",
           owner_id: designData.owner_id,
-          frames, // <-- Add this line!
+          frames, 
         };
 
         setDesign(normalized);
         console.log("Design loaded: ", normalized);
-
-        // ...rest of your code (frameEvaluations, thumbUrl, etc.)...
       } catch (err) {
         console.error('Error loading design:', err);
         setDesign(null);
@@ -1375,30 +1380,35 @@ export default function DesignDetailPage({
   useEffect(() => {
     if (!loadingEval || !design?.current_version_id) return;
 
-    let intervalId: NodeJS.Timeout | null = null;
+    const supabase = createClient();
+    console.log("[Realtime] Subscribing with job_id filter:", design.current_version_id);
+    const channel = supabase
+      .channel('progress-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'frame_evaluation_progress',
+          filter: `job_id=eq.${design.current_version_id}`,
+        },
+        (payload: { new: ProgressPayload }) => {
+          console.log("Realtime progress payload: ", payload);
+          const newProgress = payload.new?.progress ?? 0;
+          const newStatus = payload.new?.status ?? "started";
+          setBackendProgress(newProgress);
+          setProgressStatus(newStatus);
 
-    async function pollProgress() {
-      try {
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-        const res = await fetch(`${baseUrl}/api/ai/evaluate/progress?jobId=${design?.current_version_id}`);
-        const data = await res.json();
-        setBackendProgress(data.progress ?? 0);
-        setProgressStatus(data.status ?? "started");
-
-        // Only stop loading when progress is 100 and status is completed
-        if (data.progress === 100 && data.status === "completed") {
-          setLoadingEval(false);
+          // Stop loading when evaluation is complete
+          if (newProgress === 100 && newStatus === "completed") {
+            setLoadingEval(false);
+          }
         }
-      } catch (err) {
-        console.error("Failed to fetch evaluation progress:", err);
-      }
-    }
-
-    pollProgress();
-    intervalId = setInterval(pollProgress, 2000);
+      )
+      .subscribe();
 
     return () => {
-      if (intervalId) clearInterval(intervalId);
+      supabase.removeChannel(channel);
     };
   }, [loadingEval, design?.current_version_id]);
 
