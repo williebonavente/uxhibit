@@ -10,7 +10,7 @@ import {
  * Fully aligned with WCAG 2.1 + Jakob Nielsen’s 10 Usability Heuristics.
  */
 export function calculateAIWeightedScoreWithHeuristics(
-  heuristicMap: Record<string, number>, // e.g., { "01": 82, "02": 70, ..., "10": 90 }
+  heuristicMap: Record<string, number>,
   generation: Generation,
   occupation: Occupation,
 ) {

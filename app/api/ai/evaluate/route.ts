@@ -5,14 +5,11 @@ import { saveDesignVersion } from "@/lib/ai/saveDesignVersion";
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
-    console.log("[AI Evaluate] POST request received");
 
     const { url, designId, nodeId, thumbnailUrl, fallbackImageUrl, versionId, snapshot } = await req.json();
-    console.log("[AI Evaluate] Request body:", { url, designId, nodeId, thumbnailUrl, fallbackImageUrl, versionId, snapshot });
 
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    console.log("[AI Evaluate] Supabase user:", user);
     if (authError) console.log("[AI Evaluate] Supabase auth error:", authError);
 
     if (!url) {
@@ -119,7 +116,6 @@ export async function POST(req: Request) {
             updated_at: new Date().toISOString(),
         }).eq("job_id", versionId);
 
-    console.log("[AI Evaluate] Frame evaluation results:", { frameResults, total_score, summary });
     console.log("[Backend] Updating frame_evaluation_progress for job_id:", versionId);
 
     await saveDesignVersion({

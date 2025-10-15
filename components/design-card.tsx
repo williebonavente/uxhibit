@@ -100,7 +100,6 @@ export function DesignCard({
         >
             <Link
                 href={`designs/${design.design_id}`}
-                target="_blank"
                 rel="noopener noreferrer"
             >
                 <div className="relative w-full aspect-video rounded-lg border overflow-hidden">

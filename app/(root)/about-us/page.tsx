@@ -61,7 +61,7 @@ export default function AboutUs() {
                 With UXhibit, learners can upload their design projects, receive automated feedback
                 based on{" "}
                 <span className="text-orange-500 font-semibold">
-                  Nielsen’s 10 Usability Heuristics
+                  Nielsen&apos;s 10 Usability Heuristics
                 </span>{" "}
                 and{" "}
                 <span className="text-orange-500 font-semibold">
@@ -87,7 +87,7 @@ export default function AboutUs() {
                 but truly usable.
               </p>
               <p className="italic text-gray-500 dark:text-gray-400 mt-4">
-                “Good design is not just how it looks — it’s how it works for everyone.”
+                “Good design is not just how it looks — it&apos;s how it works for everyone.”
               </p>
             </div>
           </div>

@@ -117,7 +117,7 @@ export default function Evaluate() {
 
     if (frameEntries.length === 0) {
       console.log("[handleSubmit] No frames found in parsed design");
-      toast.error("No frames found in parsed design.");
+      toast.error("Invalid Design");
       setStep(2);
       return;
     }

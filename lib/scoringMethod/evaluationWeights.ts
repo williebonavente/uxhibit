@@ -8,8 +8,6 @@ export type Category =
 
 export type Generation = "Gen Z" | "Millennial" | "Gen Alpha";
 export type Occupation =
-  | "UX Researcher"
-  | "UI Designer"
   | "Student"
   | "Freelancer"
   | "Designer"
@@ -37,8 +35,6 @@ export const genSegmentNotes: Record<Generation, string> = {
 };
 
 export const occupationNotes: Record<Occupation, string> = {
-  "UX Researcher": "",
-  "UI Designer": "",
   "Student": "Students value readability and cognitive simplicity; accessibility and hierarchy are emphasized for comprehension.",
   "Freelancer": "Freelancers value aesthetic flexibility and color identity; slightly biased toward creative visual differentiation.",
   "Designer": "Designers have higher tolerance for unconventional layouts and aesthetic experimentation; typography and color valued more.",
@@ -118,22 +114,6 @@ export const evaluationWeights : EvaluationWeights = {
   // === OCCUPATION ADJUSTMENTS ===
   // Based on user familiarity, task focus, and cognitive expectations (ISO 9241-210, Norman 2013, UX Collective 2023).
   occupationAdjustments: {
-    "UX Researcher": {
-      accessibility: 0.1,
-      typography: 0.05,
-      color: 0.0,
-      layout: 0.05,
-      hierarchy: 0.05,
-      usability: 0.0,
-    },
-    "UI Designer": {
-      accessibility: -0.05,
-      typography: 0.1,
-      color: 0.1,
-      layout: 0.05,
-      hierarchy: 0.0,
-      usability: 0.0,
-    },
     Student: {
       accessibility: 1.1,
       typography: 1.0,

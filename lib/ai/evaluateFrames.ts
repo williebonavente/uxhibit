@@ -71,20 +71,48 @@ export async function evaluateFrames({
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const res = await fetch(`${baseUrl}/api/figma/parse?url=${encodeURIComponent(figmaFileUrl)}`);
   const figmaContext = await res.json();
-  console.log(figmaContext);
+  // console.log("THIS IS FIGMA CONTEXT: ", figmaContext);
   const heuristics = getHeuristicScores(figmaContext);
+  console.log("HEURISTIC CALCULATION: ", heuristics);
+  const accessibilityResults = figmaContext.accessibilityResults;
+  const layoutResults = figmaContext.layoutResults;
+  const textNodes = figmaContext.textNodes;
 
-  console.log("[evaluateFrames] frameIds: ", frameIds);
+  console.log("[ACCESSIBILITY RESULTS]: ", accessibilityResults);
+  console.log("[LAYOUT RESULTS]: ", layoutResults);
+  console.log("[textNodes]: ", textNodes);
+
+  const minimalAccessibilityResults = accessibilityResults.map(result => ({
+    frameId: result.frameId,
+    frameName: result.frameName,
+    layoutScore: result.layoutScore,
+    averageContrastScore: result.averageContrastScore,
+  }));
+
+  const minimalLayoutResults = Object.entries(layoutResults).map(([frameId, result]) => ({
+    frameId,
+    score: result.score,
+    summary: result.summary,
+    // Optionally include issues if needed:
+    // issues: result.issues,
+  }));
+
 
   const frameResults: any[] = await Promise.all(
     frameIds.map(async (nodeId, index) => {
       const imageUrl = frameSupabaseUrls[nodeId] || frameImages[nodeId];
+      const frameTextNodes = textNodes[nodeId] || [];
+
       let ai: AiEvaluator | null = null;
       let ai_error: string | undefined;
 
       try {
-        ai = await aiEvaluator(imageUrl, heuristics, {}, snapshot);
-        console.log("I am just adding the console.log to check the snapshot: ", snapshot)
+        ai = await aiEvaluator(imageUrl, heuristics, {
+          accessibilityResults: minimalAccessibilityResults,
+          layoutResults: minimalLayoutResults,
+          textNodes: frameTextNodes,
+        }, snapshot);
+
         if (!ai) ai_error = "mistral_skipped_or_empty";
         if (ai && Array.isArray(ai.issues)) {
           ai.issues = ai.issues.map((issue, issueIdx) => ({
@@ -135,6 +163,7 @@ export async function evaluateFrames({
       };
     })
   );
+
   const validResults = frameResults.filter(r => r.ai);
   const total_score = validResults.length
     ? Math.round(validResults.reduce((sum, r) => sum + (r.ai?.overall_score ?? 0), 0) / validResults.length)

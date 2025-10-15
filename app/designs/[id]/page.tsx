@@ -146,6 +146,7 @@ export type EvalResponse = {
       suggestions: string;
     }[];
     category_scores?: Record<string, number>;
+    category_score_justifications?: Record<string, string>;
     resources?: EvalResource[];
 
   } | null;
@@ -1030,7 +1031,7 @@ export default function DesignDetailPage({
           published_at: publishedData?.published_at ?? "",
           figma_link: designData.figma_link || "",
           owner_id: designData.owner_id,
-          frames, 
+          frames,
         };
 
         setDesign(normalized);
@@ -1439,6 +1440,7 @@ export default function DesignDetailPage({
         <p>Design not found.</p>
       </div>
     );
+    
   const isOwner = currentUserId && design?.id && currentUserId === design?.owner_id;
   return (
     <div>

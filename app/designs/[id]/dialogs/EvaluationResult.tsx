@@ -43,8 +43,8 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
               : evalResult.overall_score
           );
           const percent = Math.max(0, Math.min(score, 100));
-          const radius = 60; // increased radius
-          const stroke = 10; // thicker stroke
+          const radius = 60; 
+          const stroke = 10;
           const normalizedRadius = radius - stroke / 2;
           const circumference = normalizedRadius * 2 * Math.PI;
           const strokeDashoffset =
@@ -116,26 +116,28 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
           </p>
         </div>
       </div>
-
       {/* Strengths */}
-      {evalResult.strengths && evalResult.strengths.length > 0 && (
+      {Array.isArray(evalResult.strengths) && evalResult.strengths.length > 0 && (
         <div className="p-5 rounded-2xl bg-[#16A34A]/10 dark:bg-[#4ADE80]/10 mb-5 shadow-md">
           <h3 className="font-bold mb-3 text-[#16A34A] dark:text-[#4ADE80] text-lg flex items-center gap-2">
             <span className="text-xl">💪</span>
             Strengths
           </h3>
           <ul className="flex flex-col gap-3">
-            {evalResult.strengths.map((s: string, i: number) => (
+            {evalResult.strengths.map((s: any, i: number) => (
               <li
-                key={`${s}-${i}`}
-                className="flex items-center gap-3 bg-white/90 dark:bg-[#232323]/90 rounded-lg p-3 shadow-sm"
+                key={`${s.element}-${i}`}
+                className="flex flex-col gap-1 bg-white/90 dark:bg-[#232323]/90 rounded-lg p-3 shadow-sm"
               >
-                <span className="text-[#16A34A] dark:text-[#4ADE80] text-lg">
-                  ★
-                </span>
-                <span className="text-neutral-700 dark:text-neutral-200 leading-6">
-                  {s}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[#16A34A] dark:text-[#4ADE80] text-lg">★</span>
+                  <span className="font-semibold text-neutral-700 dark:text-neutral-200">{s.element}</span>
+              
+                </div>
+                <div className="text-neutral-700 dark:text-neutral-200 leading-6">{s.description}</div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                  Heuristic: {s.relatedHeuristic}
+                </div>
               </li>
             ))}
           </ul>
@@ -143,24 +145,27 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
       )}
 
       {/* Weaknesses Section */}
-      {Array.isArray(currentFrame?.ai_data?.weaknesses) && currentFrame.ai_data.weaknesses.length > 0 && (
+      {Array.isArray(evalResult.weaknesses) && evalResult.weaknesses.length > 0 && (
         <div className="p-5 rounded-2xl bg-[#DC2626]/10 dark:bg-[#F87171]/10 mb-5 shadow-md">
           <h3 className="font-bold mb-3 text-[#DC2626] dark:text-[#F87171] text-lg flex items-center gap-2">
             <span className="text-xl">😕</span>
             Weaknesses
           </h3>
           <ul className="flex flex-col gap-3">
-            {(evalResult.weaknesses ?? []).map((w: string, i: number) => (
+            {evalResult.weaknesses.map((w: any, i: number) => (
               <li
-                key={`${w}-${i}`}
-                className="flex items-center gap-3 bg-white/90 dark:bg-[#232323]/90 rounded-lg p-3 shadow-sm"
+                key={`${w.element}-${i}`}
+                className="flex flex-col gap-1 bg-white/90 dark:bg-[#232323]/90 rounded-lg p-3 shadow-sm"
               >
-                <span className="text-[#DC2626] dark:text-[#F87171] text-lg">
-                  •
-                </span>
-                <span className="text-neutral-700 dark:text-neutral-200 leading-6">
-                  {w}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[#DC2626] dark:text-[#F87171] text-lg">•</span>
+                  <span className="font-semibold text-neutral-700 dark:text-neutral-200">{w.element}</span>
+                
+                </div>
+                <div className="text-neutral-700 dark:text-neutral-200 leading-6">{w.description}</div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                  Heuristic: {w.relatedHeuristic}
+                </div>
               </li>
             ))}
           </ul>
@@ -305,7 +310,31 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
           </ul>
         </div>
       )}
-
+      {evalResult.ai?.category_score_justifications && (
+        <div className="p-5 rounded-2xl bg-[#9333EA]/10 dark:bg-[#C084FC]/10 mb-6 shadow-md">
+          <h4 className="font-bold mb-3 text-[#9333EA] dark:text-[#C084FC] text-lg flex items-center gap-2">
+            <span className="text-xl">📝</span>
+            Category Score Justifications
+          </h4>
+          <ul className="flex flex-col gap-3">
+            {Object.entries(evalResult.ai.category_score_justifications).map(
+              ([category, justification], i) => (
+                <li
+                  key={`${category}-justification-${i}`}
+                  className="flex items-start gap-2 bg-white/90 dark:bg-[#232323]/90 rounded-lg p-3 shadow-sm"
+                >
+                  <span className="font-bold capitalize text-[#9333EA] dark:text-[#C084FC] min-w-[120px]">
+                    {category.replace(/_/g, " ")}:
+                  </span>
+                  <span className="text-neutral-700 dark:text-neutral-200 leading-6">
+                    {justification}
+                  </span>
+                </li>
+              )
+            )}
+          </ul>
+        </div>
+      )}
       {/* Recommendation Resources */}
       {evalResult.ai?.resources && evalResult.ai.resources.length > 0 && (
         <div className="p-5 rounded-2xl bg-[#0D9488]/10 dark:bg-[#2DD4BF]/10 mb-6 shadow-md">

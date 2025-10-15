@@ -109,19 +109,6 @@ export async function saveDesignVersion({
       if (frameError) {
         console.error("Error inserting frame evaluation:", frameError);
       }
-      console.log("Inserting frame evaluation with payload:", {
-        design_id: designId,
-        version_id: actualVersionId,
-        file_key: fileKey,
-        node_id: frame.node_id,
-        thumbnail_url: frame.thumbnail_url,
-        ai_summary: frame.ai?.summary || null,
-        ai_data: frame.ai,
-        ai_error: frame.ai_error,
-        created_at: new Date().toISOString(),
-        snapshot: typeof snapshot === "string" ? JSON.parse(snapshot) : snapshot,
-        owner_id: user?.id
-      });
     }
 
     console.log("[saveDesignVersion] Updated version to completed:", {
