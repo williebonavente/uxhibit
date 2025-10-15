@@ -392,10 +392,10 @@ export function NavUser({ user }: { user: User | null }) {
                     <span className="ml-2 inline-block w-2 h-2 bg-red-500 rounded-full"></span>
                   )}
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <UserRound />
-                  About Us
-                </DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => router.push('/about-us')}>
+                   <UserRound />
+                   About Us
+                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleAccountClick}>
                   <IconSettings />
                   Settings
