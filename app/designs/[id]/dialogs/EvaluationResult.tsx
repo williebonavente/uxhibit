@@ -268,48 +268,6 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
         </div>
       )}
 
-      {/* Category Scores */}
-      {currentFrame?.ai_data?.category_scores && (
-        <div className="p-5 rounded-2xl bg-[#9333EA]/10 dark:bg-[#C084FC]/10 mb-6 shadow-md">
-          <h3 className="font-bold mb-4 text-[#9333EA] dark:text-[#C084FC] text-lg flex items-center gap-3">
-            <span className="text-2xl">🏅</span>
-            Category Scores
-          </h3>
-          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {Object.entries(evalResult.category_scores ?? {}).map(
-              ([category, score]: [string, any], i: number) => {
-                let icon = "🟡";
-                let colorClass = "text-yellow-500";
-
-                if (score >= 75) {
-                  icon = "🟢";
-                  colorClass = "text-green-600";
-                } else if (score < 50) {
-                  icon = "🔴";
-                  colorClass = "text-red-600";
-                }
-
-                return (
-                  <li
-                    key={`${category}-${i}`}
-                    className={`flex items-center justify-between gap-3 bg-white/90 dark:bg-[#232323]/90 rounded-lg px-4 py-3 shadow-sm hover:scale-[1.02] transition-transform`}
-                  >
-                    <span className={`text-xl ${colorClass}`}>{icon}</span>
-                    <span
-                      className={`capitalize flex-1 font-semibold ${colorClass}`}
-                    >
-                      {category.replace(/_/g, " ")}
-                    </span>
-                    <span className={`text-base font-bold ${colorClass}`}>
-                      {Math.round(score)}
-                    </span>
-                  </li>
-                );
-              }
-            )}
-          </ul>
-        </div>
-      )}
       {evalResult.ai?.category_score_justifications && (
         <div className="p-5 rounded-2xl bg-[#9333EA]/10 dark:bg-[#C084FC]/10 mb-6 shadow-md">
           <h4 className="font-bold mb-3 text-[#9333EA] dark:text-[#C084FC] text-lg flex items-center gap-2">
