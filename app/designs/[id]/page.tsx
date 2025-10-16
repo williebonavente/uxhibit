@@ -1452,7 +1452,6 @@ export default function DesignDetailPage({
             AI re-evaluation in progress...
           </span>
           <span className="text-sm text-gray-600 mt-1">
-            {backendProgress}% completed ({progressStatus})
           </span>
         </div>
       )}
