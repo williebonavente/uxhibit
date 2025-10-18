@@ -281,6 +281,9 @@ export default function DesignDetailPage({
     setIsPanning(false);
   }
 
+
+  
+
   const fetchEvaluations = React.useCallback(async () => {
     const supabase = createClient();
     console.log("[fetchEvaluations] Fetching latest version for design:", design?.id);

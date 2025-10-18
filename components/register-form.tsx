@@ -64,7 +64,11 @@ export default function RegistrationForm() {
       confirmPassword: "",
     },
     resolver: zodResolver(registerFormSchema),
+    // validate on change so formState.isValid updates as the user types
+    mode: "onChange",
   });
+
+  const { isValid } = form.formState;
 
   const origin =
     typeof window !== "undefined"
@@ -363,7 +367,7 @@ export default function RegistrationForm() {
                         Birthday <span className="text-[#ED5E20]">*</span>
                       </label>
                       <FormControl>
-                        <Popover>
+                      <Popover>
                           <PopoverTrigger asChild>
                             <Button
                               variant="outline"
@@ -540,20 +544,22 @@ export default function RegistrationForm() {
             </div>
 
             {/* Submit Button */}
-            <Button
+                         <Button
               type="submit"
-              disabled={isSubmitting}
-              className="group relative inline-flex items-center justify-center
+              disabled={isSubmitting || !isValid || !termsAccepted}
+              aria-disabled={isSubmitting || !isValid || !termsAccepted}
+              className={`group relative inline-flex items-center justify-center
               w-full h-11 sm:h-12 rounded-xl text-base tracking-wide
-              transition-all duration-300 cursor-pointer
+              transition-all duration-300
               text-white shadow-[0_4px_18px_-4px_rgba(237,94,32,0.55)]
               hover:shadow-[0_6px_26px_-6px_rgba(237,94,32,0.65)]
               active:scale-[.97] focus:outline-none
-              focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40"
+              focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40
+              ${(!isValid || !termsAccepted) ? "opacity-60 cursor-not-allowed pointer-events-none" : "cursor-pointer"}`}
             >
               <span
                 aria-hidden
-                className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b]"
+                className={`absolute inset-0 rounded-xl ${(!isValid || !termsAccepted) ? "bg-gradient-to-r from-gray-400 via-gray-500 to-gray-600" : "bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b]"}`}
               />
               <span
                 aria-hidden
