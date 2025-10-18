@@ -7,7 +7,7 @@ interface CommentsSectionProps {
     newCommentText: string;
     setNewCommentText: (text: string) => void;
     currentUserId: string | null;
-    handleAddComment: () => void;
+    handleAddComment: (text?: string) => void;
     editingId: string | null;
     setEditingId: (id: string | null) => void;
     replyingToId: string | null;
@@ -49,7 +49,11 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
             />
            
             <button
-                onClick={handleAddComment}
+                onClick={() => {
+                    console.log("Post clicked, text: ", newCommentText);
+                    handleAddComment(newCommentText);
+                }}
+                type="button"
                 disabled={!newCommentText.trim() || !currentUserId}
                 className="cursor-pointer flex items-center gap-1 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm px-3 py-1.5 rounded-lg shadow transition"
             >
@@ -84,8 +88,6 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
                         comment={comment}
                         editingId={editingId}
                         setEditingId={setEditingId}
-                        // replyingToId={replyingToId}
-                        // setReplyingToId={setReplyingToId}
                         handleAddReply={handleAddReply}
                         onDelete={handleDeleteComment}
                     />

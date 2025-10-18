@@ -1,6 +1,8 @@
 import { createClient } from "@/utils/supabase/client";
-import { EvaluateInput, EvalResponse, evaluateDesign, Design } from "@/app/designs/[id]/page";
 import { Dispatch, SetStateAction } from "react";
+import { evaluateDesign } from "../evaluteDesign/evaluateDesign";
+import { EvalResponse, EvaluateInput } from "../types/evalResponse";
+import { Design } from "../types/designTypes";
 
 let pollInterval: NodeJS.Timeout | null = null;
 
