@@ -187,6 +187,7 @@ export default function DesignDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = React.use(params);
+  const lastVersionIdRef = useRef<string | null>(null);
 
   const [showEval, setShowEval] = useState(true);
   const [showVersions, setShowVersions] = useState(false);
@@ -281,9 +282,6 @@ export default function DesignDetailPage({
     setIsPanning(false);
   }
 
-
-  
-
   const fetchEvaluations = React.useCallback(async () => {
     const supabase = createClient();
     console.log("[fetchEvaluations] Fetching latest version for design:", design?.id);
@@ -310,6 +308,11 @@ export default function DesignDetailPage({
       return;
     }
 
+    // If the latest version hasn't changed since last fetch, skip updating state
+    if (lastVersionIdRef.current && lastVersionIdRef.current === String(versionData.id)) {
+      console.log("[fetchEvaluations] Version unchanged, skipping update:", versionData.id);
+      return;
+    }
     // HOTFIX: Filter out incomplete/placeholder versions
     if (
       !versionData.ai_summary ||
@@ -379,9 +382,16 @@ export default function DesignDetailPage({
 
     // 4. Combine overall and frames
     const combined = [overall, ...frames];
-    setFrameEvaluations(combined);
+    // only set state if different (avoids rerenders that retrigger fetches)
+    if (lastVersionIdRef.current !== String(versionData.id) || JSON.stringify(frameEvaluations) !== JSON.stringify(combined)) {
+      setFrameEvaluations(combined);
+      lastVersionIdRef.current = String(versionData.id);
+      console.log("[fetchEvaluations] Combined frame evaluations set:", combined);
+    } else {
+      console.log("[fetchEvaluations] Combined evaluations identical, not updating state.");
+    }
     console.log("[fetchEvaluations] Combined frame evaluations set:", combined);
-  }, [design?.id]);
+  }, [design?.id, frameEvaluations]);
 
   const sortedFrameEvaluations = React.useMemo(() => {
     if (sortOrder === "default") return frameEvaluations;
@@ -1443,7 +1453,7 @@ export default function DesignDetailPage({
         <p>Design not found.</p>
       </div>
     );
-    
+
   const isOwner = currentUserId && design?.id && currentUserId === design?.owner_id;
   return (
     <div>

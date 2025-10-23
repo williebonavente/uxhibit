@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -23,6 +23,17 @@ type ParsedMeta = {
 };
 
 export default function Evaluate() {
+
+  const pollControllerRef = useRef<AbortController | null>(null);
+  const isPollingRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    return () => {
+      try { pollControllerRef.current?.abort(); } catch (e) { }
+      pollControllerRef.current = null;
+      isPollingRef.current = false;
+    }
+  }, []);
 
   const cardCursor: React.CSSProperties = {
     cursor:
@@ -138,6 +149,38 @@ export default function Evaluate() {
         snapshot: { age, occupation },
       });
 
+      // Try to reuse existing design by file_key to avoid creating duplicate versions
+      let precheckedExisting: any = null;
+      try {
+        const checkRes = await fetch(`/api/designs?file_key=${encodeURIComponent(parsed.fileKey)}`);
+        if (checkRes.status === 405) {
+          toast.error("Pre-check endpoint not implemented (405) - skipping precheck");
+          console.warn("[handleSubmit] Pre-check endpoint not implemented (405) - skipping precheck");
+          setStep(3);
+          return;
+        }
+        else if (checkRes.status >= 500) {
+          // Server error — surface message and return to review
+          const body = await checkRes.text().catch(() => "");
+          const msg = body ? body : checkRes.statusText || "Server error";
+          toast.error(`Server error during pre-check: ${msg}`);
+          setStep(3);
+          setSubmitting(false);
+          return;
+        }
+        else if (!checkRes.ok) {
+          const body = await checkRes.text().catch(() => "(no body)");
+          console.warn("[handleSubmit] Pre-check failed", checkRes.status, body);
+        } else {
+          precheckedExisting = await checkRes.json().catch(() => null);
+          if (precheckedExisting?.design?.id) {
+            console.log("[handleSubmit] Found existing design by file_key", precheckedExisting.design.id);
+          }
+        }
+      } catch (e) {
+        console.warn("[handleSubmit] pre-save check failed (network), continuing to save", e);
+      }
+
       const saveRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/designs`, {
         method: "POST",
         headers: {
@@ -156,65 +199,163 @@ export default function Evaluate() {
       });
       console.log("[handleSubmit] Save response status", saveRes.status);
 
-      const saved = await saveRes.json();
-      console.log("[handleSubmit] Save response data", saved);
-
-      if (!saveRes.ok || !saved?.design?.id) {
-        console.log("[handleSubmit] Save failed", saved?.error);
-        toast.error(saved?.error || "Save failed");
+      const saved = await saveRes.json().catch(() => ({}));
+      const designId =
+        saved?.design?.id ?? saved?.id ?? saved?.design_id ?? saved?.data?.design?.id ?? null;
+      if (!saveRes.ok || !designId) {
+        console.log("[handleSubmit] Save failed or missing design id", { status: saveRes.status, saved });
+        toast.error(saved?.error || "Save failed (no design id).");
         return;
       }
+      let resolvedVersionId = saved?.version_id ?? null;
+      if (!resolvedVersionId) {
+        try {
+          const vres = await fetch(`/api/designs/${designId}/versions`);
+          if (vres.ok) {
+            const vdata = await vres.json().catch(() => null);
+            const newest = Array.isArray(vdata?.versions) && vdata.versions[0];
+            if (newest?.id) {
+              resolvedVersionId = newest.id;
+              console.log("[handleSubmit] Resolved version_id from versions endpoint", resolvedVersionId);
+            } else {
+              console.warn("[handleSubmit] No versions returned when resolving version_id", vdata);
+            }
+          } else {
+            console.warn("[handleSubmit] Failed to fetch versions for design", designId, vres.status);
+          }
+        } catch (e) {
+          console.warn("[handleSubmit] Error resolving version_id, proceeding without it", e);
+        }
+      }
+      if (resolvedVersionId) {
+        saved.version_id = resolvedVersionId;
+      } else {
+        console.warn("[handleSubmit] No version_id available — polling may miss worker updates");
+      }
 
-      setSavedDesignId(saved.design.id);
-      console.log("[handleSubmit] Saved design ID", saved.design.id);
 
+      // Prefer existing design from pre-check if present
+      if (precheckedExisting?.design?.id && !saved?.design?.id && !saved?.id) {
+        saved.design = saved.design ?? {};
+        saved.design.id = precheckedExisting.design.id;
+        if (precheckedExisting.design.version_id) saved.version_id = precheckedExisting.design.version_id;
+        console.log("[handleSubmit] Using prechecked existing design data", saved);
+      }
+
+      // Normalize returned design id (handle different backend shapes)
+
+
+      setSavedDesignId(designId);
+      console.log("[handleSubmit] Normalized design Id", designId, "version_id:", saved?.version_id);
+
+      // Polling with AbortController, version param, robust guards
+      // abort any previous poll, create a new controller for this session
+      try { pollControllerRef.current?.abort(); } catch (e) { }
+      pollControllerRef.current = new AbortController();
+      const controller = pollControllerRef.current;
       let pollCount = 0;
       let frames: EvalResponse[] = [];
-      while (pollCount < 60) {
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-        console.log(`[handleSubmit] Polling evaluation (attempt ${pollCount + 1}) for design ID: ${saved.design.id}`);
-        const res = await fetch(`${baseUrl}/api/designs/${saved.design.id}/evaluations?ts=${Date.now()}`);
-        console.log(`[handleSubmit] Evaluation response status: ${res.status}`);
+      const maxPolls = 60;
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+      const expectedIds = Object.keys(parsed.frameImages || {});
+      const versionParam = saved?.version_id ? `&version=${saved.version_id}` : "";
 
-        if (!res.ok) {
-          const errorData = await res.json().catch(() => ({}));
-          console.log("[handleSubmit] Failed to fetch evaluation results", errorData);
-          toast.error("Failed to fetch evaluation results.");
-          break;
+      try {
+        while (pollCount < maxPolls) {
+          pollCount++;
+          console.log(`[handleSubmit] Polling evaluation (attempt ${pollCount}) for design ID: ${designId} version:${saved?.version_id ?? "n/a"}`);
+
+          let res: Response | null = null;
+          let data: any = null;
+          try {
+            res = await fetch(
+              `${baseUrl}/api/designs/${designId}/evaluations?ts=${Date.now()}${versionParam}`,
+              { cache: "no-store", signal: controller.signal }
+            );
+          } catch (err: any) {
+            if (err?.name === "AbortError") {
+              console.log("[handleSubmit] Polling aborted");
+              break;
+            }
+            console.error("[handleSubmit] Network error while polling:", err);
+            await new Promise((r) => setTimeout(r, 2000));
+            continue;
+          }
+
+          try {
+            data = await res.json();
+          } catch (err) {
+            console.error("[handleSubmit] Failed to parse evaluation JSON:", err);
+            await new Promise((r) => setTimeout(r, 2000));
+            continue;
+          }
+
+          console.log(`[handleSubmit] Evaluation response status: ${res.status}`, {
+            statusField: data?.status,
+            returnedIds: (data?.results || []).map((r: any) => r.nodeId ?? r.node_id),
+            expectedIds,
+          });
+
+          if (!res.ok && res.status >= 400 && res.status < 500) {
+            console.error("[handleSubmit] Permanent polling error:", data);
+            toast.error("Failed to fetch evaluation results.");
+            break;
+          }
+
+          // Backend signalled stop
+          if (data?.status === "not_found" || data?.status === "error") {
+            console.log("[handleSubmit] Backend signaled stop:", data?.status, data?.message);
+            break;
+          }
+
+          // Collect frames matching current parsed node ids
+          frames = (Array.isArray(data.results) ? data.results : []).filter((f: any) =>
+            expectedIds.includes(f.nodeId ?? f.node_id)
+          );
+          setEvaluatedFrames(frames);
+
+          console.warn("frames.length", frames.length);
+          console.warn("expectedIds", expectedIds.length);
+
+          // Success: all expected frames present
+          if (frames.length === expectedIds.length) {
+            toast.success("Design and AI evaluation completed for all frames");
+            try { controller.abort(); } catch (e) { }
+            pollControllerRef.current = null;
+            isPollingRef.current = false;
+            router.push(`/designs/${designId}`);
+            return;
+          }
+
+          // If results exist but none match after several attempts -> abort to avoid infinite polling
+          const returnedIds = (Array.isArray(data.results) ? data.results.map((r: any) => r.nodeId ?? r.node_id) : []);
+          if (returnedIds.length > 0 && pollCount > 10 && frames.length === 0) {
+            console.warn("[handleSubmit] Returned results do not match expected node ids; aborting polling.", { expectedIds, returnedIds });
+            toast.warning("Evaluation returned unexpected frame ids. Check version/node mapping.");
+            break;
+          }
+
+          // If backend explicitly marks done -> stop
+          if (data?.status === "done") {
+            console.log("[handleSubmit] Backend marked done but not all frames present");
+            break;
+          }
+
+          // backoff before next attempt
+          await new Promise((r) => setTimeout(r, 2000));
         }
-
-        const data = await res.json();
-        console.log(`[handleSubmit] Evaluation response data:`, data);
-        const expectedIds = Object.keys(parsed.frameImages || {});
-        console.log("Raw results: ", data.results);
-        console.log("Expected frame IDs: ", expectedIds);
-        frames = (data.results || []).filter((f: any) =>
-          expectedIds.includes(f.nodeId || f.node_id)
-        );
-        console.log(`[handleSubmit] Evaluated frames count: ${frames.length} / ${expectedIds.length}`, frames);
-
-        setEvaluatedFrames(frames);
-
-        if (frames.length === expectedIds.length) {
-          console.log("[handleSubmit] All frames evaluated, redirecting...");
-          toast.success("Design and AI evaluation completed for all frames");
-          router.push(`/designs/${saved.design.id}`);
-          return;
-        }
-
-        await new Promise(res => setTimeout(res, 2000));
-        pollCount++;
+      } finally {
+        // ensure controller cleaned up
+        try { controller.abort(); } catch (e) { }
+        isPollingRef.current = false;
       }
 
-      if (frames.length < frameEntries.length) {
-        console.log("[handleSubmit] Timeout: Not all frames evaluated", {
-          framesEvaluated: frames.length,
-          expected: frameEntries.length,
-        });
+      // End of polling: route consistently using normalized id
+      if (frames.length < expectedIds.length) {
+        console.log("[handleSubmit] Polling finished without completing all frames", { framesEvaluated: frames.length, expected: expectedIds.length });
         toast.warning("Design saved, but AI evaluation did not complete.");
-        router.push(`/designs/${saved.design.id}`);
+        router.push(`/designs/${designId}`);
       }
-
     } catch (error) {
       console.error("[handleSubmit] Submit failed:", error);
       toast.error("Submit failed");

@@ -8,188 +8,201 @@ import {
   YAxis,
   CartesianGrid,
   ResponsiveContainer,
+  Tooltip as RechartTooltip,
+  Legend,
 } from "recharts";
 import { generateUsabilityTrendReport } from "@/lib/systemGeneratedReport/trendPdfGenerator";
-// import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { IconLoader2, IconDownload } from "@tabler/icons-react";
 import { createClient } from "@/utils/supabase/client";
+
+/* shadcn/ui components — adjust paths if your project places them elsewhere */
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+
+/* Lightweight tooltip renderer for recharts (keeps UI consistent with shadcn) */
+function ChartTooltip({ active, payload, label }: any) {
+  if (!active || !payload || !payload.length) return null;
+  const point = payload[0].payload;
+  return (
+    <div className="bg-white dark:bg-slate-900 border rounded-md px-3 py-2 text-sm shadow">
+      <div className="font-medium text-slate-900 dark:text-slate-100">Version {point.version}</div>
+      <div className="text-slate-600 dark:text-slate-300">Score: {point.score}</div>
+      <div className="text-xs text-slate-500 dark:text-slate-400">Label: {label}</div>
+    </div>
+  );
+}
 
 export default function UsabilityScoreTrendPage() {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [trendData, setTrendData] = useState<
     { version: string; score: number; label: string }[]
   >([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchTrendData = async () => {
-      const supabase = createClient();
+      setLoading(true);
+      try {
+        const supabase = createClient();
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
+        if (userError || !user) {
+          toast.error("User not logged in");
+          setTrendData([]);
+          return;
+        }
+        const currentUserId = user.id;
 
-      // 1. Get current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        toast.error("User not logged in");
-        return;
+        const { data, error } = await supabase
+          .from("design_versions")
+          .select("version, total_score, created_at")
+          .eq("created_by", currentUserId)
+          .order("created_at", { ascending: true });
+
+        if (error) {
+          toast.error("Error fetching trend data");
+          setTrendData([]);
+          return;
+        }
+
+        const mapped = (data || []).map((row: any, idx: number) => ({
+          version: `V${row.version ?? idx + 1}`,
+          score: Math.max(0, Math.min(10, Number(row.total_score ?? 0))),
+          label: (idx + 1).toString().padStart(2, "0"),
+        }));
+
+        setTrendData(mapped);
+      } catch (err) {
+        console.error("fetchTrendData error", err);
+        setTrendData([]);
+      } finally {
+        setLoading(false);
       }
-      const currentUserId = user.id;
-
-      // 2. Fetch all versions for the user's designs (or a selected design)
-      // You may want to filter by a specific design_id if needed
-      const { data, error } = await supabase
-        .from("design_versions")
-        .select("version, total_score, created_at")
-        .eq("created_by", currentUserId)
-        .order("created_at", { ascending: true });
-
-      if (error) {
-        toast.error("Error fetching trend data");
-        return;
-      }
-
-      // 3. Map to chart data format
-      const mapped = (data || []).map((row: any, idx: number) => ({
-        version: `V${row.version ?? idx + 1}`,
-        score: row.total_score ?? 0,
-        label: (idx + 1).toString().padStart(2, "0"),
-      }));
-
-      setTrendData(mapped);
     };
 
     fetchTrendData();
   }, []);
+
   const handleExportReport = async () => {
     setIsGeneratingPDF(true);
     try {
       await generateUsabilityTrendReport(trendData);
-      // Show success message (optional)
-      toast.success("PDF report generetead successfully");
-      // showSuccessToast("PDF report generated successfully", theme);
-      // alert('PDF report generated successfully!');
+      toast.success("PDF report generated successfully");
     } catch (error) {
       console.error("Error generating report:", error);
-      alert("Failed to generate PDF report. Please try again.");
+      toast.error("Failed to generate PDF report");
     } finally {
       setIsGeneratingPDF(false);
     }
   };
 
   return (
-    <div className="space-y-5">
-      <div className="border-b-2 p-2">
-        <h1 className="text-2xl font-medium">
-          Usability Score Trend
-        </h1>
-      </div>
-      <div className="p-2 m-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-        <p className="text-sm sm:text-base text-gray-700 dark:text-gray-200 w-full sm:mb-0 font-['Poppins']">
-          Track how your design improves over time. Each submission is evaluated
-          using Jakob Nielsen&apos;s 10 heuristics, and your score is plotted here.
-          The line graph helps you see whether revisions are making your UI more
-          usable before it&apos;s added to your portfolio.
-        </p>
-        <button
-          onClick={handleExportReport}
-          disabled={isGeneratingPDF}
-          className={`w-full sm:w-auto px-6 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors font-['Poppins'] font-medium mt-4 sm:mt-0 sm:ml-6 cursor-pointer ${isGeneratingPDF
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-[#ED5E20] hover:bg-[#d44e0f]"
-            } text-white`}
-        >
-          <span>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Usability Score Trend</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-300 max-w-xl mt-2">
+            Track how your designs improve over time. Each submission is evaluated using
+            Nielsen's heuristics — this chart helps you spot regressions and improvements.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <Button onClick={handleExportReport} disabled={isGeneratingPDF || trendData.length === 0}>
             {isGeneratingPDF ? (
-              <IconLoader2 className="animate-spin" />
+              <span className="flex items-center gap-2">
+                <IconLoader2 className="animate-spin w-4 h-4" />
+                Generating...
+              </span>
             ) : (
-              <IconDownload />
+              <span className="flex items-center gap-2">
+                <IconDownload className="w-4 h-4" />
+                Export
+              </span>
             )}
-          </span>
-          <span>{isGeneratingPDF ? "Generating..." : "Export"}</span>
-        </button>
-      </div>
-      <div className="bg-white dark:bg-[#19181D] rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-        {/* Header with Improvements label */}
-        <div className="bg-[#ED5E20] text-white px-6 py-4">
-          <h3 className="text-center align-middle text-lg font-bold font-['Poppins']">
-            Improvements
-          </h3>
+          </Button>
+          <Badge variant="secondary">{trendData.length} submissions</Badge>
         </div>
+      </div>
 
-        {/* Chart Container */}
-        <div className="p-8">
-          <div className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={trendData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
-              >
-                <defs>
-                  <linearGradient
-                    id="scoreGradient"
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                  >
-                    <stop offset="5%" stopColor="#ED5E20" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#ED5E20" stopOpacity={0.1} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#6b7280" />
-                <XAxis
-                  dataKey="label"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{
-                    fontSize: 14,
-                    fill: "#6b7280",
-                    fontFamily: "Poppins",
-                  }}
-                  dy={10}
-                />
-                <YAxis
-                  domain={[0, 10]}
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{
-                    fontSize: 12,
-                    fill: "#ED5E20",
-                    fontFamily: "Poppins",
-                    fontWeight: "bold",
-                  }}
-                  dx={-10}
-                  label={{
-                    value: "Usability Score",
-                    angle: -90,
-                    position: "insideLeft",
-                    style: {
-                      textAnchor: "middle",
-                      fill: "#ED5E20",
-                      fontFamily: "Poppins",
-                      fontWeight: "bold",
-                    },
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="score"
-                  stroke="#ED5E20"
-                  strokeWidth={3}
-                  fill="url(#scoreGradient)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Improvements</span>
+            <div className="text-sm text-slate-500 dark:text-slate-400">Usability Score (0–10)</div>
+          </CardTitle>
+        </CardHeader>
 
-          {/* Version labels */}
-          <div className="flex justify-center mt-4">
-            <div className="text-center">
-              <div className="text-sm text-gray-600 dark:text-gray-400 font-['Poppins'] font-medium">
-                Version
+        <Separator />
+
+        <CardContent className="p-4">
+          <div className="h-72 w-full">
+            {loading ? (
+              <div className="flex items-center justify-center h-full">
+                <IconLoader2 className="animate-spin w-6 h-6 text-slate-600 dark:text-slate-300" />
               </div>
-            </div>
+            ) : trendData.length === 0 ? (
+              <div className="text-center text-sm text-slate-500 dark:text-slate-400">
+                No data available. Submit evaluations to see trends.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trendData} margin={{ top: 12, right: 24, left: 8, bottom: 12 }}>
+                  <defs>
+                    <linearGradient id="scoreGrad" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="5%" stopColor="#ED5E20" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#ED5E20" stopOpacity={0.08} />
+                    </linearGradient>
+                  </defs>
+
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e6e6e6" />
+                  <XAxis
+                    dataKey="label"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: "#6b7280" }}
+                    interval={0}
+                    padding={{ left: 10, right: 10 }}
+                  />
+                  <YAxis
+                    domain={[0, 10]}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: "#ED5E20", fontWeight: 600 }}
+                    ticks={[0, 2, 4, 6, 8, 10]}
+                    width={40}
+                  />
+
+                  <RechartTooltip content={<ChartTooltip />} />
+                  <Legend verticalAlign="top" height={36} />
+
+                  <Area
+                    type="monotone"
+                    dataKey="score"
+                    name="Usability"
+                    stroke="#ED5E20"
+                    strokeWidth={3}
+                    fill="url(#scoreGrad)"
+                    activeDot={{ r: 5 }}
+                    dot={{ r: 3 }}
+                    connectNulls
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
-        </div>
-      </div>
+
+          <div className="mt-4 flex items-center justify-between">
+            <div className="text-sm text-slate-600 dark:text-slate-400">Version</div>
+            <div className="text-sm text-slate-500 dark:text-slate-400">Last updated: N/A</div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

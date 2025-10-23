@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
 import { LoadingButton } from "@/components/loading_props/loading-button";
+import BackgroundVideo from "@/components/background_video/backgroundVideo";
 
 export default function Home() {
   const [loadingBtn, setLoadingBtn] = useState<string | null>(null);
@@ -58,21 +59,12 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Background Video */}
-      <div className="fixed inset-0 w-full h-full overflow-hidden -z-10">
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="w-full h-full object-cover"
-        >
-          <source src="/images/uxhibit-gif-3(webm).webm" type="video/webm" />
-          Your browser does not support the video tag.
-        </video>
-        {/* gradient overlay for readability */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent"></div>
-      </div>
+      <BackgroundVideo
+        src="/images/uxhibit-gif-3(webm).webm"
+        type="video/webm"
+        overlay={true}
+        disabled={true}
+      />
 
       {/* Main Content */}
       <main className="flex flex-col lg:flex-row items-center justify-center w-full min-h-screen px-4 sm:px-6 lg:px-12 gap-15 relative z-10 text-white">

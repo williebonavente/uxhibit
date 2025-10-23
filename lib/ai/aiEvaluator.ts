@@ -43,8 +43,8 @@ export async function aiEvaluator(
     imageUrl: string,
     heuristics: Record<string, number>,
     context: {
-        accessibilityResults?: AccessibilityResult[];
-        layoutResults?: LayoutResult[];
+        accessibilityResults?: any;
+        layoutResults?: any;
         textNodes?: any;
     },
     snapshot?: Record<string, unknown>): Promise<AiEvaluator | null> {

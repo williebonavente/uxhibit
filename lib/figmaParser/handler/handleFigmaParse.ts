@@ -6,19 +6,30 @@ import { normalizeDocument } from "@/utils/extractor/metadataExtractor";
 import { evaluateFrameAccessibility } from "@/utils/contrastChecker/frameAccessibility";
 import { evaluateFrameScores } from "@/lib/frameScorer/frameScorer";
 import { getFrameTextMap } from "@/utils/extractor/frameExtractor";
-import { findParentFrame } from "../fetchers/findParentFrame";
 import { fetchFigmaImage } from "../fetchers/fetchFigmaImage";
 import { fetchFigmaNodeData } from "../fetchers/fetchFigmaNodeData";
 import { FIGMA_TOKEN } from "@/constants/figma_token";
 import { LayoutCheckResult } from "@/lib/declaration/figmaLayout";
 import { checkLayout } from "@/utils/extractor/frameLayoutChecker";
+import { findParentFrameInPages } from "@/utils/extractor/findParentFrameInPages";
+import { detectButtonsParallel } from "@/lib/ai/interactiveElements/buttons/detectButtonsParallel";
+import { detectButtonsInFrame } from "@/lib/ai/interactiveElements/buttons/detectButtons";
 
+/**
+ * Handles parsing of a Figma file or node URL, fetching metadata, images, and running analysis.
+ * Returns a normalized JSON response with extracted frames, accessibility, layout, and detected elements.
+ * 
+ * @param url - The Figma file or node URL to parse.
+ */
 export async function handleFigmaParse(url: string) {
+    // Check for required Figma API token
     if (!FIGMA_TOKEN) return NextResponse.json({ error: "Missing FIGMA_ACCESS_TOKEN" }, { status: 500 });
+
+    // Parse the Figma URL to extract fileKey and nodeId
     const parsed = parseFigmaUrl(url);
     if (!parsed) return NextResponse.json({ error: "Invalid Figma URL" }, { status: 400 });
 
-    // File metadata
+    // Fetch the Figma file metadata from the API
     const fileRes = await fetch(`https://api.figma.com/v1/files/${parsed.fileKey}`, {
         headers: { "X-Figma-Token": FIGMA_TOKEN },
         cache: "no-store",
@@ -31,9 +42,12 @@ export async function handleFigmaParse(url: string) {
         );
     }
     const fileJson = await fileRes.json();
+
+    // Extract all pages from the Figma document
     let targetPages: FigmaNode[] = [];
     const pages: FigmaNode[] = fileJson?.document?.children ?? [];
 
+    // Determine which pages to target based on nodeId (single node or all pages)
     if (parsed.nodeId) {
         targetPages = pages.filter((page: FigmaNode) => {
             function containsNode(node: FigmaNode): boolean {
@@ -47,16 +61,16 @@ export async function handleFigmaParse(url: string) {
         targetPages = pages.length > 0 ? [pages[0]] : [];
     }
 
+    // Find the parent frame for the nodeId, if present
     let extractedFrameId: string | null = null;
     if (parsed.nodeId) {
-        for (const page of pages) {
-            const parentFrame = findParentFrame(page, parsed.nodeId);
-            if (parentFrame) {
-                extractedFrameId = parentFrame.id;
-                break;
-            }
+        const parentFrame = findParentFrameInPages(pages, parsed.nodeId);
+        if (parentFrame) {
+            extractedFrameId = parentFrame.id;
         }
     }
+
+    // Fetch images for the node and its parent frame (if available)
     const [nodeImageUrl, frameImageUrl, metadataJson] = await Promise.all([
         parsed.nodeId ? fetchFigmaImage(parsed.fileKey, parsed.nodeId) : Promise.resolve(null),
         extractedFrameId ? fetchFigmaImage(parsed.fileKey, extractedFrameId) : Promise.resolve(null),
@@ -64,6 +78,7 @@ export async function handleFigmaParse(url: string) {
         Promise.resolve(null)
     ]);
 
+    // Collect all frame IDs and themed frame IDs from the target pages
     const { ids: allFrameIds, themedIds } = targetPages.reduce(
         (acc: { ids: string[]; themedIds: string[] }, page: FigmaNode) => {
             const { ids, themedIds } = collectReasonableFrameIds(page, [], []);
@@ -74,6 +89,7 @@ export async function handleFigmaParse(url: string) {
         { ids: [], themedIds: [] }
     );
 
+    // Fetch images for all frames if there are any
     let frameImages: Record<string, string> = {};
     if (allFrameIds.length > 0) {
         const idsParam = allFrameIds.map(encodeURIComponent).join(",");
@@ -88,43 +104,46 @@ export async function handleFigmaParse(url: string) {
         }
     }
 
+    // Initialize metadata and accessibility variables
     let frameMetadata: Record<string, any> = {};
     let frameAccessibility: any[] = [];
     let allTextNodes: Record<string, TextNode[]> = {};
     let accessibilityResults: any = null;
 
-    // Fetch metadata in parallel if there are frame IDs
+    // Fetch frame metadata and run accessibility evaluation if there are frame IDs
     let actualMetadataJson = metadataJson;
     if (allFrameIds.length > 0) {
         actualMetadataJson = await fetchFigmaNodeData(parsed.fileKey, allFrameIds);
         frameMetadata = actualMetadataJson?.nodes || {};
 
-        // Accessibility evaluation
+        // Evaluate accessibility for each frame
         accessibilityResults = evaluateFrameAccessibility({
             name: fileJson?.name ?? "",
             role: fileJson?.role ?? "",
             nodes: frameMetadata,
         });
 
-        // Build FrameTextMap (text nodes grouped with bg color)
+        // Build a map of text nodes for each frame
         const frameTextMap = getFrameTextMap(frameMetadata);
         const frameScores = evaluateFrameScores(frameTextMap);
 
+        // Group text nodes by frameId
         const groupedTextNodes: Record<string, any[]> = {};
         Object.values(frameTextMap).forEach(f => groupedTextNodes[f.frameId] = f.textNodes);
 
-        // assign variables to include in response
+        // Assign variables for response
         frameAccessibility = frameScores;
         allTextNodes = groupedTextNodes;
     }
 
+    // Normalize the document structure for downstream processing
     const normalized = normalizeDocument({
         name: fileJson?.name ?? "",
         role: fileJson?.role ?? "",
         nodes: frameMetadata,
     });
 
-    // Evaluate layout for each frame
+    // Evaluate layout for each normalized frame
     const layoutResults: Record<string, LayoutCheckResult> = {};
     if (normalized.frames) {
         normalized.frames.forEach(frame => {
@@ -132,7 +151,30 @@ export async function handleFigmaParse(url: string) {
         });
     }
 
-    // Merge layout results into accessibilityResults, and other properties
+    let detectedButtons: any[] = [];
+    if (Array.isArray(targetPages)) {
+        detectedButtons = [];
+        for (const page of targetPages) {
+            // Traverse all frames in the page
+            if (page.children) {
+                for (const frame of page.children) {
+                    const frameButtons = detectButtonsInFrame(frame).map(btn => ({
+                        ...btn,
+                        frameId: frame.id,
+                        frameName: frame.name,
+                        pageId: page.id,
+                        pageName: page.name
+                    }));
+                    detectedButtons.push(...frameButtons);
+                    if (frameButtons.length > 0) {
+                        console.log(`Buttons detected in frame "${frame.name}" (page "${page.name}"):`, frameButtons);
+                    }
+                }
+            }
+        }
+    }
+
+    // Merge layout results into accessibility results for each frame
     if (Array.isArray(accessibilityResults)) {
         accessibilityResults.forEach(result => {
             const layout = layoutResults[result.frameId];
@@ -157,6 +199,7 @@ export async function handleFigmaParse(url: string) {
         message: parsed.nodeId
             ? "Parsed a single node image."
             : "Parsed all frame images in the file.",
+        detectedButtons,
         extractedFrameId,
         extractedFrameImageUrl: frameImageUrl,
         frameMetadata,

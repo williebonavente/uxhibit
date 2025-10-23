@@ -39,6 +39,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
+import BackgroundVideo from "./background_video/backgroundVideo";
 
 export default function RegistrationForm() {
   const router = useRouter();
@@ -189,15 +190,13 @@ export default function RegistrationForm() {
       style={whiteCursor}
       className="relative min-h-screen flex items-center justify-center w-full overflow-hidden p-5"
     >
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover"
-      >
-        <source src="/images/uxhibit-gif-3(webm).webm" type="video/webm" />
-      </video>
+
+      <BackgroundVideo
+        src="/images/uxhibit-gif-3(webm).webm"
+        type="video/webm"
+        overlay={true}
+        disabled={true}
+      />
 
       <div className="absolute inset-0 bg-black/40" />
 
@@ -367,7 +366,7 @@ export default function RegistrationForm() {
                         Birthday <span className="text-[#ED5E20]">*</span>
                       </label>
                       <FormControl>
-                      <Popover>
+                        <Popover>
                           <PopoverTrigger asChild>
                             <Button
                               variant="outline"
@@ -544,7 +543,7 @@ export default function RegistrationForm() {
             </div>
 
             {/* Submit Button */}
-                         <Button
+            <Button
               type="submit"
               disabled={isSubmitting || !isValid || !termsAccepted}
               aria-disabled={isSubmitting || !isValid || !termsAccepted}

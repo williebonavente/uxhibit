@@ -1,0 +1,9 @@
+﻿    /**
+     * detectContextMenus.ts
+     * Auto-generated detector for ContextMenus interactive elements.
+     * This module should export detection and heuristic evaluation logic.
+     */
+    export function detectContextMenus(frame: any) {
+        // TODO: Implement detection logic for ContextMenus
+        return [];
+    }
