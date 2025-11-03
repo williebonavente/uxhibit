@@ -148,38 +148,6 @@ export default function EvaluationParamsModal({
             )}
           </label>
 
-          {/* Scale */}
-          {/* <label className="group relative flex flex-col rounded-xl bg-neutral-100 dark:bg-neutral-800/60 p-5 transition-colors focus-within:ring-1 focus-within:ring-[#ED5E20]/70 focus-within:border-[#ED5E20] border text-left">
-            <span className="text-[15px] font-semibold text-[#ED5E20] mb-2">
-              Scale
-            </span>
-            <div className="relative flex items-center gap-2">
-              <svg
-                className="h-8 w-8 text-[#ED5E20]"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                viewBox="0 0 24 24"
-              >
-                <rect x="4" y="10" width="16" height="4" rx="2" />
-                <rect x="7" y="7" width="10" height="4" rx="2" />
-                <rect x="10" y="4" width="4" height="4" rx="2" />
-              </svg>
-              <Input
-                type="number"
-                min={1}
-                max={5}
-                value={scale}
-                onChange={e => setScale(Number(e.target.value))}
-                className="w-full rounded-lg bg-white dark:bg-neutral-800/70 text-sm font-medium text-neutral-900 dark:text-neutral-200 px-3 py-2"
-              />
-            </div>
-            {touched && (scale < 1 || scale > 5) && (
-              <span className="text-xs text-red-500 mt-2">Scale must be between 1 and 5.</span>
-            )}
-          </label> */}
         </fieldset>
         <div className="flex flex-col sm:flex-row justify-center gap-4">
           <button

@@ -217,8 +217,8 @@ export async function aiEvaluator(
 
     try {
         const completion = await client.chat.complete({
-            model: 'pixtral-12b',
-            temperature: 0.1,
+            model: 'ft:ministral-8b-latest:521112c6:20251101:fbb300c8',
+            temperature: 0,
             messages: [
                 {
                     role: "user",
@@ -226,9 +226,9 @@ export async function aiEvaluator(
                         {
                             type: "text", text: prompt
                         },
-                        {
-                            type: "image_url", imageUrl: { url: imageUrl }
-                        }
+                        // {
+                        //     type: "image_url", imageUrl: { url: imageUrl }
+                        // }
                     ],
                 },
             ],

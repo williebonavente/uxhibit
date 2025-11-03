@@ -217,6 +217,7 @@ export default function LoginForm() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
+                    <FormMessage />
                     <FormControl>
                       <Input
                         id="email"
@@ -227,7 +228,6 @@ export default function LoginForm() {
                         {...field}
                       />
                     </FormControl>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -238,6 +238,7 @@ export default function LoginForm() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
+                      <FormMessage />
                     <FormControl>
                       <PasswordInput
                         id="password"
@@ -247,7 +248,6 @@ export default function LoginForm() {
                         {...field}
                       />
                     </FormControl>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
