@@ -47,7 +47,7 @@ interface DesignHeaderActionsProps {
   weaknesses?: IWeakness[];
   loadingWeaknesses?: boolean;
   displayVersionToShow?: string | null;
-  
+  allVersions: Versions[];
 }
 
 const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
@@ -74,6 +74,7 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
   fetchWeaknesses,
   weaknesses,
   loadingWeaknesses,
+  allVersions,
 }) => {
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [showGraphs, setShowGraphs] = useState(false);
@@ -373,6 +374,8 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
       )
     ).sort((a, b) => a - b);
   }, [evaluations]);
+
+  console.warn("This is fetchingWeaknesses: ",fetchWeaknesses);
   return (
     <div className="flex gap-2 items-center justify-between">
       {/* Wrapper */}
@@ -683,13 +686,24 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
 
               // immediate best-guess display value (no network)
               let display: string | null = null;
-                             if (selectedVersion?.version != null) {
-                 display = String(selectedVersion.version);
-               } else if (selectedVersion?.id) {
-                 // fallback: extract any digits from the id (rare) or use the id string
-                 const digits = String(selectedVersion.id).match(/\d+/g)?.join("");
-                 display = digits ?? String(selectedVersion.id);
-               }
+              if (selectedVersion?.version != null) {
+                display = String(selectedVersion.version);
+              } else if (selectedVersion?.id) {
+                const digits = String(selectedVersion.id)
+                  .match(/\d+/g)
+                  ?.join("");
+                display = digits ?? String(selectedVersion.id);
+              }
+
+              // If we don't have a reliable display, fetch it first to avoid flicker
+              if (!display) {
+                try {
+                  const fetched = await fetchLatestVersionNumber(design.id);
+                  if (fetched) display = fetched;
+                } catch (e) {
+                  console.error("failed to prefetch version:", e);
+                }
+              }
 
               // force parent state update synchronously so modal receives prop immediately
               flushSync(() => {
@@ -697,16 +711,12 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
               });
               setShowWeaknesses(true);
 
-              // fetch in background: try to fill a missing display, and load weaknesses
+              // still fetch weaknesses in background
               (async () => {
                 try {
-                  if (!display) {
-                    const fetched = await fetchLatestVersionNumber(design.id);
-                    if (fetched) setDisplayVersionToShow(fetched);
-                  }
                   await fetchWeaknesses?.(design.id, vid);
                 } catch (e) {
-                  console.error("background weakness/version fetch failed:", e);
+                  console.error("background weakness fetch failed:", e);
                 }
               })();
             }}
@@ -732,7 +742,7 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
         )}
         {showWeaknesses && (
           <WeaknessesModal
-          key={displayVersionToShow ?? "weaknesses-modal"}
+            key={displayVersionToShow ?? "weaknesses-modal"}
             open={showWeaknesses}
             onClose={() => setShowWeaknesses(false)}
             weaknesses={weaknesses ?? []}
@@ -748,6 +758,9 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
                 selectedVersion?.id ?? design?.current_version_id ?? null
               );
             }}
+            fetchWeaknesses={fetchWeaknesses}
+            designId={design.id}
+            allVersions={allVersions}
           />
         )}
       </div>

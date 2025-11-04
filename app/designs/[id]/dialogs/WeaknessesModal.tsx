@@ -1,9 +1,24 @@
 // ...existing code...
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Lightbulb,
+  X,
+  Zap,
+} from "lucide-react";
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Versions } from "../page";
 
 export interface IWeakness {
   id?: string;
@@ -35,6 +50,12 @@ interface Props {
   onRecheck: (opts?: { frameId?: string }) => Promise<void>;
   versionIdToShow?: string | null;
   displayVersionToShow?: string | null;
+  fetchWeaknesses?: (
+    designId?: string | null,
+    versionId?: string | null
+  ) => Promise<void>;
+  designId?: string | null;
+  allVersions?: Versions[];
 }
 
 export default function WeaknessesModal({
@@ -42,13 +63,13 @@ export default function WeaknessesModal({
   onClose,
   weaknesses,
   versionIdToShow = null,
-  displayVersionToShow = null,
+  displayVersionToShow,
   onApplyFixes,
   onRecheck,
+  fetchWeaknesses,
+  designId,
+  allVersions,
 }: Props) {
-  const params = useParams();
-  const designId = params?.id;
-
   // initialize from parent-provided displayVersionToShow to avoid flicker
   const [displayVersionNumber, setDisplayVersionNumber] = useState<
     string | null
@@ -57,13 +78,42 @@ export default function WeaknessesModal({
   const [latestVersion, setLatestVersion] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [resolving, setResolving] = useState<boolean>(false);
+  const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
 
+  const pendingMood: "red" | "yellow" = "red";
+
+  const toggleResolved = (id: string) => {
+    setResolvedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
   const modalContentRef = useRef<HTMLDivElement | null>(null);
 
   const weaknessList = useMemo<IWeakness[]>(
     () => weaknesses ?? [],
     [weaknesses]
   );
+
+  // generate stable, deterministic keys using a source index when available.
+  // fallback uses a per-base counter to ensure uniqueness across items without ids.
+  const idCountersRef = useRef<Map<String, number>>(new Map());
+  const stableId = (w: IWeakness) => {
+    const base =
+      w.id ??
+      `${w.versionId ?? w.frameId ?? "ungrouped"}-${String(
+        w.element ?? "issue"
+      ).replace(/\s+/g, "_")}`;
+
+    const srcIdx = (w as any).__srcIndex;
+    if (typeof srcIdx === "number") return `${base}-${srcIdx};`;
+    const counters = idCountersRef.current;
+    const count = counters.get(base) ?? 0;
+    counters.set(base, count + 1);
+    return `${base}-${count};`;
+  };
 
   // prevent background scroll while modal is open, but allow scrolling inside modal
   React.useEffect(() => {
@@ -114,14 +164,19 @@ export default function WeaknessesModal({
 
   const groups = useMemo(() => {
     const map = new Map<string, IWeakness[]>();
-    displayed.forEach((raw) => {
+    displayed.forEach((raw, srcIndex) => {
       const normalizedFrameId =
         (raw as any).frameId ??
         (raw as any).frameEvalId ??
         (raw as any).frame_id ??
         raw.node_id ??
         "ungrouped";
-      const w: IWeakness = { ...raw, frameId: normalizedFrameId };
+      // preserve a deterministic source index so stableId can produce unique stable keys
+      const w: IWeakness = {
+        ...(raw as any),
+        frameId: normalizedFrameId,
+        __srcIndex: srcIndex,
+      } as any;
       const arr = map.get(normalizedFrameId) ?? [];
       arr.push(w);
       map.set(normalizedFrameId, arr);
@@ -177,20 +232,24 @@ export default function WeaknessesModal({
     return map;
   }, [groups]);
 
-  const inferVersionFromList = (
-    items: IWeakness[] | undefined
+  const inferVersionIdFromList = (
+    items: IWeakness[] | undefined,
+    allVersions?: Versions[]
   ): string | null => {
-    if (!items || items.length === 0) return null;
-    const nums = items
-      .map((w) => {
-        const raw = (w as any).versionId ?? (w as any).version ?? "";
-        const digits = String(raw).match(/\d+/g)?.join("") ?? "";
-        const n = Number(digits);
-        return Number.isNaN(n) ? null : n;
-      })
-      .filter((n): n is number => n !== null);
-    if (nums.length === 0) return null;
-    return String(Math.max(...nums));
+    if (items && items.length > 0) {
+      const ids = items.map((w) => w.versionId).filter(Boolean);
+      if (ids.length > 0) {
+        return ids[ids.length - 1] as string;
+      }
+    }
+    // Fallback: return the latest version's id from allVersions if available
+    if (Array.isArray(allVersions) && allVersions.length > 0) {
+      const sorted = [...allVersions].sort(
+        (a, b) => Number(b.version) - Number(a.version)
+      );
+      return String(sorted[0].id);
+    }
+    return null;
   };
 
   // show which version the modal is currently displaying
@@ -201,6 +260,13 @@ export default function WeaknessesModal({
     const found = (displayed as any[]).find((w) => (w as any).versionId);
     return found?.versionId ?? (displayed[0] as any)?.versionId ?? null;
   }, [versionIdToShow, displayed]);
+
+  // Find the selected version object
+  const selectedVersionObj = allVersions?.find(
+    (v) => String(v.id) === String(displayVersionNumber)
+  );
+
+  const selectedVersionId = inferVersionIdFromList(weaknesses, allVersions);
 
   // keep local displayVersionNumber in sync when parent updates the provided string
   useEffect(() => {
@@ -216,12 +282,11 @@ export default function WeaknessesModal({
       displayVersionToShow ??
       versionIdToShow ??
       currentVersionId ??
-      inferVersionFromList(weaknesses) ??
+      inferVersionIdFromList(weaknesses) ??
       null;
     if (immediate && immediate !== displayVersionNumber) {
       setDisplayVersionNumber(String(immediate));
     }
-    // don't clear it here if immediate is null
   }, [
     open,
     displayVersionToShow,
@@ -293,20 +358,20 @@ export default function WeaknessesModal({
           // try by id
           let q = await supabase
             .from("design_versions")
-            .select("version")
+            .select("id, version")
             .eq("id", idLike)
             .maybeSingle();
-          if (q.data && !q.error) return String(q.data.version);
+          if (q.data && !q.error) return String(q.data.id);
           // if numeric-like, use numeric
           const asNum = Number(idLike);
           if (!Number.isNaN(asNum)) return String(asNum);
           // try by version value
           q = await supabase
             .from("design_versions")
-            .select("version")
+            .select("id, version")
             .eq("version", idLike)
             .maybeSingle();
-          if (q.data && !q.error) return String(q.data.version);
+          if (q.data && !q.error) return String(q.data.id);
           return null;
         };
 
@@ -331,7 +396,7 @@ export default function WeaknessesModal({
         // final fallback: fetch latest version; only set if found
         const { data, error } = await supabase
           .from("design_versions")
-          .select("version")
+          .select("id, version")
           .order("version", { ascending: false })
           .limit(1)
           .single();
@@ -363,9 +428,20 @@ export default function WeaknessesModal({
     weaknesses,
   ]);
 
+  useEffect(() => {
+    if (
+      open &&
+      Array.isArray(allVersions) &&
+      allVersions.length > 0 &&
+      !displayVersionNumber
+    ) {
+      setDisplayVersionNumber(String(allVersions[0].id));
+    }
+  }, [open, allVersions, displayVersionNumber]);
+
   const visibleVersion =
     displayVersionNumber ??
-    inferVersionFromList(weaknesses) ??
+    inferVersionIdFromList(weaknesses) ??
     currentVersionId ??
     (latestVersion != null ? String(latestVersion) : null);
 
@@ -428,6 +504,43 @@ export default function WeaknessesModal({
     setExpanded(groups[currentIndex + 1].id);
   };
 
+  const applyFixesForFrame = async (frameId: string, items: IWeakness[]) => {
+    if (resolving) return;
+    setResolving(true);
+    try {
+      await onApplyFixes?.({ frameId });
+      setResolvedIds((prev) => {
+        const next = new Set(prev);
+        items.forEach((w) => next.add(stableId(w)));
+        return next;
+      });
+    } catch (err) {
+      console.error("applyFixesForFrame error:", err);
+    } finally {
+      setResolving(false);
+    }
+  };
+
+  // revert fixes for a whole frame (mark resolved items as pending)
+  const revertFixesForFrame = async (frameId: string, items: IWeakness[]) => {
+    if (resolving) return;
+    setResolving(true);
+    try {
+      // optional: could call an API to revert; here we update local state to "re-open" items
+      setResolvedIds((prev) => {
+        const next = new Set(prev);
+        items.forEach((w) => next.delete(stableId(w)));
+        return next;
+      });
+      // optionally trigger a recheck after revert
+      await onRecheck?.({ frameId });
+    } catch (err) {
+      console.error("revertFixesForFrame error:", err);
+    } finally {
+      setResolving(false);
+    }
+  };
+
   if (!open) return null;
   return (
     <Modal open={open} onClose={onClose}>
@@ -447,45 +560,92 @@ export default function WeaknessesModal({
             ref={modalContentRef}
             className="relative z-10 w-full max-w-6xl max-h-[90vh] bg-white dark:bg-[#0b0b0b] rounded-2xl shadow-2xl p-6 flex flex-col overflow-auto"
           >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3">
-                  {/* <span
-                    className="inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium rounded bg-slate-100 text-slate-800 dark:bg-neutral-800 dark:text-slate-200"
-                    aria-hidden
+            <div className="flex items-center justify-between mb-4 w-full">
+              {/* Left: Title and Version Selector */}
+              <div className="flex items-center gap-6 min-w-0">
+                <div className="flex flex-col min-w-0">
+                  <h2
+                    id="weaknesses-title"
+                    className="text-2xl sm:text-3xl font-bold gradient-text truncate"
                   >
-                    {weaknesses.length}
-                  </span> */}
-                  <div>
-                    <h2
-                      id="weaknesses-title"
-                      className="text-2xl sm:text-3xl font-bold gradient-text truncate"
-                    >
-                      Detected Issues
-                    </h2>
-
-                    {/* Version box positioned below the title, theme-aware outline */}
-                    <div className="mt-3">
-                      <div className="inline-flex items-center gap-3 px-3 py-1.5 rounded-md border border-slate-200 dark:border-neutral-800 bg-white/50 dark:bg-black/10 shadow-sm">
-                        <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                          Version
-                        </div>
-                        <div className="font-mono font-semibold text-sm text-slate-900 dark:text-slate-100">
-                          {visibleVersion}
+                    Detected Issues
+                  </h2>
+                  {/* Version box positioned below the title, theme-aware outline */}
+                  <div className="mt-3">
+                    <div className="inline-flex items-center gap-3 px-3 py-1.5 rounded-md border border-slate-200 dark:border-neutral-800 bg-white/50 dark:bg-black/10 shadow-sm">
+                      <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                        <div className="mb-1 text-sm font-mono text-slate-700 dark:text-slate-300">
+                          {selectedVersionObj
+                            ? `Version ${selectedVersionObj.version}`
+                            : "Select a version"}
                         </div>
                       </div>
+                      <Select
+                        value={selectedVersionId ?? ""}
+                        onValueChange={(val) => {
+                          setDisplayVersionNumber(val);
+                          if (designId) fetchWeaknesses?.(designId, val);
+                        }}
+                      >
+                        <SelectTrigger className="w-24 font-mono font-semibold text-sm text-slate-900 dark:text-slate-100 bg-transparent border-none shadow-none focus:ring-0 focus:outline-none">
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.isArray(allVersions)
+                            ? allVersions
+                                .slice()
+                                .sort(
+                                  (a, b) =>
+                                    Number(b.version) - Number(a.version)
+                                )
+                                .map((ver) => (
+                                  <SelectItem key={ver.id} value={ver.id}>
+                                    {ver.version}
+                                  </SelectItem>
+                                ))
+                            : []}
+                        </SelectContent>
+                      </Select>
                     </div>
-
-                    {/* <p className="mt-3 text-xs text-slate-500 dark:text-slate-400 truncate">
-                      Grouped per frame for easier review — expand a frame to
-                      see its issues.
-                    </p> */}
                   </div>
                 </div>
               </div>
-              <div className="flex gap-2 items-start">
+
+              {/* Right: Pagination and Close Button */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {/* {groups.length > 0 && (
+                  <div className="flex items-center gap-2 mr-2">
+                    <button
+                      onClick={goPrev}
+                      disabled={!canPrev}
+                      aria-label="Previous frame"
+                      className={`p-2 rounded ${
+                        canPrev
+                          ? "hover:bg-gray-100 dark:hover:bg-neutral-800 cursor-pointer"
+                          : "opacity-40 cursor-not-allowed"
+                      }`}
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <div className="text-sm font-mono text-slate-600 dark:text-slate-400 px-2">
+                      {`${Math.max(1, currentIndex + 1)} / ${groups.length}`}
+                    </div>
+                    <button
+                      onClick={goNext}
+                      disabled={!canNext}
+                      aria-label="Next frame"
+                      className={`p-2 rounded ${
+                        canNext
+                          ? "hover:bg-gray-100 dark:hover:bg-neutral-800 cursor-pointer"
+                          : "opacity-40 cursor-not-allowed"
+                      }`}
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                )} */}
                 <button
-                  className="px-3 py-1 rounded border hover:bg-gray-100 dark:hover:bg-neutral-800 cursor-pointer"
+                  className="absolute top-0 right-0 mt-2 mr-6 px-3 py-2 rounded border hover:bg-gray-100 dark:hover:bg-neutral-800 cursor-pointer z-10"
                   onClick={onClose}
                   aria-label="Close weaknesses modal"
                 >
@@ -495,250 +655,464 @@ export default function WeaknessesModal({
             </div>
 
             {/* Body: left = frames list, right = details */}
-            <div className="flex-1 grid grid-cols-3 gap-4">
-              {/* frames list / overview */}
-              <div className="col-span-1 overflow-auto border-r pr-3">
-                {groups.map((g) => {
-                  const groupVersion =
-                    g.items[0]?.versionId ?? currentVersionId ?? "no-version";
-                  const idxNum = frameIndexMap.get(g.id) ?? 0;
-                  const frameLabel =
-                    idxNum === 0 ? "All Frames" : `Frames ${idxNum}`;
-                  return (
-                    <button
-                      key={g.id}
-                      onClick={() => setExpanded(g.id)}
-                      data-version={groupVersion}
-                      className={`w-full flex items-center gap-3 p-3 mb-2 rounded-lg text-left transition ${
-                        expanded === g.id
-                          ? "bg-gradient-to-r from-[#FFFAF5] to-white dark:from-neutral-800/60 dark:to-neutral-800/40 ring-1 ring-[#ED5E20]/20"
-                          : "hover:bg-gray-50 dark:hover:bg-neutral-900/40 cursor-pointer"
-                      }`}
-                    >
-                      {g.thumbnail ? (
-                        <Image
-                          src={g.thumbnail}
-                          alt={`frame-${g.id}`}
-                          width={56}
-                          height={40}
-                          className="object-cover rounded"
-                        />
-                      ) : (
-                        <div className="w-14 h-10 bg-neutral-100 dark:bg-neutral-800 rounded" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">
-                          <span className="inline-flex items-center gap-2">
-                            <span>{frameLabel}</span>
-                            <span className="text-xs text-slate-400 dark:text-slate-500 font-mono">
-                              {/* THIS is the versionId */}
-                              {/* {groupVersion} */}
-                            </span>
-                          </span>
-                        </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                          {/* {g.items.length} issue{g.items.length > 1 ? "s" : ""}{" "} */}
-                          {/* · {g.highestSeverity} */}
-                        </div>
-                      </div>
-                      {(() => {
-                        const isOverview = idxNum === 0;
-                        // compute unique total across all groups to avoid double-counting duplicates
-                        const totalCount = groups.reduce((sum, grp) => {
-                          const gIdx = frameIndexMap.get(grp.id) ?? 0;
-                          return gIdx === 0
-                            ? sum
-                            : sum + (grp.items?.length ?? 0);
-                        }, 0);
-                        const count = isOverview ? totalCount : g.items.length;
-                        const level =
-                          count >= 5 ? "high" : count >= 2 ? "medium" : "low";
-                        const base =
-                          "px-2 py-1 rounded-full text-xs font-mono font-bold border";
-                        const color =
-                          level === "high"
-                            ? "border-[#E11D48] bg-[#E11D48]/10 text-[#E11D48] dark:border-[#E11D48]/20"
-                            : level === "medium"
-                            ? "border-[#F59E0B] bg-[#F59E0B]/10 text-[#F59E0B] dark:border-[#F59E0B]/20"
-                            : "border-[#10B981] bg-[#10B981]/10 text-[#10B981] dark:border-[#10B981]/20";
-                        const label = isOverview
-                          ? `${count} total issue${count !== 1 ? "s" : ""}`
-                          : `${count} issue${count !== 1 ? "s" : ""}`;
-                        return (
-                          <span className={`${base} ${color}`} aria-hidden>
-                            {label}
-                          </span>
-                        );
-                      })()}
-                    </button>
-                  );
-                })}
-                {groups.length === 0 && (
-                  <div className="text-sm text-slate-500 p-3">
-                    No issues found.
+            <div className="flex-1 space-y-6">
+              {groups.length === 0 ? (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="w-full flex flex-col items-center justify-center gap-4 py-12"
+                >
+                  <div className="w-36 h-36 rounded-full bg-gradient-to-tr from-[#ECFDF5] to-[#BBF7D0] dark:from-[#064E3B]/30 dark:to-transparent flex items-center justify-center shadow-inner relative">
+                    <Check
+                      size={48}
+                      className="text-[#059669] drop-shadow-lg animate-pulse"
+                    />
+                    <span className="absolute -top-2 -right-2 w-3 h-3 rounded-full bg-[#86efac] animate-pulse" />
+                    <span className="absolute top-3 left-10 w-2 h-2 rounded-full bg-[#bbf7d0] animate-ping" />
                   </div>
-                )}
-              </div>
 
-              {/* details */}
-              <div className="col-span-2 overflow-auto space-y-6 pr-2">
-                {groups.map((g) => {
-                  if (expanded !== g.id) return null;
-                  const groupVersion =
-                    g.items[0]?.versionId ?? currentVersionId ?? "no-version";
-                  return (
-                    <section
-                      key={g.id}
-                      className="space-y-4"
-                      aria-labelledby={`frame-${g.id}-title`}
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    No issues detected
+                  </h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xl text-center">
+                    There are no weaknesses to show for the selected version or
+                    frame. Try switching to another version.
+                  </p>
+
+                  {/* <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={() =>
+                        onRecheck?.({ frameId: expanded ?? undefined })
+                      }
+                      className="px-3 py-1 rounded border bg-white hover:bg-gray-50 dark:bg-neutral-900 dark:hover:bg-neutral-800"
                     >
-                      {/* Frame header with divider */}
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-4">
-                          {g.thumbnail ? (
-                            <Image
-                              src={g.thumbnail}
-                              alt={`frame-${g.id}`}
-                              width={96}
-                              height={64}
-                              className="rounded object-cover"
-                            />
-                          ) : (
-                            <div className="w-24 h-16 bg-neutral-100 dark:bg-neutral-800 rounded" />
-                          )}
-                          <div>
-                            {(() => {
-                              const headerIdx = frameIndexMap.get(g.id) ?? 0;
-                              const headerLabel =
-                                headerIdx === 0
-                                  ? "All Frames"
-                                  : `Frame ${headerIdx}`;
-                              return (
+                      Re-check
+                    </button>
+                    <button
+                      onClick={onClose}
+                      className="px-3 py-1 rounded border hover:bg-gray-50 dark:hover:bg-neutral-900/40"
+                    >
+                      Close
+                    </button>
+                  </div> */}
+                </div>
+              ) : (
+                groups
+                  .filter((g) => expanded === null || g.id === expanded)
+                  .map((g) => {
+                    const groupVersion =
+                      g.items[0]?.versionId ?? visibleVersion ?? "no-version";
+                    const headerIdx = frameIndexMap.get(g.id) ?? 0;
+                    const headerLabel =
+                      headerIdx === 0 ? "All Frames" : `Frame ${headerIdx}`;
+
+                    const pending = g.items.filter(
+                      (w) => !resolvedIds.has(stableId(w))
+                    );
+                    const resolved = g.items.filter((w) =>
+                      resolvedIds.has(stableId(w))
+                    );
+
+                    return (
+                      <section
+                        key={g.id}
+                        className="rounded-lg border p-4 bg-white/50 dark:bg-black/5"
+                        aria-labelledby={`frame-${g.id}-title`}
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-4  flex-1 min-w-0">
+                            {g.thumbnail ? (
+                              <Image
+                                src={g.thumbnail}
+                                alt={`frame-${g.id}`}
+                                width={96}
+                                height={64}
+                                className="rounded object-cover"
+                              />
+                            ) : (
+                              <div className="w-24 h-16 bg-neutral-100 dark:bg-neutral-800 rounded" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between w-full">
                                 <h3
                                   id={`frame-${g.id}-title`}
                                   className="text-lg font-semibold"
                                 >
                                   {headerLabel}
                                 </h3>
-                              );
-                            })()}
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                              {g.items.length} issue
-                              {g.items.length > 1 ? "s" : ""}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          {/* Prev / Next controls */}
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={goPrev}
-                              disabled={!canPrev}
-                              aria-label="Previous frame"
-                              className={`p-2 rounded ${
-                                canPrev
-                                  ? "hover:bg-gray-100 dark:hover:bg-neutral-800 cursor-pointer"
-                                  : "opacity-40 cursor-not-allowed"
-                              }`}
-                            >
-                              <ChevronLeft size={16} />
-                            </button>
-                            <button
-                              onClick={goNext}
-                              disabled={!canNext}
-                              aria-label="Next frame"
-                              className={`p-2 rounded ${
-                                canNext
-                                  ? "hover:bg-gray-100 dark:hover:bg-neutral-800 cursor-pointer"
-                                  : "opacity-40 cursor-not-allowed"
-                              }`}
-                            >
-                              <ChevronRight size={16} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
 
-                      {/* visual divider */}
-                      <div className="border-t border-slate-200 dark:border-neutral-800" />
-                      {/* issues list for this frame */}
-                      <div className="space-y-3">
-                        {[...g.items]
-                          .slice()
-                          .sort((a, b) => {
-                            const rank: Record<string, number> = {
-                              high: 3,
-                              medium: 2,
-                              low: 1,
-                            };
-                            const aRank =
-                              rank[(a.impactLevel ?? "medium").toLowerCase()] ??
-                              2;
-                            const bRank =
-                              rank[(b.impactLevel ?? "medium").toLowerCase()] ??
-                              2;
-                            return bRank - aRank;
-                          })
-                          .map((w, idx) => (
-                            <article
-                              key={w.id ?? `${g.id}-issue-${idx}`}
-                              className="p-4 rounded-lg border dark:border-neutral-800 bg-white/60 dark:bg-black/10"
-                              data-version={w.versionId ?? groupVersion}
-                              aria-labelledby={`${g.id}-issue-${idx}-title`}
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <h4
-                                    id={`${g.id}-issue-${idx}-title`}
-                                    className="text-sm font-semibold"
-                                  >
-                                    {w.element ?? "Issue"}
-                                  </h4>
-                                  <p className="text-xs text-slate-600 dark:text-slate-400">
-                                    {w.description}
-                                  </p>
-                                  <div className="mt-1 text-xs text-slate-400 dark:text-slate-500 font-mono">
-                                    {/* This is versionId */}
-                                    {/* Version: {w.versionId ?? groupVersion} */}
+                                {/* Pagination (right-most) */}
+                                <div className="flex items-center gap-3 ml-auto">
+                                  <div className="flex items-center gap-3 px-2 py-1 rounded-md border bg-white/60 dark:bg-neutral-900/40 shadow-sm">
+                                    <button
+                                      onClick={goPrev}
+                                      disabled={!canPrev}
+                                      aria-label="Previous frame"
+                                      className={`p-2 rounded-md ${
+                                        canPrev
+                                          ? "hover:bg-gray-100 dark:hover:bg-neutral-800 cursor-pointer"
+                                          : "opacity-40 cursor-not-allowed"
+                                      }`}
+                                    >
+                                      <ChevronLeft size={20} />
+                                    </button>
+
+                                    {/* compact status with SVG ring */}
+                                    <div className="flex items-center gap-2 px-2">
+                                      <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-white/70 dark:bg-neutral-900/40 border shadow-sm">
+                                        <div className="text-sm font-mono text-slate-600 dark:text-slate-400">
+                                          {`${Math.max(
+                                            1,
+                                            currentIndex + 1
+                                          )} / ${groups.length}`}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <button
+                                      onClick={goNext}
+                                      disabled={!canNext}
+                                      aria-label="Next frame"
+                                      className={`p-2 rounded-md ${
+                                        canNext
+                                          ? "hover:bg-gray-100 dark:hover:bg-neutral-800 cursor-pointer"
+                                          : "opacity-40 cursor-not-allowed"
+                                      }`}
+                                    >
+                                      <ChevronRight size={20} />
+                                    </button>
                                   </div>
                                 </div>
-
-                                {/* severity badge */}
-                                {(() => {
-                                  const sev = (
-                                    w.impactLevel ?? "medium"
-                                  ).toLowerCase();
-                                  let badgeColor =
-                                    "bg-[#10B981]/10 dark:bg-[#10B981]/20 text-[#10B981]";
-                                  if (sev === "high") {
-                                    badgeColor =
-                                      "bg-[#FF0000]/10 dark:bg-[#FF0000]/5 text-[#E11D48]";
-                                  } else if (sev === "medium") {
-                                    badgeColor =
-                                      "bg-[#F59E0B]/10 dark:bg-[#F59E0B]/5 text-[#F59E0B]";
-                                  }
-                                  return (
-                                    <span
-                                      className={`ml-auto px-3 py-1 rounded-full text-xs font-semibold uppercase ${badgeColor}`}
-                                    >
-                                      {w.impactLevel ?? "medium"}
-                                    </span>
-                                  );
-                                })()}
                               </div>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-3">
+                                {/* <span className="font-mono">{g.items.length} total</span> */}
 
-                              {w.suggestion && (
-                                <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                                  {w.suggestion}
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                    pendingMood === "red"
+                                      ? "bg-[#FEE2E2] text-[#DC2626] dark:bg-[#4B1F1F]/30"
+                                      : "bg-[#FFEDD5] text-[#92400E] dark:bg-[#3F2B0D]/20"
+                                  }`}
+                                >
+                                  {/* {pending.length} pending */}
+                                </span>
+
+                                <span className="text-slate-400 dark:text-slate-500">
+                                  {/* <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-[#ECFDF5] text-[#059669] dark:bg-[#064E3B]/30">
+                                    {resolved.length} resolved
+                                  </span> */}
+                                </span>
+                                {/* optional: show version */}
+                                {/* <span className="ml-auto font-mono text-xs">{groupVersion}</span> */}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* <div className="text-sm text-slate-500 dark:text-slate-400 font-mono">
+                          <button
+                            onClick={() =>
+                              setExpanded(g.id === expanded ? null : g.id)
+                            }
+                            className="px-2 py-1 rounded border hover:bg-gray-50 dark:hover:bg-neutral-900/40"
+                          >
+                            {expanded === g.id ? "Collapse" : "Expand"}
+                          </button>
+                        </div> */}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          {/* Pending */}
+
+                          {/* Pending (stylized header + body) */}
+                          <div>
+                            <div
+                              className="flex items-center justify-between mb-3 p-3 rounded-md bg-gradient-to-r from-white/70 to-slate-50 dark:from-neutral-900/60 dark:to-neutral-900/40 border border-slate-200 dark:border-neutral-800"
+                              aria-hidden
+                            >
+                              <div className="flex items-center gap-3">
+                                {/* <div className="w-9 h-9 rounded-full bg-[#FEF3F2] dark:bg-[#4B1F1F]/30 flex items-center justify-center">
+                                <AlertTriangle
+                                  size={18}
+                                  className="text-[#E11D48]"
+                                />
+                              </div> */}
+                                <div>
+                                  <div className="text-sm font-semibold">
+                                    Issues
+                                  </div>
+                                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                                    Issues that needed to be resolved.
+                                  </div>
+                                </div>
+                              </div>
+                              {/* <div className="flex items-center gap-2">
+                              <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                                {pending.length} issues
+                                {pending.length !== 1 ? "s" : ""}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-[#FFEDD5] text-[#92400E] dark:bg-[#3F2B0D]/20">
+                                {pending.length === 0
+                                  ? "All Clear"
+                                  : pending.length >= 5
+                                  ? "High"
+                                  : pending.length >= 2
+                                  ? "Medium"
+                                  : "Low"}
+                              </span>
+                            </div> */}
+                            </div>
+
+                            <div className="space-y-3">
+                              {pending.length === 0 && (
+                                <div
+                                  role="status"
+                                  aria-live="polite"
+                                  className="flex items-center gap-3 p-4 rounded-md border border-slate-200 dark:border-neutral-800 bg-white/60 dark:bg-black/20"
+                                >
+                                  <div className="flex-shrink-0">
+                                    <div className="flex-shrink-0">
+                                      <div className="w-14 h-14 relative flex items-center justify-center">
+                                        {/* subtle green background + inner glow */}
+                                        <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#ECFDF5] to-[#BBF7D0] dark:from-[#064E3B]/30 dark:to-transparent shadow-inner" />
+                                        {/* greener check */}
+                                        <Check
+                                          size={22}
+                                          className="relative text-[#059669] drop-shadow-sm"
+                                        />
+                                        {/* decorative sparkles */}
+                                        <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[#86efac] opacity-95 animate-pulse" />
+                                        <span className="absolute top-0 left-3 w-1.5 h-1.5 rounded-full bg-[#bbf7d0] opacity-80 animate-ping" />
+                                        <span className="absolute bottom-0.5 -left-1 w-1.5 h-1.5 rounded-full bg-[#bbf7d0] opacity-85 animate-pulse" />
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="min-w-0">
+                                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                      No pending issues
+                                    </div>
+                                    <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                                      Everything in this frame looks good — nice
+                                      work.
+                                    </div>
+                                  </div>
                                 </div>
                               )}
-                            </article>
-                          ))}
-                      </div>
-                    </section>
-                  );
-                })}
-              </div>
+
+                              {pending.map((w) => {
+                                const key = stableId(w);
+                                const sev = (
+                                  w.impactLevel ?? "medium"
+                                ).toLowerCase();
+                                return (
+                                  <article
+                                    key={key}
+                                    className="p-3 rounded-lg border dark:border-neutral-800 bg-white/60 dark:bg-black/10 flex items-start gap-3"
+                                  >
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                          <div className="text-sm font-semibold">
+                                            {w.element ?? "Issue"}
+                                          </div>
+                                          <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                                            {w.description}
+                                          </div>
+                                        </div>
+                                        <div className="text-right ml-2">
+                                          <div className="mt-2">
+                                            <button
+                                              onClick={() =>
+                                                toggleResolved(key)
+                                              }
+                                              className="px-2 py-1 text-xs rounded border hover:bg-gray-100 dark:hover:bg-neutral-800"
+                                            >
+                                              Mark resolved
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                                        <strong>What to do:</strong>{" "}
+                                        {w.suggestion ??
+                                          "Provide a clear label, reduce steps, and improve affordance for this control."}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <span
+                                        className={`px-2 py-1 rounded-full text-xs font-semibold uppercase ${
+                                          sev === "high"
+                                            ? "bg-[#FF0000]/10 text-[#E11D48]"
+                                            : sev === "medium"
+                                            ? "bg-[#F59E0B]/10 text-[#F59E0B]"
+                                            : "bg-[#10B981]/10 text-[#10B981]"
+                                        }`}
+                                      >
+                                        {w.impactLevel ?? "medium"}
+                                      </span>
+                                    </div>
+                                  </article>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Resolved (stylized header + body) */}
+                          <div>
+                            <div
+                              className="flex items-center justify-between mb-3 p-3 rounded-md bg-gradient-to-r from-white/70 to-slate-50 dark:from-neutral-900/60 dark:to-neutral-900/40 border border-slate-200 dark:border-neutral-800"
+                              aria-hidden
+                            >
+                              <div className="flex items-center gap-3">
+                                <div>
+                                  <div className="text-sm font-semibold">
+                                    Resolved
+                                  </div>
+                                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                                    Issues you resolved.
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                {/* <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                                {resolved.length} item
+                                {resolved.length !== 1 ? "s" : ""}
+                              </span> */}
+
+                                {/* <button
+                                onClick={() =>
+                                  revertFixesForFrame(
+                                    g.id,
+                                    g.items.filter((w) =>
+                                      resolvedIds.has(stableId(w))
+                                    )
+                                  )
+                                }
+                                disabled={resolving || resolved.length === 0}
+                                className={`px-3 py-1 rounded border text-sm font-medium ${
+                                  resolved.length === 0
+                                    ? "opacity-60 cursor-not-allowed"
+                                    : "hover:bg-gray-50 dark:hover:bg-neutral-900/40"
+                                }`}
+                                title={
+                                  resolved.length === 0
+                                    ? "No resolved items to re-open"
+                                    : "Re-open all resolved items"
+                                }
+                              >
+                                {resolving ? "Working…" : "Re-open all"}
+                              </button>
+
+                              <button
+                                onClick={() => onRecheck?.({ frameId: g.id })}
+                                disabled={resolving}
+                                className="px-3 py-1 rounded border text-sm hover:bg-gray-50 dark:hover:bg-neutral-900/40"
+                              >
+                                Re-check frame
+                              </button> */}
+                              </div>
+                            </div>
+
+                            <div className="space-y-3">
+                              {resolved.length === 0 && (
+                                <div
+                                  role="status"
+                                  aria-live="polite"
+                                  className="flex items-center gap-4 p-6 rounded-lg border border-slate-200 dark:border-neutral-800 bg-white/60 dark:bg-black/20"
+                                >
+                                  <div className="flex-shrink-0">
+                                    <div className="w-14 h-14 relative flex items-center justify-center">
+                                      {/* warmer yellow gradient + subtle ring for emphasis */}
+                                      <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#fff7cc] to-[#fff1a8] dark:from-[#4a2b00] dark:to-transparent shadow-inner ring-1 ring-yellow-100/40" />
+                                      {/* yellow lightbulb accent */}
+                                      <Lightbulb
+                                        size={22}
+                                        className="relative text-amber-500 drop-shadow-lg"
+                                      />
+                                      {/* yellow sparkles */}
+                                      <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[#ffd54f] opacity-95 animate-pulse" />
+                                      <span className="absolute top-0 left-3 w-1.5 h-1.5 rounded-full bg-[#fff59d] opacity-80 animate-ping" />
+                                      <span className="absolute bottom-0.5 -left-1 w-1.5 h-1.5 rounded-full bg-[#fff176] opacity-85 animate-pulse" />
+                                    </div>
+                                  </div>
+
+                                  <div className="min-w-0">
+                                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                      Nothing has been resolved yet
+                                    </div>
+                                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                      No items in this frame are marked as
+                                      resolved. Mark issues as resolved when
+                                      fixed, or run a re-check.
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                              {resolved.map((w) => {
+                                const key = stableId(w);
+                                const sev = (
+                                  w.impactLevel ?? "medium"
+                                ).toLowerCase();
+                                return (
+                                  <article
+                                    key={key}
+                                    className="p-3 rounded-lg border dark:border-neutral-800 bg-white/30 dark:bg-black/5 flex items-start gap-3 opacity-80"
+                                  >
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                          <div className="text-sm font-semiboldi">
+                                            {w.element ?? "Issue"}
+                                          </div>
+                                          <div className="text-xs text-slate-600 dark:text-slate-400 mt-1 ">
+                                            {w.description}
+                                          </div>
+                                        </div>
+                                        <div className="text-right ml-2">
+                                          <div>
+                                            <span className="px-2 py-1 rounded-full text-xs font-semibold uppercase flex items-center gap-2 bg-[#10B981]/10 text-[#10B981] dark:bg-[#10B981]/20">
+                                              <Check
+                                                size={14}
+                                                className="inline-block"
+                                              />
+                                              Resolved
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                                        <strong>What was suggested:</strong>{" "}
+                                        {w.suggestion ??
+                                          "No suggestion recorded."}
+                                      </div>
+
+                                      {/* moved severity badge below the suggestion */}
+                                      <div className="mt-2">
+                                        <span
+                                          className={`px-2 py-1 rounded-full text-xs font-semibold uppercase ${
+                                            sev === "high"
+                                              ? "bg-[#FF0000]/10 text-[#E11D48]"
+                                              : sev === "medium"
+                                              ? "bg-[#F59E0B]/10 text-[#F59E0B]"
+                                              : "bg-[#10B981]/10 text-[#10B981]"
+                                          }`}
+                                        >
+                                          {w.impactLevel ?? "medium"}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    {/* right column removed (badge moved above) */}
+                                  </article>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </section>
+                    );
+                  })
+              )}
             </div>
           </div>
         </div>

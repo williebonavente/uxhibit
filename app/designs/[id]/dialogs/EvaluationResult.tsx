@@ -282,6 +282,82 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
           </div>
         )}
 
+      {/* Category Scores */}
+      {evalResult.ai?.category_scores && (
+        <section className="mb-8 p-5 rounded-2xl bg-[#9333EA]/10 dark:bg-[#C084FC]/10 shadow-md">
+          <h4 className="font-bold text-lg mb-4 flex items-center gap-2 text-[#7c3aed] dark:text-[#a78bfa]">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 22 22"
+              className="opacity-80"
+            >
+              <circle cx="11" cy="11" r="10" fill="#a78bfa" opacity="0.13" />
+              <path
+                d="M6 13l3-3 2 2 5-6"
+                stroke="#a78bfa"
+                strokeWidth="1.2"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Category Scores
+          </h4>
+          <div className="flex flex-col gap-4">
+            {Object.entries(evalResult.ai.category_scores).map(
+              ([key, value]) => {
+                const score =
+                  typeof value === "number"
+                    ? Math.max(0, Math.min(100, Math.round(value)))
+                    : 0;
+                const label = key.replace(/_/g, " ");
+                // Color ramp for progress bar
+                let barColor = "bg-[#f87171]";
+                if (score >= 85) barColor = "bg-[#10b981]";
+                else if (score >= 65) barColor = "bg-[#a78bfa]";
+                else if (score >= 40) barColor = "bg-[#fbbf24]";
+                return (
+                  <div
+                    key={`cat-score-${key}`}
+                    className="flex flex-col sm:flex-row items-center gap-3 px-2 py-1 transition-all"
+                    role="group"
+                    aria-label={`${label} score ${score} out of 100`}
+                  >
+                    <span className="w-36 text-sm font-medium text-neutral-700 dark:text-neutral-200 capitalize truncate">
+                      {label}
+                    </span>
+                    <div className="flex-1 w-full flex items-center gap-2">
+                      <div className="w-full h-3 bg-neutral-200 dark:bg-neutral-800 rounded-full overflow-hidden">
+                        <div
+                          className={`${barColor} h-3 rounded-full transition-all`}
+                          style={{ width: `${score}%` }}
+                        />
+                      </div>
+                      <span
+                        className="ml-2 text-xs font-bold tabular-nums"
+                        style={{
+                          color:
+                            score >= 85
+                              ? "#10b981"
+                              : score >= 65
+                              ? "#a78bfa"
+                              : score >= 40
+                              ? "#fbbf24"
+                              : "#f87171",
+                        }}
+                      >
+                        {score}
+                      </span>
+                    </div>
+                  </div>
+                );
+              }
+            )}
+          </div>
+        </section>
+      )}
+
       {evalResult.ai?.category_score_justifications && (
         <div className="p-5 rounded-2xl bg-[#9333EA]/10 dark:bg-[#C084FC]/10 mb-6 shadow-md">
           <h4 className="font-bold mb-3 text-[#9333EA] dark:text-[#C084FC] text-lg flex items-center gap-2">
@@ -307,6 +383,186 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
           </ul>
         </div>
       )}
+
+      {/* Heuristic breakdown */}
+      {Array.isArray(evalResult.ai?.heuristic_breakdown) &&
+        evalResult.ai.heuristic_breakdown.length > 0 && (
+          <section className="mb-8 p-5 rounded-2xl bg-[#0ea5e9]/10 dark:bg-[#38bdf8]/10 shadow-md">
+            <h4 className="font-bold text-lg mb-4 flex items-center gap-2 text-[#0891b2] dark:text-[#38bdf8]">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                className="opacity-80"
+              >
+                <path
+                  d="M3 12h18"
+                  stroke="#0891b2"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M6 7h.01M6 17h.01"
+                  stroke="#0891b2"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+              </svg>
+              Heuristic Breakdown
+            </h4>
+
+            {/* Desktop / tablet: table */}
+            <div className="hidden sm:block">
+              <table className="w-full table-auto text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-neutral-500 dark:text-neutral-400">
+                    <th className="px-3 py-2 w-24">Code</th>
+                    <th className="px-3 py-2">Principle</th>
+                    <th className="px-3 py-2 w-56">Evaluation focus</th>
+                    <th className="px-3 py-2">Justification</th>
+                    <th className="px-3 py-2 w-32 text-right">Score</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y bg-white/90 dark:bg-[#232323]/90">
+                  {evalResult.ai.heuristic_breakdown.map(
+                    (h: any, idx: number) => {
+                      const score = typeof h.score === "number" ? h.score : 0;
+                      const max =
+                        typeof h.max_points === "number" ? h.max_points : 4;
+                      const pct = Math.round((score / Math.max(1, max)) * 100);
+                      const badgeClass =
+                        pct >= 85
+                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200"
+                          : pct >= 65
+                          ? "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-200"
+                          : pct >= 40
+                          ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+                          : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200";
+
+                      return (
+                        <tr
+                          key={`heuristic-${h.code ?? idx}`}
+                          className="align-top"
+                        >
+                          <td className="px-3 py-3 align-top">
+                            <span className="inline-block px-2 py-1 rounded-full text-xs font-mono font-bold border border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800 text-slate-700 dark:text-slate-200">
+                              {h.code}
+                            </span>
+                          </td>
+
+                          <td className="px-3 py-3 align-top">
+                            <div className="font-semibold text-neutral-800 dark:text-neutral-100">
+                              {h.principle}
+                            </div>
+                          </td>
+
+                          <td className="px-3 py-3 align-top text-xs text-neutral-500 dark:text-neutral-400">
+                            {h.evaluation_focus}
+                          </td>
+
+                          <td className="px-3 py-3 align-top text-xs text-neutral-600 dark:text-neutral-400">
+                            {h.justification}
+                          </td>
+
+                          <td className="px-3 py-3 align-top text-right">
+                            <div
+                              className="flex flex-col items-end gap-2"
+                              aria-label={`Score ${score} out of ${max}, ${pct} percent`}
+                            >
+                              {/* compact badge for the numeric score */}
+                              <span
+                                className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-mono font-semibold ${badgeClass} border border-transparent shadow-sm`}
+                                role="status"
+                              >
+                                <span className="tabular-nums">{score}</span>
+                                <span className="text-xs font-normal text-neutral-600 dark:text-neutral-400">
+                                  / {max}
+                                </span>
+                              </span>
+                              {/* compact percent as colored text (no badge) */}
+                              <span
+                                className={`ml-2 mr-3 text-xs font-semibold tabular-nums ${
+                                  pct >= 85
+                                    ? "text-green-600 dark:text-green-300"
+                                    : pct >= 65
+                                    ? "text-violet-600 dark:text-violet-300"
+                                    : pct >= 40
+                                    ? "text-amber-600 dark:text-amber-300"
+                                    : "text-red-600 dark:text-red-300"
+                                }`}
+                                title={`${pct}%`}
+                                aria-hidden={false}
+                                aria-label={`${pct} percent`}
+                              >
+                                {pct}%
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    }
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile: stacked cards */}
+            <div className="sm:hidden grid gap-3">
+              {evalResult.ai.heuristic_breakdown.map((h: any, idx: number) => {
+                const score = typeof h.score === "number" ? h.score : 0;
+                const max = typeof h.max_points === "number" ? h.max_points : 4;
+                const pct = Math.round((score / Math.max(1, max)) * 100);
+                const badgeClass =
+                  pct >= 85
+                    ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200"
+                    : pct >= 65
+                    ? "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-200"
+                    : pct >= 40
+                    ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+                    : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200";
+
+                return (
+                  <div
+                    key={`heuristic-mobile-${h.code ?? idx}`}
+                    className="bg-white/90 dark:bg-[#232323]/90 rounded-lg p-4 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="px-2 py-1 rounded-full text-xs font-mono font-bold border border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800 text-slate-700 dark:text-slate-200">
+                          {h.code}
+                        </span>
+                        <div>
+                          <div className="font-semibold text-neutral-800 dark:text-neutral-100">
+                            {h.principle}
+                          </div>
+                          <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                            {h.evaluation_focus}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div
+                        className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-semibold ${badgeClass}`}
+                      >
+                        <span className="tabular-nums">
+                          {score} / {max}
+                        </span>
+                        <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                          ({pct}%)
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 text-sm text-neutral-600 dark:text-neutral-400">
+                      {h.justification}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
       {/* Recommendation Resources */}
       {evalResult.ai?.resources && evalResult.ai.resources.length > 0 && (
         <div className="p-5 rounded-2xl bg-[#0D9488]/10 dark:bg-[#2DD4BF]/10 mb-6 shadow-md">

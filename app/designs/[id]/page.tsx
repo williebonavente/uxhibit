@@ -65,10 +65,19 @@ interface FrameEvaluation {
   total_score: number;
 }
 
-type Snapshot = {
+export type Snapshot = {
   age: string;
   occupation: string;
 };
+
+export type HeuristicBreakdownItem = {
+  code: string;
+  score: number;
+  principle: string;
+  max_points: number;
+  justification?: string;
+  evaluation_focus?: string;
+}
 
 export type Versions = {
   id: string;
@@ -150,6 +159,7 @@ export type EvalResponse = {
     category_scores?: Record<string, number>;
     category_score_justifications?: Record<string, string>;
     resources?: EvalResource[];
+    heuristic_breakdown?: HeuristicBreakdownItem[];
   } | null;
 };
 
@@ -247,6 +257,7 @@ export default function DesignDetailPage({
   const [progressStatus, setProgressStatus] = useState("started");
   const [weaknesses, setWeaknesses] = React.useState<IWeakness[]>([]);
   const [loadingWeaknesses, setLoadingWeaknesses] = React.useState(false);
+  const [allVersions, setAllVersions] = useState<Versions[]>([]);
 
   function startResizing() {
     setIsResizing(true);
@@ -1791,6 +1802,13 @@ export default function DesignDetailPage({
     console.log("[loadingEval] changed:", loadingEval);
   }, [loadingEval]);
 
+  useEffect(() => {
+  if (!design?.id) return;
+  fetchDesignVersions(design.id)
+    .then((versions) => setAllVersions(versions))
+    .catch((e) => console.error("Failed to fetch versions", e));
+}, [design?.id]);
+
   if (designLoading)
     return (
       <div className="flex flex-col items-center justify-center h-screen animate-pulse">
@@ -1862,6 +1880,7 @@ export default function DesignDetailPage({
               fetchWeaknesses={fetchWeaknesses}
               weaknesses={weaknesses}
               loadingWeaknesses={loadingWeaknesses}
+              allVersions={allVersions}
               
             />
           )}

@@ -10,7 +10,7 @@ import {
   IconLayoutGrid,
   IconList,
   IconTrash,
-  IconEye
+  IconEye,
 } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
@@ -37,20 +37,28 @@ type PublishedDesign = {
   num_of_views: number;
 };
 
-export default function DesignsGallery({ profileId, isOwnProfile }: { profileId: string, isOwnProfile?: boolean }) {
+export default function DesignsGallery({
+  profileId,
+  isOwnProfile,
+}: {
+  profileId: string;
+  isOwnProfile?: boolean;
+}) {
   const [designs, setDesigns] = useState<DesignRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showOverlay, setShowOverlay] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
-  const [filter, setFilter] = useState<"all" | "published" | "unpublished">("all");
+  const [filter, setFilter] = useState<"all" | "published" | "unpublished">(
+    "all"
+  );
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
   const filteredDesigns = designs.filter((d) => {
     if (filter === "published") return d.is_published;
     if (filter === "unpublished") return !d.is_published;
-    return true; 
+    return true;
   });
   const supabase = createClient();
 
@@ -95,14 +103,16 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
     setLoading(true);
     const { data, error } = await supabase
       .from("designs")
-      .select(`id,
+      .select(
+        `id,
               title,
               thumbnail_url,
               file_key,
               node_id,
               current_version_id,
               published_designs(is_active, num_of_hearts, num_of_views) 
-              `)
+              `
+      )
       .eq("owner_id", profileId) // using the profileId, not the currentUserId
       .order("updated_at", { ascending: false });
     if (error) {
@@ -115,7 +125,11 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
       (data || []).map(async (d) => {
         let likes = 0;
         let views = 0;
-        const pub = d.published_designs as PublishedDesign | PublishedDesign[] | null | undefined;
+        const pub = d.published_designs as
+          | PublishedDesign
+          | PublishedDesign[]
+          | null
+          | undefined;
         if (pub) {
           if (Array.isArray(pub)) {
             likes = pub[0]?.num_of_hearts ?? 0;
@@ -133,7 +147,7 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
           views,
           is_published: Array.isArray(d.published_designs)
             ? d.published_designs.some((p) => p.is_active)
-            : !!(d.published_designs && d.published_designs.is_active)
+            : !!(d.published_designs && d.published_designs.is_active),
         };
       })
     );
@@ -156,7 +170,9 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
   useEffect(() => {
     const fetchUser = async () => {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       setCurrentUserId(user?.id ?? null);
     };
     fetchUser();
@@ -169,8 +185,7 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
     return () => clearInterval(interval);
   }, [loadDesigns]);
 
-  const handleDelete = (id: string,
-    isPublished: boolean) => {
+  const handleDelete = (id: string, isPublished: boolean) => {
     setShowOverlay(true);
 
     if (isPublished) {
@@ -189,14 +204,16 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
               Warning: Published Design
             </h2>
             <p className="text-sm text-yellow-800 mb-1">
-              <span className="font-bold">This design is currently published.</span>
+              <span className="font-bold">
+                This design is currently published.
+              </span>
             </p>
             <p className="text-sm text-yellow-800 mb-1">
               Unpublish it before deleting.
             </p>
             <p className="text-xs italic text-yellow-600">
-              Published designs are visible to others and cannot be deleted directly
-              for safety.
+              Published designs are visible to others and cannot be deleted
+              directly for safety.
             </p>
           </div>
           <div className="flex justify-center items-center gap-2 mt-2 mb-3">
@@ -214,7 +231,8 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
         {
           position: "top-center",
           duration: 999999,
-          className: "bg-white dark:bg-[#120F12] text-black dark:text-white rounded-2xl items-center justify-center text-center",
+          className:
+            "bg-white dark:bg-[#120F12] text-black dark:text-white rounded-2xl items-center justify-center text-center",
           onAutoClose: () => setShowOverlay(false),
         }
       );
@@ -256,19 +274,26 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
                 // First get design info for logging and storage cleanup
                 const { data: design } = await supabase
                   .from("designs")
-                  .select(`
+                  .select(
+                    `
                   title, 
                   thumbnail_url,
                   published_designs(id), 
                   design_versions!design_versions_design_id_fkey (
                     id,
-                    thumbnail_url)`)
+                    thumbnail_url)`
+                  )
                   .eq("id", id)
                   .single();
 
                 // Check if published (adjust this logic to your schema)
-                if (design?.published_designs && design.published_designs.length > 0) {
-                  toast.error("This design cannot be deleted since it is currently published.");
+                if (
+                  design?.published_designs &&
+                  design.published_designs.length > 0
+                ) {
+                  toast.error(
+                    "This design cannot be deleted since it is currently published."
+                  );
                   setShowOverlay(false);
                   toast.dismiss();
                   return;
@@ -276,26 +301,34 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
 
                 const storagePaths: string[] = [];
 
-                if (design?.thumbnail_url && !design.thumbnail_url.startsWith('http')) {
+                if (
+                  design?.thumbnail_url &&
+                  !design.thumbnail_url.startsWith("http")
+                ) {
                   storagePaths.push(design.thumbnail_url);
                 }
 
                 // Add version thumbnails if they're storage paths
-                design?.design_versions?.forEach(version => {
-                  if (version.thumbnail_url && !version.thumbnail_url.startsWith('http')) {
+                design?.design_versions?.forEach((version) => {
+                  if (
+                    version.thumbnail_url &&
+                    !version.thumbnail_url.startsWith("http")
+                  ) {
                     storagePaths.push(version.thumbnail_url);
                   }
                 });
 
                 // Delete storage files first
                 if (storagePaths.length > 0) {
-                  const { error: storageError } = await supabase
-                    .storage
-                    .from('design-thumbnails')
+                  const { error: storageError } = await supabase.storage
+                    .from("design-thumbnails")
                     .remove(storagePaths);
 
                   if (storageError) {
-                    console.error('Failed to delete storage files:', storageError);
+                    console.error(
+                      "Failed to delete storage files:",
+                      storageError
+                    );
                   }
                 }
                 const { error: updateError } = await supabase
@@ -304,17 +337,23 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
                   .eq("id", id);
 
                 if (updateError) {
-                  console.error('Failed to clear current version:', updateError);
+                  console.error(
+                    "Failed to clear current version:",
+                    updateError
+                  );
                   throw updateError;
                 }
-                
+
                 const { error: versionsError } = await supabase
                   .from("design_versions")
                   .delete()
                   .eq("design_id", id);
 
                 if (versionsError) {
-                  console.error('Failed to delete versions:', versionsError.message);
+                  console.error(
+                    "Failed to delete versions:",
+                    versionsError.message
+                  );
                   throw versionsError;
                 }
 
@@ -324,7 +363,9 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
                   .eq("design_id", id);
 
                 if (commentsError) {
-                  console.error(`Failed to delete coments: " ${commentsError.message}`);
+                  console.error(
+                    `Failed to delete coments: " ${commentsError.message}`
+                  );
                   throw commentsError;
                 }
 
@@ -334,18 +375,22 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
                   .eq("id", id);
 
                 if (deleteError) {
-                  console.error('Delete failed:', {
-                    error: deleteError,
-                    designId: id,
-                    designTitle: design?.title
-                  }, deleteError.message);
+                  console.error(
+                    "Delete failed:",
+                    {
+                      error: deleteError,
+                      designId: id,
+                      designTitle: design?.title,
+                    },
+                    deleteError.message
+                  );
                   toast.error(`Delete failed: ${deleteError.message}`);
-                } else { 
+                } else {
                   setDesigns((d) => d.filter((x) => x.id !== id));
                   toast.success("Design deleted successfully");
                 }
               } catch (err) {
-                console.error('Unexpected error during delete:', err);
+                console.error("Unexpected error during delete:", err);
                 toast.error("An unexpected error occurred");
               } finally {
                 setShowOverlay(false);
@@ -360,7 +405,8 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
       {
         position: "top-center",
         duration: 999999,
-        className: "bg-white dark:bg-[#120F12] text-black dark:text-white rounded-2xl items-center justify-center text-center",
+        className:
+          "bg-white dark:bg-[#120F12] text-black dark:text-white rounded-2xl items-center justify-center text-center",
         onAutoClose: () => setShowOverlay(false),
       }
     );
@@ -403,40 +449,37 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
         })
         .eq("id", existing.id));
     } else if (newStatus) {
-      ({ error } = await supabase
-        .from("published_designs")
-        .insert({
-          design_id: design.id,
-          user_id: userId,
-          published_version_id: design.current_version_id,
-          published_at: new Date().toISOString(),
-          is_active: true,
-        }));
+      ({ error } = await supabase.from("published_designs").insert({
+        design_id: design.id,
+        user_id: userId,
+        published_version_id: design.current_version_id,
+        published_at: new Date().toISOString(),
+        is_active: true,
+      }));
     }
 
     if (!error) {
       setDesigns((prev) =>
         prev.map((d) =>
-          d.id === design.id
-            ? { ...d, is_published: newStatus }
-            : d
+          d.id === design.id ? { ...d, is_published: newStatus } : d
         )
       );
       toast.success(
-        newStatus
-          ? "Design published to the community!"
-          : "Design unpublished!"
+        newStatus ? "Design published to the community!" : "Design unpublished!"
       );
     } else {
       toast.error(
-        `Failed to ${newStatus ? "publish" : "unpublish"} design: ${error.message || "Unknown error"
+        `Failed to ${newStatus ? "publish" : "unpublish"} design: ${
+          error.message || "Unknown error"
         }`
       );
     }
   };
   const [publishModalOpen, setPublishModalOpen] = useState(false);
   const [selectedDesign, setSelectedDesign] = useState<DesignRow | null>(null);
-  const [publishMode, setPublishMode] = useState<"publish" | "unpublish">("publish");
+  const [publishMode, setPublishMode] = useState<"publish" | "unpublish">(
+    "publish"
+  );
 
   if (loading) {
     return (
@@ -449,9 +492,7 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
           className="object-contain mb-6"
           priority
         />
-        <p className="text-gray-500 text-sm mb-4">
-          Loading designs...
-        </p>
+        <p className="text-gray-500 text-sm mb-4">Loading designs...</p>
       </div>
     );
   }
@@ -487,9 +528,7 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
           className="object-contain mb-6"
           priority
         />
-        <p className="text-gray-500 text-sm mb-4">
-          Loading designs...
-        </p>
+        <p className="text-gray-500 text-sm mb-4">Loading designs...</p>
       </div>
     );
   }
@@ -533,19 +572,28 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
               <div className="absolute right-0 mt-2 w-40 rounded-md shadow-lg bg-white dark:bg-accent border z-10">
                 <div className="py-1">
                   <button
-                    onClick={() => { setFilter("all"); setShowFilterDropdown(false); }}
+                    onClick={() => {
+                      setFilter("all");
+                      setShowFilterDropdown(false);
+                    }}
                     className="block w-full text-left px-4 py-2 text-sm hover:bg-[#ED5E20]/20 cursor-pointer"
                   >
                     All
                   </button>
                   <button
-                    onClick={() => { setFilter("published"); setShowFilterDropdown(false); }}
+                    onClick={() => {
+                      setFilter("published");
+                      setShowFilterDropdown(false);
+                    }}
                     className="block w-full text-left px-4 py-2 text-sm hover:bg-[#ED5E20]/20 cursor-pointer"
                   >
                     Published
                   </button>
                   <button
-                    onClick={() => { setFilter("unpublished"); setShowFilterDropdown(false); }}
+                    onClick={() => {
+                      setFilter("unpublished");
+                      setShowFilterDropdown(false);
+                    }}
                     className="block w-full text-left px-4 py-2 text-sm hover:bg-[#ED5E20]/20 cursor-pointer"
                   >
                     Unpublished
@@ -558,8 +606,11 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
           {/* Grid/List Toggle Buttons */}
           <button
             onClick={() => setViewMode("grid")}
-            className={`w-10 h-10 flex justify-center items-center rounded-lg cursor-pointer transition-colors hover:bg-[#ED5E20]/50 ${viewMode === "grid" ? "bg-[#ED5E20]/20 text-[#ED5E20]" : "text-[#ED5E20] dark:text-white"
-              }`}
+            className={`w-10 h-10 flex justify-center items-center rounded-lg cursor-pointer transition-colors hover:bg-[#ED5E20]/50 ${
+              viewMode === "grid"
+                ? "bg-[#ED5E20]/20 text-[#ED5E20]"
+                : "text-[#ED5E20] dark:text-white"
+            }`}
             title="Grid View"
           >
             <IconLayoutGrid size={20} />
@@ -567,8 +618,11 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
 
           <button
             onClick={() => setViewMode("list")}
-            className={`w-10 h-10 flex justify-center items-center rounded-lg cursor-pointer transition-colors hover:bg-[#ED5E20]/50 ${viewMode === "list" ? "bg-[#ED5E20]/20 text-[#ED5E20]" : "text-[#ED5E20] dark:text-white"
-              }`}
+            className={`w-10 h-10 flex justify-center items-center rounded-lg cursor-pointer transition-colors hover:bg-[#ED5E20]/50 ${
+              viewMode === "list"
+                ? "bg-[#ED5E20]/20 text-[#ED5E20]"
+                : "text-[#ED5E20] dark:text-white"
+            }`}
             title="List View"
           >
             <IconList size={20} />
@@ -591,15 +645,15 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
             {filter === "published"
               ? "No Published Designs Yet"
               : filter === "unpublished"
-                ? "No Unpublished Designs Yet"
-                : "No Designs Yet"}
+              ? "No Unpublished Designs Yet"
+              : "No Designs Yet"}
           </h2>
           <p className="text-gray-500 text-sm mb-4">
             {filter === "published"
               ? "You don't have any published designs yet."
               : filter === "unpublished"
-                ? "You don't have any unpublished designs yet."
-                : "Your gallery is waiting for its first design!"}
+              ? "You don't have any unpublished designs yet."
+              : "Your gallery is waiting for its first design!"}
           </p>
         </div>
       ) : viewMode === "grid" ? (
@@ -651,13 +705,12 @@ export default function DesignsGallery({ profileId, isOwnProfile }: { profileId:
           onClose={() => setPublishModalOpen(false)}
           onConfirm={async () => {
             if (selectedDesign) {
-              await togglePublish(selectedDesign); // actually toggle after confirmation
+              await togglePublish(selectedDesign);
               setPublishModalOpen(false);
             }
           }}
         />
       )}
-
     </div>
   );
 }
@@ -672,7 +725,7 @@ function DesignCard({
   setSelectedDesign,
   setPublishModalOpen,
   setPublishMode,
-  isOwnProfile
+  isOwnProfile,
 }: any) {
   const [isEditing, setIsEditing] = useState(false);
 
@@ -694,10 +747,17 @@ function DesignCard({
           className="object-cover bg-accent/10 dark:bg-accent"
           sizes="(min-width:1280px) 1280px, 100vw"
           onError={async () => {
-            if (design.thumbnail_storage_path && !design.thumbnail_storage_path.startsWith("http")) {
-              const newUrl = await resolveThumbnail(design.thumbnail_storage_path);
+            if (
+              design.thumbnail_storage_path &&
+              !design.thumbnail_storage_path.startsWith("http")
+            ) {
+              const newUrl = await resolveThumbnail(
+                design.thumbnail_storage_path
+              );
               setDesigns((ds: any[]) =>
-                ds.map((d) => (d.id === design.id ? { ...d, thumbnail_url: newUrl } : d))
+                ds.map((d) =>
+                  d.id === design.id ? { ...d, thumbnail_url: newUrl } : d
+                )
               );
             }
           }}
@@ -719,7 +779,9 @@ function DesignCard({
           />
         ) : (
           <div className="w-full max-w-full overflow-hidden">
-            <p className="text-lg text-black dark:text-white truncate whitespace-nowrap overflow-ellipsis">{design.title}</p>
+            <p className="text-lg text-black dark:text-white truncate whitespace-nowrap overflow-ellipsis">
+              {design.title}
+            </p>
           </div>
         )}
 
@@ -728,7 +790,10 @@ function DesignCard({
           {isOwnProfile && (
             <>
               <button
-                onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsEditing(true);
+                }}
                 title="Edit"
                 className="text-gray-500 hover:text-blue-500 cursor-pointer"
               >
@@ -743,14 +808,24 @@ function DesignCard({
                   setPublishModalOpen(true);
                 }}
                 title={design.is_published ? "Unpublish" : "Publish"}
-                className={`text-gray-500 ${design.is_published ? "hover:text-yellow-500" : "hover:text-green-500"
-                  } transition cursor-pointer`}
+                className={`text-gray-500 ${
+                  design.is_published
+                    ? "hover:text-yellow-500"
+                    : "hover:text-green-500"
+                } transition cursor-pointer`}
               >
-                {design.is_published ? <IconArchive size={20} /> : <IconRocket size={20} />}
+                {design.is_published ? (
+                  <IconArchive size={20} />
+                ) : (
+                  <IconRocket size={20} />
+                )}
               </button>
 
               <button
-                onClick={(e) => { e.stopPropagation(); handleDelete(design.id, design.is_published); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(design.id, design.is_published);
+                }}
                 title="Delete"
                 className="text-gray-500 hover:text-red-500 cursor-pointer"
               >
@@ -759,16 +834,28 @@ function DesignCard({
             </>
           )}
         </div>
-
-
       </div>
 
       {/* Published badge */}
       {design.is_published && (
         <div className="flex items-center gap-2 text-green-600 text-xs animate-pulse">
-          <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24" className="inline-block drop-shadow-[0_0_1px_#22c55e]" style={{ filter: "drop-shadow(0 0 6px #22c55e)" }}>
+          <svg
+            width="12"
+            height="12"
+            fill="currentColor"
+            viewBox="0 0 24 24"
+            className="inline-block drop-shadow-[0_0_1px_#22c55e]"
+            style={{ filter: "drop-shadow(0 0 6px #22c55e)" }}
+          >
             <circle cx="12" cy="12" r="8" fill="currentColor" />
-            <circle cx="12" cy="12" r="11" stroke="currentColor" strokeWidth="2" fill="none" />
+            <circle
+              cx="12"
+              cy="12"
+              r="11"
+              stroke="currentColor"
+              strokeWidth="2"
+              fill="none"
+            />
           </svg>
           <span className="drop-shadow-[0_0_1px_#22c55e]">Now Live</span>
         </div>
@@ -776,11 +863,17 @@ function DesignCard({
 
       {/* Stats */}
       <div className="text-sm text-gray-500 flex items-center justify-between mt-2">
-        <span className="flex items-center gap-1"><IconHeart size={18} /> {design.likes ?? 0}</span>
-        <span className="flex items-center gap-1"><IconEye size={18} /> {design.views ?? 0}</span>
+        <span className="flex items-center gap-1">
+          <IconHeart size={18} /> {design.likes ?? 0}
+        </span>
+        <span className="flex items-center gap-1">
+          <IconEye size={18} /> {design.views ?? 0}
+        </span>
       </div>
 
-      {showOverlay && <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm" />}
+      {showOverlay && (
+        <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm" />
+      )}
     </div>
   );
 }
@@ -801,7 +894,9 @@ function DesignListRow({
   return (
     <div
       className="relative group flex items-start gap-4 bg-white dark:bg-[#1A1A1A] rounded-xl p-2 transition cursor-pointer shadow-md"
-      onClick={() => !isEditing && (window.location.href = `/designs/${design.id}`)}
+      onClick={() =>
+        !isEditing && (window.location.href = `/designs/${design.id}`)
+      }
     >
       {/* Thumbnail */}
       <div className="relative w-40 h-20 rounded-lg border overflow-hidden shrink-0">
@@ -811,10 +906,17 @@ function DesignListRow({
           fill
           className="object-cover bg-accent/10 dark:bg-accent"
           onError={async () => {
-            if (design.thumbnail_storage_path && !design.thumbnail_storage_path.startsWith("http")) {
-              const newUrl = await resolveThumbnail(design.thumbnail_storage_path);
+            if (
+              design.thumbnail_storage_path &&
+              !design.thumbnail_storage_path.startsWith("http")
+            ) {
+              const newUrl = await resolveThumbnail(
+                design.thumbnail_storage_path
+              );
               setDesigns((ds: any[]) =>
-                ds.map((d) => (d.id === design.id ? { ...d, thumbnail_url: newUrl } : d))
+                ds.map((d) =>
+                  d.id === design.id ? { ...d, thumbnail_url: newUrl } : d
+                )
               );
             }
           }}
@@ -838,7 +940,9 @@ function DesignListRow({
             />
           ) : (
             <div className="w-full max-w-full overflow-hidden">
-              <p className="text-lg text-black dark:text-white truncate whitespace-nowrap overflow-ellipsis">{design.title}</p>
+              <p className="text-lg text-black dark:text-white truncate whitespace-nowrap overflow-ellipsis">
+                {design.title}
+              </p>
             </div>
           )}
 
@@ -854,7 +958,14 @@ function DesignListRow({
                 style={{ filter: "drop-shadow(0 0 6px #22c55e)" }}
               >
                 <circle cx="12" cy="12" r="8" fill="currentColor" />
-                <circle cx="12" cy="12" r="11" stroke="currentColor" strokeWidth="2" fill="none" />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="11"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  fill="none"
+                />
               </svg>
               <span className="drop-shadow-[0_0_1px_#22c55e]">Now Live</span>
             </div>
@@ -875,7 +986,10 @@ function DesignListRow({
       {/* Action buttons */}
       <div className="flex flex-col items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition shrink-0 z-10">
         <button
-          onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsEditing(true);
+          }}
           title="Edit"
           className="text-gray-500 hover:text-blue-500 cursor-pointer"
         >
@@ -890,22 +1004,33 @@ function DesignListRow({
             setPublishModalOpen(true);
           }}
           title={design.is_published ? "Unpublish" : "Publish"}
-          className={`text-gray-500 ${design.is_published ? "hover:text-yellow-500" : "hover:text-green-500"
-            } transition cursor-pointer`}
+          className={`text-gray-500 ${
+            design.is_published
+              ? "hover:text-yellow-500"
+              : "hover:text-green-500"
+          } transition cursor-pointer`}
         >
-          {design.is_published ? <IconArchive size={20} /> : <IconRocket size={20} />}
+          {design.is_published ? (
+            <IconArchive size={20} />
+          ) : (
+            <IconRocket size={20} />
+          )}
         </button>
 
-
         <button
-          onClick={(e) => { e.stopPropagation(); handleDelete(design.id, design.is_published); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDelete(design.id, design.is_published);
+          }}
           title="Delete"
           className="text-gray-500 hover:text-red-500 cursor-pointer"
         >
           <IconTrash size={20} />
         </button>
       </div>
-      {showOverlay && <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm" />}
+      {showOverlay && (
+        <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm" />
+      )}
     </div>
   );
 }
