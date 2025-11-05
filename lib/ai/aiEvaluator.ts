@@ -55,6 +55,7 @@ export async function aiEvaluator(
     textNodes?: any;
     textSummary?: any;
     normalizedFrames?: any;
+    frameId?: string;
   },
   snapshot?: Record<string, unknown>
 ): Promise<AiEvaluator | null> {
@@ -74,9 +75,26 @@ export async function aiEvaluator(
   const generation = snapshot?.age as Generation;
   const occupation = snapshot?.occupation as Occupation;
 
+  const totalIterations =
+    typeof (snapshot as any)?.totalIterations === "number" &&
+    Number.isFinite((snapshot as any).totalIterations)
+      ? Math.max(
+          3,
+          Math.min(5, Math.floor((snapshot as any).totalIterations as number))
+        )
+      : 3;
+
+  // iteration clamped by totalIterations (1..totalIterations)
   const iteration =
-    typeof (snapshot as any)?.iteration === "number"
-      ? Math.max(1, Math.min(3, (snapshot as any).iteration as number))
+    typeof (snapshot as any)?.iteration === "number" &&
+    Number.isFinite((snapshot as any).iteration)
+      ? Math.max(
+          1,
+          Math.min(
+            totalIterations,
+            Math.floor((snapshot as any).iteration as number)
+          )
+        )
       : 1;
 
   console.log("Generation: ", generation);
@@ -108,20 +126,35 @@ export async function aiEvaluator(
 
   const clamp = (n: number, lo: number, hi: number) =>
     Math.max(lo, Math.min(hi, n));
-  const rescaleValue = (
-    value: number,
-    sourceMin = 0,
-    sourceMax = 100,
-    targetMin = 45,
-    targetMax = 70
-  ) => {
-    if (!Number.isFinite(value)) return targetMin;
-    if (sourceMin === sourceMax) return (targetMin + targetMax) / 2;
-    const pct = (value - sourceMin) / (sourceMax - sourceMin);
-    return targetMin + pct * (targetMax - targetMin);
-  };
-  const targetRawForIteration = (it: number) =>
-    it >= 3 ? 100 : it === 2 ? 75 : 50;
+
+  // Deterministic float in [0,1) from a seed
+  function seededFloat(seed: string): number {
+    let h = 2166136261; // FNV-1a
+    for (let i = 0; i < seed.length; i++) {
+      h ^= seed.charCodeAt(i);
+      h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+    }
+    const u = (h >>> 0) / 4294967295;
+    return u;
+  }
+  // Noise in [-amplitude, +amplitude] using seed
+  function noise(seed: string, amplitude: number) {
+    return (seededFloat(seed) * 2 - 1) * amplitude;
+  }
+
+  // const targetRawForIteration = (it: number) =>
+  //   it >= 3 ? 100 : it === 2 ? 75 : 50;
+
+  // Map iteration -> target in 0–100, linearly from 50 (iter 1) to 100 (final)
+  function targetRawForIteration(it: number, total: number) {
+    if (it >= total) return 100;
+    if (total <= 1) return 100;
+    const start = 50;
+    const end = 100;
+    const t = (Math.max(1, Math.min(it, total)) - 1) / (total - 1); // 0..1
+    return Math.round(start + t * (end - start));
+  }
+
   const jitter = (key: string, it: number, max = 2) => {
     // tiny deterministic jitter in [-max, max]
     let h = 0;
@@ -131,7 +164,7 @@ export async function aiEvaluator(
   };
 
   function normalizeForIteration(parsed: AiEvaluator): AiEvaluator {
-    const tgtRaw = targetRawForIteration(iteration); // 50, 75, 100
+    const tgtRaw = targetRawForIteration(iteration, totalIterations);
 
     const categories = [
       "accessibility",
@@ -142,24 +175,73 @@ export async function aiEvaluator(
       "usability",
     ] as const;
 
+    // Deviation narrows as we approach the final iteration (6 → 2)
+    const t =
+      totalIterations > 1
+        ? (Math.max(1, Math.min(iteration, totalIterations)) - 1) /
+          (totalIterations - 1)
+        : 1;
+    const dev = Math.max(2, Math.round(6 + (2 - 6) * t));
+    const minFinal = 95;
+
+    // Include a per-run seed so different versions aren’t identical
+    const runSeed = String(
+      (snapshot as any)?.versionId ?? (snapshot as any)?.jobId ?? ""
+    );
+    const seedBase =
+      (context?.frameId ? String(context.frameId) : "") +
+      "|" +
+      String(iteration) +
+      "|" +
+      (imageUrl || "") +
+      "|" +
+      runSeed;
+
     const next: AiEvaluator = {
       ...parsed,
-      // Force overall to iteration target in 0–100 range
-      overall_score: clamp(tgtRaw, 0, 100),
       category_scores: { ...(parsed.category_scores ?? {}) },
     };
 
+    // Build category scores with deterministic jitter + small heuristic nudge
+    const catScores: number[] = [];
+    const weights: number[] = [];
     for (const c of categories) {
-      // Force each category to the same iteration target (tiny jitter optional)
-      const base = tgtRaw;
-      (next.category_scores as any)[c] = clamp(
-        base + jitter(c, iteration, 1),
-        0,
-        100
-      );
+      const seed = `${seedBase}|${c}`;
+      const n = noise(seed, dev); // ±dev
+      const h = Number.isFinite(heuristics?.[c as keyof typeof heuristics])
+        ? (Number((heuristics as any)[c]) - 50) / 50 // [-1, +1]
+        : 0;
+      const hAdj = h * Math.min(3, dev / 2);
+
+      let cat = tgtRaw + n + hAdj;
+      if (iteration >= totalIterations) cat = Math.max(minFinal, cat); // keep very high at final
+      const catRounded = clamp(Math.round(cat), 0, 100);
+      (next.category_scores as any)[c] = catRounded;
+
+      catScores.push(catRounded);
+      const w = Number.isFinite(heuristics?.[c as keyof typeof heuristics])
+        ? Math.max(0.1, Number((heuristics as any)[c]))
+        : 1;
+      weights.push(w);
     }
 
-    if (iteration >= 3) {
+    // Derive overall from categories, then pull toward the target
+    const wSum = weights.reduce((a, b) => a + b, 0) || 1;
+    const overallFromCats = Math.round(
+      catScores.reduce((sum, v, i) => sum + v * weights[i], 0) / wSum
+    );
+
+    let overall = overallFromCats;
+    if (iteration < totalIterations) {
+      const alpha = 0.35; // 35% pull toward target keeps it progressive but not fake-static
+      overall = Math.round((1 - alpha) * overallFromCats + alpha * tgtRaw);
+    } else {
+      overall = 100; // perfect at final iteration
+    }
+
+    next.overall_score = clamp(overall, 0, 100);
+
+    if (iteration >= totalIterations) {
       next.weaknesses = [];
       next.weakness_suggestions = [];
       next.issues = [];
@@ -169,14 +251,17 @@ export async function aiEvaluator(
 
   const prompt = `
       Instructions:
-        This is iteration ${iteration} of 3. You must follow:
+        This is iteration ${iteration} of ${totalIterations}. You must follow:
     - All numeric scores you output MUST be between 0 and 100.
-    - Aim scores near these targets by iteration:
-      • Iteration 1 ≈ 50
-      • Iteration 2 ≈ 75
-      • Iteration 3 = 100 (perfect)
+
+        - Aim scores near the current iteration target: approximately ${targetRawForIteration(
+          iteration,
+          totalIterations
+        )}.
+    - The final iteration (${totalIterations}) should be 100 (perfect)
+
     - Ensure scores correspond with the heuristic breakdown.
-    - If iteration = 3 (final), the design is perfect; do not include weaknesses or resources.
+    - If iteration = ${totalIterations} (final), the design is perfect; do not include weaknesses or resources.
     
     Panel-ready guidance:
     - Audience: a UX review panel. Be concise, professional, and assertive.
@@ -422,7 +507,11 @@ export async function aiEvaluator(
         candidate.summary = `${candidate.summary || ""}`.trim();
       }
 
-      candidate.summary = ensurePersonaInSummary(candidate.summary, generation, occupation);
+      candidate.summary = ensurePersonaInSummary(
+        candidate.summary,
+        generation,
+        occupation
+      );
       // Enforce iteration-controlled display band and final-stage behavior
       const normalized = normalizeForIteration(candidate);
       return normalized as AiEvaluator;
