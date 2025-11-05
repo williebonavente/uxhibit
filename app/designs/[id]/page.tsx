@@ -1,12 +1,7 @@
 "use client";
 
 import React from "react";
-import {
-  useEffect,
-  useState,
-  useRef,
-  useCallback
-} from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import Image from "next/image";
 import { createClient } from "@/utils/supabase/client";
 import EvaluationResult from "./dialogs/EvaluationResult";
@@ -16,7 +11,10 @@ import {
   IconLayoutSidebarRightExpand,
 } from "@tabler/icons-react";
 import { Spinner } from "@/components/ui/shadcn-io/spinner/index";
-import { fetchDesignVersions, deleteDesignVersion } from "@/database/actions/versions/versionHistory";
+import {
+  fetchDesignVersions,
+  deleteDesignVersion,
+} from "@/database/actions/versions/versionHistory";
 
 import { toast } from "sonner";
 import VersionHistoryModal from "./dialogs/VersionHistoryModal";
@@ -24,9 +22,13 @@ import DesignHeaderActions from "./dialogs/DesignHeader";
 import ZoomControls from "./dialogs/ZoomControls";
 import { CommentsSection } from "./comments/page";
 import { Comment } from "@/components/comments-user";
-import EvaluationParamsModal from "@/components/evaluation-params-modal";
+// import EvaluationParamsModal from "@/components/evaluation-params-modal";
 import DesignHeaderTitle from "@/components/arrow-back-button";
-import { handleEvalParamsSubmit, handleEvaluateWithParams } from "@/lib/reEvaluate/evaluationHandlers";
+import {
+  handleEvalParamsSubmit,
+  handleEvaluateWithParams,
+} from "@/lib/reEvaluate/evaluationHandlers";
+import { IWeakness } from "./dialogs/WeaknessesModal";
 
 interface FrameEvaluation {
   id: string;
@@ -63,10 +65,20 @@ interface FrameEvaluation {
   total_score: number;
 }
 
-type Snapshot = {
+export type Snapshot = {
   age: string;
   occupation: string;
-}
+  iteration?: number;
+};
+
+export type HeuristicBreakdownItem = {
+  code: string;
+  score: number;
+  principle: string;
+  max_points: number;
+  justification?: string;
+  evaluation_focus?: string;
+};
 
 export type Versions = {
   id: string;
@@ -87,7 +99,7 @@ type EvalResource = {
   title: string;
   url: string;
   description: string;
-}
+};
 export type Design = {
   is_active: boolean;
   id: string;
@@ -99,7 +111,7 @@ export type Design = {
   thumbnailPath?: string;
   snapshot: Snapshot;
   current_version_id: string;
-  frames?: { id: string | number; name: string;[key: string]: any }[];
+  frames?: { id: string | number; name: string; [key: string]: any }[];
   published_version_id?: string;
   published_at?: string;
   figma_link?: string;
@@ -108,14 +120,14 @@ export type Design = {
 
 export type EvaluateInput = {
   designId: string;
-  fileKey: string
+  fileKey: string;
   nodeId?: string;
   fallbackImageUrl?: string;
-  snapshot: Snapshot;
+  snapshot?: Snapshot;
   url?: string;
   frameIds?: string[];
   versionId: string;
-}
+};
 
 export type EvalResponse = {
   nodeId: string;
@@ -145,10 +157,15 @@ export type EvalResponse = {
       message: string;
       suggestions: string;
     }[];
+    weakness_suggestions?: {
+      element: string;
+      suggestion: string;
+      priority: "low" | "medium" | "high";
+    }[];
     category_scores?: Record<string, number>;
     category_score_justifications?: Record<string, string>;
     resources?: EvalResource[];
-
+    heuristic_breakdown?: HeuristicBreakdownItem[];
   } | null;
 };
 
@@ -158,9 +175,11 @@ type ProgressPayload = {
   [key: string]: any;
 };
 
-export async function evaluateDesign(input: EvaluateInput): Promise<EvalResponse[]> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  console.log('Calling evaluate with:', input);
+export async function evaluateDesign(
+  input: EvaluateInput
+): Promise<EvalResponse[]> {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  console.log("Calling evaluate with:", input);
 
   const res = await fetch(`${baseUrl}/api/ai/evaluate`, {
     method: "POST",
@@ -171,10 +190,10 @@ export async function evaluateDesign(input: EvaluateInput): Promise<EvalResponse
   });
 
   const data = await res.json();
-  console.log('Evaluate response:', data);
+  console.log("Evaluate response:", data);
 
   if (!res.ok) {
-    console.error('Evaluate failed:', data);
+    console.error("Evaluate failed:", data);
     throw new Error(data?.error || "Failed to evaluate");
   }
   console.log("Existing data: ", data);
@@ -187,6 +206,7 @@ export default function DesignDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = React.use(params);
+  const lastVersionIdRef = useRef<string | null>(null);
 
   const [showEval, setShowEval] = useState(true);
   const [showVersions, setShowVersions] = useState(false);
@@ -200,11 +220,15 @@ export default function DesignDetailPage({
   const [versions, setVersions] = useState<Versions[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [versionChanged, setVersionChanged] = useState(0);
-  const [frameEvaluations, setFrameEvaluations] = useState<FrameEvaluation[]>([]);
+  const [frameEvaluations, setFrameEvaluations] = useState<FrameEvaluation[]>(
+    []
+  );
   const [selectedFrameIndex, setSelectedFrameIndex] = useState(0);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortOrder, setSortOrder] = useState<"default" | "asc" | "desc">("default");
+  const [sortOrder, setSortOrder] = useState<"default" | "asc" | "desc">(
+    "default"
+  );
   const [showSortOptions, setShowSortOptions] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newCommentText, setNewCommentText] = useState("");
@@ -214,7 +238,10 @@ export default function DesignDetailPage({
   const [postingComment, setPostingComment] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [loadingComments, setLoadingComments] = useState(false);
-  const [currentUserProfile, setCurrentUserProfile] = useState<{ fullName: string; avatarUrl: string } | null>(null);
+  const [currentUserProfile, setCurrentUserProfile] = useState<{
+    fullName: string;
+    avatarUrl: string;
+  } | null>(null);
   const [showEvalParams, setShowEvalParams] = useState(false);
   const [pendingParams, setPendingParams] = useState<any>(null);
   const [page, setPage] = useState(0);
@@ -234,6 +261,9 @@ export default function DesignDetailPage({
   const sortRef = useRef<HTMLDivElement>(null);
   const [backendProgress, setBackendProgress] = useState(0);
   const [progressStatus, setProgressStatus] = useState("started");
+  const [weaknesses, setWeaknesses] = React.useState<IWeakness[]>([]);
+  const [loadingWeaknesses, setLoadingWeaknesses] = React.useState(false);
+  const [allVersions, setAllVersions] = useState<Versions[]>([]);
 
   function startResizing() {
     setIsResizing(true);
@@ -243,7 +273,9 @@ export default function DesignDetailPage({
     function handleMouseMove(e: MouseEvent) {
       if (!isResizing) return;
       const newWidth = window.innerWidth - e.clientX - 8;
-      setSidebarWidth(Math.max(minSidebarWidth, Math.min(maxSidebarWidth, newWidth)));
+      setSidebarWidth(
+        Math.max(minSidebarWidth, Math.min(maxSidebarWidth, newWidth))
+      );
       if (newWidth <= 20) setShowEval(false);
     }
     function handleMouseUp() {
@@ -259,7 +291,6 @@ export default function DesignDetailPage({
     };
   }, [isResizing, sidebarWidth, minSidebarWidth, maxSidebarWidth]);
 
-
   function handlePanStart(e: React.MouseEvent) {
     if (zoom === 1) return;
     setIsPanning(true);
@@ -267,49 +298,71 @@ export default function DesignDetailPage({
     mouseStart.current = { x: e.clientX, y: e.clientY };
   }
 
-  const handlePanMove = React.useCallback((e: MouseEvent) => {
-    if (!isPanning) return;
-    const dx = e.clientX - mouseStart.current.x;
-    const dy = e.clientY - mouseStart.current.y;
-    setPan({
-      x: panStart.current.x + dx,
-      y: panStart.current.y + dy,
-    });
-  }, [isPanning, mouseStart, panStart, setPan]);
+  const handlePanMove = React.useCallback(
+    (e: MouseEvent) => {
+      if (!isPanning) return;
+      const dx = e.clientX - mouseStart.current.x;
+      const dy = e.clientY - mouseStart.current.y;
+      setPan({
+        x: panStart.current.x + dx,
+        y: panStart.current.y + dy,
+      });
+    },
+    [isPanning, mouseStart, panStart, setPan]
+  );
 
   function handlePanEnd() {
     setIsPanning(false);
   }
 
-
-  
-
   const fetchEvaluations = React.useCallback(async () => {
     const supabase = createClient();
-    console.log("[fetchEvaluations] Fetching latest version for design:", design?.id);
+    console.log(
+      "[fetchEvaluations] Fetching latest version for design:",
+      design?.id
+    );
 
     // 1. Fetch the latest version for this design
     const { data: versionData, error: versionError } = await supabase
       .from("design_versions")
-      .select(`
+      .select(
+        `
         id, design_id, version, file_key, node_id, thumbnail_url, created_by,
         ai_summary, ai_data, snapshot, created_at, updated_at, total_score
-      `)
+      `
+      )
       .eq("design_id", design?.id)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (versionError) {
-      console.error("[fetchEvaluations] Failed to fetch overall evaluation:", versionError.message);
+      console.error(
+        "[fetchEvaluations] Failed to fetch overall evaluation:",
+        versionError.message
+      );
       return;
     }
     if (!versionData) {
-      console.warn("[fetchEvaluations] No version data found for design:", design?.id);
+      console.warn(
+        "[fetchEvaluations] No version data found for design:",
+        design?.id
+      );
       setFrameEvaluations([]);
       return;
     }
 
+    // If the latest version hasn't changed since last fetch, skip updating state
+    if (
+      lastVersionIdRef.current &&
+      lastVersionIdRef.current === String(versionData.id)
+    ) {
+      console.log(
+        "[fetchEvaluations] Version unchanged, skipping update:",
+        versionData.id
+      );
+      return;
+    }
     // HOTFIX: Filter out incomplete/placeholder versions
     if (
       !versionData.ai_summary ||
@@ -317,7 +370,10 @@ export default function DesignDetailPage({
       typeof versionData.total_score !== "number" ||
       versionData.total_score === 0
     ) {
-      console.warn("[fetchEvaluations] Skipping incomplete/placeholder version:", versionData);
+      console.warn(
+        "[fetchEvaluations] Skipping incomplete/placeholder version:",
+        versionData
+      );
       setFrameEvaluations([]);
       return;
     }
@@ -330,7 +386,11 @@ export default function DesignDetailPage({
       try {
         aiData = JSON.parse(aiData);
       } catch (e) {
-        console.error("[fetchEvaluations] Failed to parse ai_data:", e, versionData.ai_data);
+        console.error(
+          "[fetchEvaluations] Failed to parse ai_data:",
+          e,
+          versionData.ai_data
+        );
         aiData = {};
       }
     }
@@ -352,20 +412,28 @@ export default function DesignDetailPage({
     };
 
     // 3. Fetch all frames for this version
-    console.log("[fetchEvaluations] Fetching frames for version_id:", versionData.id);
+    console.log(
+      "[fetchEvaluations] Fetching frames for version_id:",
+      versionData.id
+    );
 
     const { data: frameData, error: frameError } = await supabase
       .from("design_frame_evaluations")
-      .select(`
+      .select(
+        `
         id, design_id, version_id, file_key, node_id, thumbnail_url, owner_id,
         ai_summary, ai_data, snapshot, created_at, updated_at
-      `)
+      `
+      )
       .eq("design_id", design?.id)
       .eq("version_id", versionData.id)
       .order("created_at", { ascending: true });
 
     if (frameError) {
-      console.error("[fetchEvaluations] Failed to fetch frame evaluations:", frameError.message);
+      console.error(
+        "[fetchEvaluations] Failed to fetch frame evaluations:",
+        frameError.message
+      );
       setFrameEvaluations([overall]);
       return;
     }
@@ -374,14 +442,227 @@ export default function DesignDetailPage({
 
     const frames = (frameData || []).map((frame: any) => ({
       ...frame,
-      ai_data: typeof frame.ai_data === "string" ? JSON.parse(frame.ai_data) : frame.ai_data,
+      ai_data:
+        typeof frame.ai_data === "string"
+          ? JSON.parse(frame.ai_data)
+          : frame.ai_data,
     }));
 
     // 4. Combine overall and frames
     const combined = [overall, ...frames];
-    setFrameEvaluations(combined);
+    // only set state if different (avoids rerenders that retrigger fetches)
+    if (
+      lastVersionIdRef.current !== String(versionData.id) ||
+      JSON.stringify(frameEvaluations) !== JSON.stringify(combined)
+    ) {
+      setFrameEvaluations(combined);
+      lastVersionIdRef.current = String(versionData.id);
+      console.log(
+        "[fetchEvaluations] Combined frame evaluations set:",
+        combined
+      );
+    } else {
+      console.log(
+        "[fetchEvaluations] Combined evaluations identical, not updating state."
+      );
+    }
     console.log("[fetchEvaluations] Combined frame evaluations set:", combined);
-  }, [design?.id]);
+  }, [design?.id, frameEvaluations]);
+
+  const fetchWeaknesses = React.useCallback(
+    async (designId?: string | null, versionId?: string | null) => {
+      const did = designId ?? design?.id ?? null;
+      setLoadingWeaknesses(true);
+      if (!did) {
+        console.warn("fetchWeaknesses: missing designId");
+        setLoadingWeaknesses(false);
+        return;
+      }
+      try {
+        const supabase = createClient();
+        let vid = versionId ?? design?.current_version_id ?? null;
+        if (!vid) {
+          const { data: latest, error: latestError } = await supabase
+            .from("design_versions")
+            .select("id, thumbnail_url, ai_data, created_at")
+            .eq("design_id", did)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (latestError)
+            console.warn("fetchWeaknesses: latest lookup failed", latestError);
+          vid = latest?.id ?? null;
+        }
+        if (!vid) {
+          setWeaknesses([]);
+          return;
+        }
+
+        const vPromise = supabase
+          .from("design_versions")
+          .select("id, thumbnail_url, ai_data, created_at")
+          .eq("id", vid)
+          .maybeSingle();
+
+        const fPromise = supabase
+          .from("design_frame_evaluations")
+          .select("id, ai_data, thumbnail_url, version_id, node_id")
+          .eq("design_id", did)
+          .eq("version_id", vid)
+          .order("created_at", { ascending: true });
+
+        const [
+          { data: versionData, error: vError },
+          { data: frames, error: fError },
+        ] = await Promise.all([vPromise, fPromise]);
+
+        if (vError)
+          console.warn("fetchWeaknesses: version query error", vError);
+        if (fError) console.warn("fetchWeaknesses: frames query error", fError);
+
+        const collected: any[] = [];
+        const normalizeEntries = (raw: any) => {
+          if (raw == null) return [];
+          if (Array.isArray(raw)) return raw;
+          if (typeof raw === "object") {
+            const keys = Object.keys(raw);
+            if (keys.length && keys.every((k) => /^\d+$/.test(k)))
+              return Object.values(raw);
+            return [raw];
+          }
+          try {
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [parsed];
+          } catch {
+            return [];
+          }
+        };
+
+        if (versionData?.ai_data) {
+          try {
+            const parsed =
+              typeof versionData.ai_data === "string"
+                ? JSON.parse(versionData.ai_data)
+                : versionData.ai_data;
+            normalizeEntries(parsed).forEach((entry: any) => {
+              const root = entry?.ai ?? entry;
+              if (Array.isArray(root?.weaknesses)) {
+                collected.push(
+                  ...root.weaknesses.map((it: any) => ({
+                    ...(it || {}),
+                    frameId: "version-global",
+                    versionId: versionData.id,
+                    thumbnail_url:
+                      it?.thumbnail_url ?? versionData.thumbnail_url,
+                  }))
+                );
+              }
+              if (Array.isArray(root?.issues)) {
+                collected.push(
+                  ...root.issues.map((it: any) => ({
+                    ...(it || {}),
+                    frameId: "version-global",
+                    versionId: versionData.id,
+                    thumbnail_url:
+                      it?.thumbnail_url ?? versionData.thumbnail_url,
+                  }))
+                );
+              }
+            });
+          } catch (e) {
+            console.warn("fetchWeaknesses: failed to parse version ai_data", e);
+          }
+        }
+
+        if (Array.isArray(frames) && frames.length) {
+          frames.forEach((f: any) => {
+            if (!f?.ai_data) return;
+            try {
+              const parsed =
+                typeof f.ai_data === "string"
+                  ? JSON.parse(f.ai_data)
+                  : f.ai_data;
+              normalizeEntries(parsed).forEach((entry: any) => {
+                const root = entry?.ai ?? entry;
+                const attachMeta = (item: any) => {
+                  const nodeFromItem =
+                    item?.frameId ?? item?.node_id ?? item?.nodeId ?? f.node_id;
+                  const normalizedFrameId = nodeFromItem ?? `eval-${f.id}`;
+                  return {
+                    ...(item || {}),
+                    frameId: normalizedFrameId,
+                    frameEvalId: f.id,
+                    thumbnail_url: f.thumbnail_url ?? item?.thumbnail_url,
+                    versionId: f.version_id ?? vid,
+                  };
+                };
+                if (Array.isArray(root?.weaknesses))
+                  collected.push(...root.weaknesses.map(attachMeta));
+                if (Array.isArray(root?.issues))
+                  collected.push(...root.issues.map(attachMeta));
+              });
+            } catch (e) {
+              console.warn(
+                "fetchWeaknesses: failed to parse frame ai_data",
+                f.id,
+                e
+              );
+            }
+          });
+        }
+
+        // dedupe
+        const uniq: any[] = [];
+        const seen = new Set<string>();
+        collected.forEach((w: any) => {
+          const framePart =
+            w.frameId ?? w.frameEvalId ?? w.node_id ?? "frame:global";
+          const key = `${framePart}::${w.id ?? w.message ?? JSON.stringify(w)}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            uniq.push(w);
+          }
+        });
+        // debug: group by version and show small samples
+        // toast.message(
+        //   `fetchWeaknesses vid=${vid} collected=${collected.length} uniq=${uniq.length}`
+        // );
+        const byVersion = uniq.reduce<Record<string, any[]>>((acc, item) => {
+          const k = String(item.versionId ?? "no-version");
+          (acc[k] = acc[k] || []).push(item);
+          return acc;
+        }, {});
+        Object.entries(byVersion).forEach(([ver, items]) => {
+          console.log(`version ${ver}: count=${items.length}`);
+          console.table(
+            items.slice(0, 6).map((it: any) => ({
+              id: it.id ?? "(no-id)",
+              frameId:
+                it.frameId ?? it.frameEvalId ?? it.node_id ?? "(no-frame)",
+              message: it.message ?? it.description ?? "(no-message)",
+              thumbnail: it.thumbnail_url ?? "(no-thumb)",
+            }))
+          );
+        });
+        console.groupEnd();
+        // console.error(
+        //   "fetchWeaknesses: vid=",
+        //   vid,
+        //   "collected=",
+        //   collected.length,
+        //   "uniq=",
+        //   uniq.length
+        // );
+        setWeaknesses(uniq);
+      } catch (err) {
+        console.error("fetchWeaknesses failed:", err);
+        setWeaknesses([]);
+      } finally {
+        setLoadingWeaknesses(false);
+      }
+    },
+    [design?.id, design?.current_version_id]
+  );
 
   const sortedFrameEvaluations = React.useMemo(() => {
     if (sortOrder === "default") return frameEvaluations;
@@ -396,17 +677,20 @@ export default function DesignDetailPage({
 
   const filteredFrameEvaluations = React.useMemo(() => {
     if (!searchQuery.trim()) return sortedFrameEvaluations;
-    return sortedFrameEvaluations.filter(frame =>
-      frame.ai_summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      frame.ai_data.summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      frame.node_id?.toLowerCase().includes(searchQuery.toLowerCase())
+    return sortedFrameEvaluations.filter(
+      (frame) =>
+        frame.ai_summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        frame.ai_data.summary
+          ?.toLowerCase()
+          .includes(searchQuery.toLowerCase()) ||
+        frame.node_id?.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [sortedFrameEvaluations, searchQuery]);
 
   const currentFrame = sortedFrameEvaluations[selectedFrameIndex];
 
   function handleOpenEvalParams() {
-    const frameIds = design?.frames?.map(f => String(f.id)) ?? [];
+    const frameIds = design?.frames?.map((f) => String(f.id)) ?? [];
     console.log("[handleOpenEvalParams] frameIds:", frameIds);
 
     const thumbnailUrl =
@@ -422,8 +706,7 @@ export default function DesignDetailPage({
       snapshot: design?.snapshot,
       url: design?.figma_link,
       fallbackImageUrl: thumbnailUrl,
-      frameIds
-
+      frameIds,
     });
     setShowEvalParams(true);
   }
@@ -445,13 +728,15 @@ export default function DesignDetailPage({
 
     const { data, error } = await supabase
       .from("comments")
-      .select(`
+      .select(
+        `
         id, text, user_id, created_at, local_time, 
         is_read, parent_id, updated_at, design_id,
         profiles:profiles!comments_user_id_fkey (
           first_name, middle_name, last_name, avatar_url
         )
-      `)
+      `
+      )
       .eq("design_id", design?.id)
       .order("created_at", { ascending: false });
 
@@ -461,26 +746,33 @@ export default function DesignDetailPage({
         text: comment.text,
         user: {
           id: comment.user_id,
-          fullName: [comment.profiles?.first_name, comment.profiles?.middle_name, comment.profiles?.last_name]
-            .filter(Boolean)
-            .join(" ") || "",
+          fullName:
+            [
+              comment.profiles?.first_name,
+              comment.profiles?.middle_name,
+              comment.profiles?.last_name,
+            ]
+              .filter(Boolean)
+              .join(" ") || "",
           avatarUrl: comment.profiles?.avatar_url || "",
         },
         replies: [],
         parentId: comment.parent_id,
         createdAt: new Date(comment.created_at),
-        updatedAt: comment.updated_at ? new Date(comment.updated_at) : undefined,
+        updatedAt: comment.updated_at
+          ? new Date(comment.updated_at)
+          : undefined,
         localTime: comment.local_time,
         design_id: comment.design_id,
         is_read: comment.is_read,
       }));
 
       const commentMap: { [id: string]: any } = {};
-      mappedComments.forEach(comment => {
+      mappedComments.forEach((comment) => {
         commentMap[comment.id] = { ...comment, replies: [] };
       });
       const rootComments: any[] = [];
-      mappedComments.forEach(comment => {
+      mappedComments.forEach((comment) => {
         if (comment.parentId) {
           if (commentMap[comment.parentId]) {
             commentMap[comment.parentId].replies.push(commentMap[comment.id]);
@@ -500,23 +792,25 @@ export default function DesignDetailPage({
     setLoadingVersions(true);
     if (design?.id) {
       fetchDesignVersions(design.id)
-        .then((versions) => setVersions(
-          versions.map((v: any) => ({
-            ...v,
-            total_score: v.total_score ?? 0, // Ensure total_score exists
-          }))
-        ))
+        .then((versions) =>
+          setVersions(
+            versions.map((v: any) => ({
+              ...v,
+              total_score: v.total_score ?? 0,
+            }))
+          )
+        )
         .catch((e: string) => console.error("Failed to fetch versions", e))
         .finally(() => setLoadingVersions(false));
     } else {
       setLoadingVersions(false);
     }
-  }
+  };
   const handleEvaluate = React.useCallback(async () => {
     if (!design?.id || !design?.fileKey) {
-      console.error('Missing required design data:', {
+      console.error("Missing required design data:", {
         id: design?.id,
-        fileKey: design?.fileKey
+        fileKey: design?.fileKey,
       });
       setEvalError("Missing required design data");
       return;
@@ -527,7 +821,7 @@ export default function DesignDetailPage({
 
     try {
       let imageUrlForAI = design.thumbnail;
-      if (imageUrlForAI && !imageUrlForAI.startsWith('http')) {
+      if (imageUrlForAI && !imageUrlForAI.startsWith("http")) {
         const supabase = createClient();
         const { data: signed } = await supabase.storage
           .from("design-thumbnails")
@@ -538,7 +832,7 @@ export default function DesignDetailPage({
         }
       }
 
-      console.log('Starting evaluation with:', {
+      console.log("Starting evaluation with:", {
         designId: design.id,
         fileKey: design.fileKey,
         nodeId: design.nodeId,
@@ -552,12 +846,15 @@ export default function DesignDetailPage({
         fileKey: design.fileKey,
         nodeId: design.nodeId,
         fallbackImageUrl: imageUrlForAI,
-        snapshot: typeof design?.snapshot === "string" ? JSON.parse(design.snapshot) : design?.snapshot,
+        snapshot:
+          typeof design?.snapshot === "string"
+            ? JSON.parse(design.snapshot)
+            : design?.snapshot,
         url: design.figma_link,
-        frameIds: design?.frames?.map(f => String(f.id)) ?? [],
+        frameIds: design?.frames?.map((f) => String(f.id)) ?? [],
         versionId: design.current_version_id || "",
       });
-      console.log('Evaluation successful:', data);
+      console.log("Evaluation successful:", data);
       setEvalResult(data[0]);
 
       try {
@@ -568,22 +865,37 @@ export default function DesignDetailPage({
           .eq("id", design.id)
           .single();
         if (!error && updatedDesign) {
-          setDesign((prev) => prev ? { ...prev, current_version_id: updatedDesign.current_version_id } : prev);
+          setDesign((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  current_version_id: updatedDesign.current_version_id,
+                }
+              : prev
+          );
         }
       } catch (err) {
-        console.error("Failed to refresh current_version_id after evaluation:", err);
+        console.error(
+          "Failed to refresh current_version_id after evaluation:",
+          err
+        );
       }
       setLoadingVersions(true);
     } catch (e: any) {
-      console.error('Evaluation failed:', e);
+      console.error("Evaluation failed:", e);
       setEvalError(e.message || "Failed to evaluate");
     } finally {
       setLoadingEval(false);
       setLoadingVersions(false);
-
     }
-  }, [design, setEvalError, setLoadingEval, setEvalResult, setDesign, setLoadingVersions]);
-
+  }, [
+    design,
+    setEvalError,
+    setLoadingEval,
+    setEvalResult,
+    setDesign,
+    setLoadingVersions,
+  ]);
 
   const syncPublishedState = React.useCallback(async (): Promise<void> => {
     const supabase = createClient();
@@ -610,11 +922,11 @@ export default function DesignDetailPage({
     setDesign((prev) =>
       prev
         ? {
-          ...prev,
-          is_active: !!published,
-          published_version_id: published?.published_version_id || "",
-          published_at: published?.published_at || "",
-        }
+            ...prev,
+            is_active: !!published,
+            published_version_id: published?.published_version_id || "",
+            published_at: published?.published_at || "",
+          }
         : prev
     );
   }, [design?.id]);
@@ -649,21 +961,21 @@ export default function DesignDetailPage({
         .eq("id", existing.id));
     } else {
       // Insert new row
-      ({ error } = await supabase
-        .from("published_designs")
-        .insert({
-          design_id: design?.id,
-          user_id: userId,
-          published_version_id: design?.current_version_id,
-          published_at: new Date().toISOString(),
-          is_active: true,
-        }));
+      ({ error } = await supabase.from("published_designs").insert({
+        design_id: design?.id,
+        user_id: userId,
+        published_version_id: design?.current_version_id,
+        published_at: new Date().toISOString(),
+        is_active: true,
+      }));
     }
 
     if (!error) {
       toast.success("Design published to the community!");
     } else {
-      toast.error(`Failed to publish design: ${error.message || "Unknown error"}`);
+      toast.error(
+        `Failed to publish design: ${error.message || "Unknown error"}`
+      );
     }
   }
   async function unpublishProject() {
@@ -679,12 +991,12 @@ export default function DesignDetailPage({
       .eq("user_id", userId);
 
     if (!error) {
-      setDesign((prev) =>
-        prev ? { ...prev, is_active: false } : prev
-      );
+      setDesign((prev) => (prev ? { ...prev, is_active: false } : prev));
       toast.success("Design unpublished!");
     } else {
-      toast.error(`Failed to unpublish design: ${error.message || "Unknown error"}`);
+      toast.error(
+        `Failed to unpublish design: ${error.message || "Unknown error"}`
+      );
     }
   }
 
@@ -692,12 +1004,14 @@ export default function DesignDetailPage({
     const supabase = createClient();
     const { data, error } = await supabase
       .from("comments")
-      .select(`
+      .select(
+        `
         id, text, user_id, created_at, local_time, parent_id, updated_at, design_id, is_read,
         profiles:profiles!comments_user_id_fkey (
           first_name, middle_name, last_name, avatar_url
         )
-      `)
+      `
+      )
       .eq("id", commentId)
       .single();
     if (error) {
@@ -710,9 +1024,14 @@ export default function DesignDetailPage({
       text: data.text,
       user: {
         id: data.user_id,
-        fullName: [data.profiles?.first_name, data.profiles?.middle_name, data.profiles?.last_name]
-          .filter(Boolean)
-          .join(" ") || "",
+        fullName:
+          [
+            data.profiles?.first_name,
+            data.profiles?.middle_name,
+            data.profiles?.last_name,
+          ]
+            .filter(Boolean)
+            .join(" ") || "",
         avatarUrl: data.profiles?.avatar_url || "",
       },
       replies: [],
@@ -725,7 +1044,10 @@ export default function DesignDetailPage({
     };
   }
 
-  function mapFrameToEvalResponse(frame: FrameEvaluation, frameIdx = 0): EvalResponse {
+  function mapFrameToEvalResponse(
+    frame: FrameEvaluation,
+    frameIdx = 0
+  ): EvalResponse {
     const aiData = frame.ai_data ?? {};
     return {
       nodeId: frame.node_id,
@@ -755,21 +1077,25 @@ export default function DesignDetailPage({
 
   const handleAddComment = async () => {
     const supabase = createClient();
-    if (!newCommentText.trim() || !currentUserId || !currentUserProfile || !design) return;
+    if (
+      !newCommentText.trim() ||
+      !currentUserId ||
+      !currentUserProfile ||
+      !design
+    )
+      return;
 
     setPostingComment(true);
 
-    const { error } = await supabase
-      .from("comments")
-      .insert([
-        {
-          user_id: currentUserId,
-          design_id: design.id,
-          text: newCommentText,
-          parent_id: null,
-          local_time: new Date().toLocaleTimeString(),
-        },
-      ]);
+    const { error } = await supabase.from("comments").insert([
+      {
+        user_id: currentUserId,
+        design_id: design.id,
+        text: newCommentText,
+        parent_id: null,
+        local_time: new Date().toLocaleTimeString(),
+      },
+    ]);
 
     if (error) {
       toast.error(`Failed to add comment!, ${error.message}`);
@@ -786,21 +1112,20 @@ export default function DesignDetailPage({
   const handleAddReply = async (parentId: string, replyText: string) => {
     console.log("Parent handleAddReply called with:", parentId, replyText);
     const supabase = createClient();
-    if (!replyText.trim() || !currentUserId || !currentUserProfile || !design) return;
+    if (!replyText.trim() || !currentUserId || !currentUserProfile || !design)
+      return;
 
     setPostingComment(true);
 
-    const { error } = await supabase
-      .from("comments")
-      .insert([
-        {
-          user_id: currentUserId,
-          design_id: design.id,
-          text: replyText,
-          parent_id: parentId,
-          local_time: new Date().toLocaleTimeString(),
-        },
-      ]);
+    const { error } = await supabase.from("comments").insert([
+      {
+        user_id: currentUserId,
+        design_id: design.id,
+        text: replyText,
+        parent_id: parentId,
+        local_time: new Date().toLocaleTimeString(),
+      },
+    ]);
 
     if (error) {
       toast.error(`Failed to add reply! ${error.message}`);
@@ -811,7 +1136,6 @@ export default function DesignDetailPage({
     setPostingComment(false);
     fetchComments();
     console.log("fetchComments called after reply");
-
   };
 
   const fetchComments = useCallback(async () => {
@@ -823,12 +1147,14 @@ export default function DesignDetailPage({
     setLoadingComments(true);
     const { data, error } = await supabase
       .from("comments")
-      .select(`
+      .select(
+        `
         id, text, user_id, created_at, local_time, parent_id, updated_at, design_id,
         profiles:profiles!comments_user_id_fkey (
           first_name, middle_name, last_name, avatar_url
         )
-      `)
+      `
+      )
       .eq("design_id", design?.id)
       .order("created_at", { ascending: false });
     // .range(0, 19);
@@ -844,9 +1170,14 @@ export default function DesignDetailPage({
       text: comment.text,
       user: {
         id: comment.user_id,
-        fullName: [comment.profiles?.first_name, comment.profiles?.middle_name, comment.profiles?.last_name]
-          .filter(Boolean)
-          .join(" ") || "",
+        fullName:
+          [
+            comment.profiles?.first_name,
+            comment.profiles?.middle_name,
+            comment.profiles?.last_name,
+          ]
+            .filter(Boolean)
+            .join(" ") || "",
         avatarUrl: comment.profiles?.avatar_url || "",
       },
       replies: [],
@@ -860,12 +1191,12 @@ export default function DesignDetailPage({
     console.log("commentsWithUser", commentsWithUser);
 
     const commentMap: { [id: string]: any } = {};
-    commentsWithUser.forEach(comment => {
+    commentsWithUser.forEach((comment) => {
       commentMap[comment.id] = { ...comment, replies: [] };
     });
 
     const rootComments: any[] = [];
-    commentsWithUser.forEach(comment => {
+    commentsWithUser.forEach((comment) => {
       if (comment.parentId) {
         if (commentMap[comment.parentId]) {
           commentMap[comment.parentId].replies.push(commentMap[comment.id]);
@@ -880,19 +1211,21 @@ export default function DesignDetailPage({
   }, [design?.id]);
 
   const handleDeleteComment = (id: string) => {
-    setComments(comments.filter(comment => comment.id !== id));
+    setComments(comments.filter((comment) => comment.id !== id));
     fetchComments();
-  }
+  };
 
   // Helper to update a comment in the tree
   const updateCommentTree = React.useCallback((comments, updated) => {
-    return comments.map(comment => {
+    return comments.map((comment) => {
       if (comment.id === updated.id) {
         return { ...comment, ...updated };
       }
       return {
         ...comment,
-        replies: comment.replies ? updateCommentTree(comment.replies, updated) : [],
+        replies: comment.replies
+          ? updateCommentTree(comment.replies, updated)
+          : [],
       };
     });
   }, []);
@@ -900,17 +1233,21 @@ export default function DesignDetailPage({
   // Helper to delete a comment from the tree
   const deleteCommentTree = React.useCallback((comments, idToDelete) => {
     return comments
-      .filter(comment => comment.id !== idToDelete)
-      .map(comment => ({
+      .filter((comment) => comment.id !== idToDelete)
+      .map((comment) => ({
         ...comment,
-        replies: comment.replies ? deleteCommentTree(comment.replies, idToDelete) : [],
+        replies: comment.replies
+          ? deleteCommentTree(comment.replies, idToDelete)
+          : [],
       }));
   }, []);
 
   useEffect(() => {
     const supabase = createClient();
     async function fetchUserProfile() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       setCurrentUserId(user?.id ?? null);
 
       if (user?.id) {
@@ -920,9 +1257,10 @@ export default function DesignDetailPage({
           .eq("id", user.id)
           .single();
         setCurrentUserProfile({
-          fullName: [profile?.first_name, profile?.middle_name, profile?.last_name]
-            .filter(Boolean)
-            .join(" ") || "Unknown",
+          fullName:
+            [profile?.first_name, profile?.middle_name, profile?.last_name]
+              .filter(Boolean)
+              .join(" ") || "Unknown",
           avatarUrl: profile?.avatar_url ?? "",
         });
       }
@@ -944,7 +1282,6 @@ export default function DesignDetailPage({
     };
   }, [showSortOptions]);
 
-
   useEffect(() => {
     if (design?.id) {
       syncPublishedState();
@@ -959,7 +1296,8 @@ export default function DesignDetailPage({
 
         const { data: designData, error: designError } = await supabase
           .from("designs")
-          .select(`
+          .select(
+            `
             id, title, figma_link, file_key,
             node_id, thumbnail_url,
             current_version_id, owner_id,
@@ -967,12 +1305,13 @@ export default function DesignDetailPage({
               id, file_key, node_id, thumbnail_url, total_score,
               ai_summary, ai_data, snapshot, created_at, version
             )
-          `)
+          `
+          )
           .eq("id", id)
           .maybeSingle();
 
         if (designError || !designData) {
-          console.error('Failed to load design:', designError, designData);
+          console.error("Failed to load design:", designError, designData);
           setDesign(null);
           setDesignLoading(false);
           return;
@@ -989,11 +1328,12 @@ export default function DesignDetailPage({
         let parsedAiData = null;
         if (latestVersion?.ai_data) {
           try {
-            parsedAiData = typeof latestVersion.ai_data === 'string'
-              ? JSON.parse(latestVersion.ai_data)
-              : latestVersion.ai_data;
+            parsedAiData =
+              typeof latestVersion.ai_data === "string"
+                ? JSON.parse(latestVersion.ai_data)
+                : latestVersion.ai_data;
           } catch (e) {
-            console.error('Error parsing AI data:', e, latestVersion.ai_data);
+            console.error("Error parsing AI data:", e, latestVersion.ai_data);
           }
         }
 
@@ -1002,20 +1342,28 @@ export default function DesignDetailPage({
         if (latestVersionId) {
           const { data: frameData, error: frameError } = await supabase
             .from("design_frame_evaluations")
-            .select(`id, design_id, version_id, file_key, node_id, thumbnail_url, owner_id,
-              ai_summary, ai_data, snapshot, created_at, updated_at`)
+            .select(
+              `id, design_id, version_id, file_key, node_id, thumbnail_url, owner_id,
+              ai_summary, ai_data, snapshot, created_at, updated_at`
+            )
             .eq("design_id", designData.id)
             .eq("version_id", latestVersionId)
             .order("created_at", { ascending: true });
 
           if (frameError) {
-            console.error("Failed to fetch frame evaluations:", frameError.message);
+            console.error(
+              "Failed to fetch frame evaluations:",
+              frameError.message
+            );
           } else {
             frames = (frameData || []).map((frame: any) => ({
               id: frame.node_id,
               name: frame.ai_summary || frame.node_id,
               ...frame,
-              ai_data: typeof frame.ai_data === "string" ? JSON.parse(frame.ai_data) : frame.ai_data,
+              ai_data:
+                typeof frame.ai_data === "string"
+                  ? JSON.parse(frame.ai_data)
+                  : frame.ai_data,
             }));
           }
         }
@@ -1040,7 +1388,7 @@ export default function DesignDetailPage({
         setDesign(normalized);
         console.log("Design loaded: ", normalized);
       } catch (err) {
-        console.error('Error loading design:', err);
+        console.error("Error loading design:", err);
         setDesign(null);
       } finally {
         setDesignLoading(false);
@@ -1059,8 +1407,20 @@ export default function DesignDetailPage({
   }, [design?.id, fetchEvaluations]);
 
   useEffect(() => {
+    if (!design?.id || !selectedVersion?.id) return;
+    fetchWeaknesses(design.id, selectedVersion.id).catch((e) =>
+      console.warn("fetchWeaknesses failed:", e)
+    );
+  }, [design?.id, selectedVersion?.id, fetchWeaknesses]);
+
+  useEffect(() => {
     if (frameEvaluations[selectedFrameIndex]) {
-      setEvalResult(mapFrameToEvalResponse(frameEvaluations[selectedFrameIndex], selectedFrameIndex));
+      setEvalResult(
+        mapFrameToEvalResponse(
+          frameEvaluations[selectedFrameIndex],
+          selectedFrameIndex
+        )
+      );
     }
   }, [selectedFrameIndex, frameEvaluations]);
 
@@ -1100,7 +1460,8 @@ export default function DesignDetailPage({
         if (!design?.id) return;
         const { data, error } = await supabase
           .from("design_versions")
-          .select(`
+          .select(
+            `
             node_id, 
             thumbnail_url, 
             ai_summary, 
@@ -1108,14 +1469,15 @@ export default function DesignDetailPage({
             total_score,
             snapshot, 
             created_at
-          `)
+          `
+          )
           .eq("design_id", design.id)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
 
         if (error) {
-          console.error('Failed to load evaluation:', error.message);
+          console.error("Failed to load evaluation:", error.message);
           return;
         }
 
@@ -1123,22 +1485,24 @@ export default function DesignDetailPage({
         let parsedAiData = null;
         if (data?.ai_data) {
           try {
-            parsedAiData = typeof data.ai_data === 'string'
-              ? JSON.parse(data.ai_data)
-              : data.ai_data;
+            parsedAiData =
+              typeof data.ai_data === "string"
+                ? JSON.parse(data.ai_data)
+                : data.ai_data;
 
-            console.log('Parsed saved AI data:', parsedAiData);
+            console.log("Parsed saved AI data:", parsedAiData);
           } catch (err) {
-            console.error('Error parsing saved AI data:', err);
+            console.error("Error parsing saved AI data:", err);
           }
         }
 
         let snapshotParam = null;
         if (data?.snapshot) {
           try {
-            snapshotParam = typeof data.snapshot === "string"
-              ? JSON.parse(data.snapshot)
-              : data.snapshot;
+            snapshotParam =
+              typeof data.snapshot === "string"
+                ? JSON.parse(data.snapshot)
+                : data.snapshot;
             console.log("Parsed snapshotParam:", snapshotParam);
           } catch (err) {
             console.error("Error parsing snapshotParam:", err, data.snapshot);
@@ -1150,8 +1514,13 @@ export default function DesignDetailPage({
           const mapped: EvalResponse = {
             nodeId: data?.node_id,
             imageUrl: data?.thumbnail_url,
-            summary: data?.ai_summary ?? parsedAiData.summary ?? parsedAiData.ai?.summary ?? "",
-            heuristics: parsedAiData.heuristics ?? parsedAiData.ai?.heuristics ?? null,
+            summary:
+              data?.ai_summary ??
+              parsedAiData.summary ??
+              parsedAiData.ai?.summary ??
+              "",
+            heuristics:
+              parsedAiData.heuristics ?? parsedAiData.ai?.heuristics ?? null,
             ai_status: "ok",
             strengths: Array.isArray(parsedAiData.strengths)
               ? parsedAiData.strengths
@@ -1162,7 +1531,10 @@ export default function DesignDetailPage({
             issues: Array.isArray(parsedAiData.issues)
               ? parsedAiData.issues
               : parsedAiData.ai?.issues ?? [],
-            category_scores: parsedAiData.category_scores ?? parsedAiData.ai?.category_scores ?? null,
+            category_scores:
+              parsedAiData.category_scores ??
+              parsedAiData.ai?.category_scores ??
+              null,
             ai: parsedAiData.ai ?? parsedAiData,
             overall_score:
               parsedAiData.overall_score ??
@@ -1171,7 +1543,7 @@ export default function DesignDetailPage({
               null,
           };
 
-          console.log('Setting saved evaluation:', mapped);
+          console.log("Setting saved evaluation:", mapped);
           setEvalResult(mapped);
           setShowEval(true);
         }
@@ -1196,7 +1568,7 @@ export default function DesignDetailPage({
 
   useEffect(() => {
     if (showVersions) setPage(0);
-  }, [showVersions, versions.length])
+  }, [showVersions, versions.length]);
 
   useEffect(() => {
     if (!design?.id) return;
@@ -1231,11 +1603,13 @@ export default function DesignDetailPage({
         const idx = sortedFrameEvaluations.findIndex(
           (frame, i) =>
             i > 0 &&
-            (
-              frame.ai_summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              frame.ai_data.summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              frame.node_id?.toLowerCase().includes(searchQuery.toLowerCase())
-            )
+            (frame.ai_summary
+              ?.toLowerCase()
+              .includes(searchQuery.toLowerCase()) ||
+              frame.ai_data.summary
+                ?.toLowerCase()
+                .includes(searchQuery.toLowerCase()) ||
+              frame.node_id?.toLowerCase().includes(searchQuery.toLowerCase()))
         );
         setSelectedFrameIndex(idx === -1 ? 0 : idx);
       }
@@ -1289,61 +1663,73 @@ export default function DesignDetailPage({
     const supabase = createClient();
 
     const channel = supabase
-      .channel('comments-realtime')
+      .channel("comments-realtime")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'comments',
+          event: "*",
+          schema: "public",
+          table: "comments",
           filter: `design_id=eq.${design.id}`,
         },
         async (payload) => {
           console.log("[Realtime] Payload received:", payload);
 
-          if (payload.eventType === 'INSERT') {
-            console.log("[Realtime] INSERT event for comment id:", payload.new.id);
+          if (payload.eventType === "INSERT") {
+            console.log(
+              "[Realtime] INSERT event for comment id:",
+              payload.new.id
+            );
 
             let newComment = null;
             for (let i = 0; i < 5; i++) {
               newComment = await fetchCommentWithProfile(payload.new.id);
               if (newComment) break;
-              await new Promise(res => setTimeout(res, 250));
+              await new Promise((res) => setTimeout(res, 250));
             }
 
-            console.log("[Realtime] Fetched new comment with profile (after retry):", newComment);
+            console.log(
+              "[Realtime] Fetched new comment with profile (after retry):",
+              newComment
+            );
             if (!newComment) {
-              console.warn("[Realtime] New comment fetch failed or returned null after retries.");
+              console.warn(
+                "[Realtime] New comment fetch failed or returned null after retries."
+              );
               return;
             }
             fetchComments();
-          }
-
-          else if (payload.eventType === 'UPDATE') {
-            console.log("[Realtime] UPDATE event for comment id:", payload.new.id);
+          } else if (payload.eventType === "UPDATE") {
+            console.log(
+              "[Realtime] UPDATE event for comment id:",
+              payload.new.id
+            );
 
             let updatedComment = null;
             for (let i = 0; i < 5; i++) {
               updatedComment = await fetchCommentWithProfile(payload.new.id);
               if (updatedComment) break;
-              await new Promise(res => setTimeout(res, 250));
+              await new Promise((res) => setTimeout(res, 250));
             }
 
             if (!updatedComment) {
-              console.warn("[Realtime] Updated comment fetch failed or returned null after retries.");
+              console.warn(
+                "[Realtime] Updated comment fetch failed or returned null after retries."
+              );
               return;
             }
 
-            setComments(prev => {
+            setComments((prev) => {
               const updated = updateCommentTree(prev, updatedComment);
               console.log("[Realtime] Comments after UPDATE:", updated);
               return updated;
             });
-          }
-
-          else if (payload.eventType === 'DELETE') {
-            console.log("[Realtime] DELETE event for comment id:", payload.old.id);
-            setComments(prev => {
+          } else if (payload.eventType === "DELETE") {
+            console.log(
+              "[Realtime] DELETE event for comment id:",
+              payload.old.id
+            );
+            setComments((prev) => {
               const updated = deleteCommentTree(prev, payload.old.id);
               console.log("[Realtime] Comments after DELETE:", updated);
               return updated;
@@ -1360,14 +1746,13 @@ export default function DesignDetailPage({
   }, [design?.id, deleteCommentTree, updateCommentTree, fetchComments]);
 
   useEffect(() => {
-    if (editingId && !comments.some(c => c.id === editingId)) {
+    if (editingId && !comments.some((c) => c.id === editingId)) {
       setEditingId(null);
     }
-    if (replyingToId && !comments.some(c => c.id === replyingToId)) {
+    if (replyingToId && !comments.some((c) => c.id === replyingToId)) {
       setReplyingToId(null);
     }
   }, [replyingToId, editingId, comments]);
-
 
   useEffect(() => {
     if (sidebarTab !== "comments") {
@@ -1385,15 +1770,18 @@ export default function DesignDetailPage({
     if (!loadingEval || !design?.current_version_id) return;
 
     const supabase = createClient();
-    console.log("[Realtime] Subscribing with job_id filter:", design.current_version_id);
+    console.log(
+      "[Realtime] Subscribing with job_id filter:",
+      design.current_version_id
+    );
     const channel = supabase
-      .channel('progress-realtime')
+      .channel("progress-realtime")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'frame_evaluation_progress',
+          event: "*",
+          schema: "public",
+          table: "frame_evaluation_progress",
           filter: `job_id=eq.${design.current_version_id}`,
         },
         (payload: { new: ProgressPayload }) => {
@@ -1420,6 +1808,13 @@ export default function DesignDetailPage({
     console.log("[loadingEval] changed:", loadingEval);
   }, [loadingEval]);
 
+  useEffect(() => {
+    if (!design?.id) return;
+    fetchDesignVersions(design.id)
+      .then((versions) => setAllVersions(versions))
+      .catch((e) => console.error("Failed to fetch versions", e));
+  }, [design?.id]);
+
   if (designLoading)
     return (
       <div className="flex flex-col items-center justify-center h-screen animate-pulse">
@@ -1431,9 +1826,7 @@ export default function DesignDetailPage({
           className="object-contain mb-6"
           priority
         />
-        <p className="text-gray-500 text-sm mb-4">
-          Loading designs...
-        </p>
+        <p className="text-gray-500 text-sm mb-4">Loading designs...</p>
       </div>
     );
 
@@ -1443,8 +1836,10 @@ export default function DesignDetailPage({
         <p>Design not found.</p>
       </div>
     );
-    
-  const isOwner = currentUserId && design?.id && currentUserId === design?.owner_id;
+
+  const isOwner =
+    currentUserId && design?.id && currentUserId === design?.owner_id;
+
   return (
     <div>
       {/* Re-evaluate loading bar */}
@@ -1454,8 +1849,7 @@ export default function DesignDetailPage({
           <span className="font-semibold text-orange-600">
             AI re-evaluation in progress...
           </span>
-          <span className="text-sm text-gray-600 mt-1">
-          </span>
+          <span className="text-sm text-gray-600 mt-1"></span>
         </div>
       )}
       <div className="mb-2">
@@ -1489,9 +1883,12 @@ export default function DesignDetailPage({
               publishProject={publishProject}
               unpublishProject={unpublishProject}
               syncPublishedState={syncPublishedState}
+              fetchWeaknesses={fetchWeaknesses}
+              weaknesses={weaknesses}
+              loadingWeaknesses={loadingWeaknesses}
+              allVersions={allVersions}
             />
           )}
-
         </div>
       </div>
       <div className="mt-8">
@@ -1511,28 +1908,35 @@ export default function DesignDetailPage({
               </span>
             </div>
           )}
-          <ZoomControls zoom={zoom} setZoom={setZoom} setPan={setPan} pan={pan} />
+          <ZoomControls
+            zoom={zoom}
+            setZoom={setZoom}
+            setPan={setPan}
+            pan={pan}
+          />
           {/* Center of the image here */}
           <Image
             src={
               selectedFrameIndex === 0
-                ? (thumbUrl
+                ? thumbUrl
                   ? thumbUrl
                   : design.fileKey
-                    ? `/api/figma/thumbnail?fileKey=${design.fileKey}${design.nodeId
-                      ? `&nodeId=${encodeURIComponent(design.nodeId)}`
-                      : ""}`
-                    : "/images/design-thumbnail.png")
-                : (frameEvaluations[selectedFrameIndex]?.thumbnail_url
-                  ? frameEvaluations[selectedFrameIndex].thumbnail_url
-                  : "/images/design-thumbnail.png")
+                  ? `/api/figma/thumbnail?fileKey=${design.fileKey}${
+                      design.nodeId
+                        ? `&nodeId=${encodeURIComponent(design.nodeId)}`
+                        : ""
+                    }`
+                  : "/images/design-thumbnail.png"
+                : frameEvaluations[selectedFrameIndex]?.thumbnail_url
+                ? frameEvaluations[selectedFrameIndex].thumbnail_url
+                : "/images/design-thumbnail.png"
             }
             alt={
               selectedFrameIndex === 0
                 ? "Overall"
                 : frameEvaluations[selectedFrameIndex]?.node_id
-                  ? `Frame ${selectedFrameIndex}`
-                  : design.project_name || "Design"
+                ? `Frame ${selectedFrameIndex}`
+                : design.project_name || "Design"
             }
             width={600}
             height={400}
@@ -1540,7 +1944,9 @@ export default function DesignDetailPage({
             style={{
               opacity: designLoading ? 0.5 : 1,
               transition: isPanning ? "none" : "opacity 0.3s, transform 0.2s",
-              transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+              transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${
+                pan.y / zoom
+              }px)`,
               transformOrigin: "center center",
               cursor: zoom > 1 ? (isPanning ? "grabbing" : "grab") : "default",
             }}
@@ -1570,58 +1976,70 @@ export default function DesignDetailPage({
           role="separator"
         />
         {/* RIGHT PANEL (Evaluation Sidebar) */}
-        {showEval && sidebarWidth > 20 && <div style={{ width: sidebarWidth }}>
-          <div
-            className="flex-1 bg-gray-50 border rounded-md dark:bg-[#1A1A1A] p-5 overflow-y-auto flex flex-col h-screen"
-            style={{ width: sidebarWidth, minWidth: minSidebarWidth, maxWidth: maxSidebarWidth }}
-          >
-            {/* Tabs */}
-            <div className="flex items-center justify-between mb-3 border-b pb-2">
-              <button
-                className={`text-lg font-semibold flex-1 text-center cursor-pointer
-                          ${sidebarTab === "ai" ? "text-[#ED5E20] border-b-2 border-[#ED5E20]" : "text-gray-500"}`}
-                onClick={() => setSidebarTab("ai")}
-              >
-                AI Evaluation
-              </button>
-              <button
-                className={`text-lg font-semibold flex-1 text-center cursor-pointer
-                  ${sidebarTab === "comments" ? "text-[#ED5E20] border-b-2 border-[#ED5E20]" : "text-gray-500"}`}
-                onClick={() => setSidebarTab("comments")}
-              >
-                Comments
-              </button>
-            </div>
-            {sidebarTab === "ai" && (
-              <>
-                <FrameNavigator
-                  selectedFrameIndex={selectedFrameIndex}
-                  setSelectedFrameIndex={setSelectedFrameIndex}
-                  sortedFrameEvaluations={sortedFrameEvaluations}
-                  filteredFrameEvaluations={filteredFrameEvaluations}
-                />
+        {showEval && sidebarWidth > 20 && (
+          <div style={{ width: sidebarWidth }}>
+            <div
+              className="flex-1 bg-gray-50 border rounded-md dark:bg-[#1A1A1A] p-5 overflow-y-auto flex flex-col h-screen"
+              style={{
+                width: sidebarWidth,
+                minWidth: minSidebarWidth,
+                maxWidth: maxSidebarWidth,
+              }}
+            >
+              {/* Tabs */}
+              <div className="flex items-center justify-between mb-3 border-b pb-2">
+                <button
+                  className={`text-lg font-semibold flex-1 text-center cursor-pointer
+                          ${
+                            sidebarTab === "ai"
+                              ? "text-[#ED5E20] border-b-2 border-[#ED5E20]"
+                              : "text-gray-500"
+                          }`}
+                  onClick={() => setSidebarTab("ai")}
+                >
+                  AI Evaluation
+                </button>
+                <button
+                  className={`text-lg font-semibold flex-1 text-center cursor-pointer
+                  ${
+                    sidebarTab === "comments"
+                      ? "text-[#ED5E20] border-b-2 border-[#ED5E20]"
+                      : "text-gray-500"
+                  }`}
+                  onClick={() => setSidebarTab("comments")}
+                >
+                  Comments
+                </button>
+              </div>
+              {sidebarTab === "ai" && (
+                <>
+                  <FrameNavigator
+                    selectedFrameIndex={selectedFrameIndex}
+                    setSelectedFrameIndex={setSelectedFrameIndex}
+                    sortedFrameEvaluations={sortedFrameEvaluations}
+                    filteredFrameEvaluations={filteredFrameEvaluations}
+                  />
 
-                <div className="flex-1 overflow-y-auto pr-5 space-y-5">
-                  {/* Error State */}
-                  {evalError && (
-                    <div className="text-red-500 text-sm">
-                      Error: {evalError}
-                    </div>
-                  )}
+                  <div className="flex-1 overflow-y-auto pr-5 space-y-5">
+                    {/* Error State */}
+                    {evalError && (
+                      <div className="text-red-500 text-sm">
+                        Error: {evalError}
+                      </div>
+                    )}
 
-                  {/* Results */}
-                  {evalResult && !loadingEval && (
-                    <EvaluationResult
-                      evalResult={evalResult}
-                      loadingEval={loadingEval}
-                      currentFrame={currentFrame}
-                      frameEvaluations={frameEvaluations}
-                      selectedFrameIndex={selectedFrameIndex}
-                    />
-                  )}
-
-                </div>
-                {isOwner && (
+                    {/* Results */}
+                    {evalResult && !loadingEval && (
+                      <EvaluationResult
+                        evalResult={evalResult}
+                        loadingEval={loadingEval}
+                        currentFrame={currentFrame}
+                        frameEvaluations={frameEvaluations}
+                        selectedFrameIndex={selectedFrameIndex}
+                      />
+                    )}
+                  </div>
+                  {/* {isOwner && (
                   <div className="mt-auto pt-4">
                     <button
                       onClick={handleOpenEvalParams}
@@ -1651,30 +2069,96 @@ export default function DesignDetailPage({
                       initialParams={pendingParams || {}}
                     />
                   </div>
-                )}
-              </>
-            )}
-            {sidebarTab === "comments" && (
-              <div className="flex-1 flex flex-col">
-                <CommentsSection
-                  comments={comments}
-                  newCommentText={newCommentText}
-                  setNewCommentText={setNewCommentText}
-                  currentUserId={currentUserId}
-                  handleAddComment={handleAddComment}
-                  handleAddReply={handleAddReply}
-                  editingId={editingId}
-                  setEditingId={setEditingId}
-                  replyingToId={replyingToId}
-                  setReplyingToId={setReplyingToId}
-                  handleDeleteComment={handleDeleteComment}
-                  postingComment={postingComment}
-                />
-              </div>
-            )}
+                )} */}
+
+                  {isOwner && (
+                    <div className="mt-auto pt-4">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (loadingEval) return;
+                          if (pendingParams) {
+                            await handleEvalParamsSubmit(
+                              pendingParams,
+                              handleEvaluateWithParams,
+                              design,
+                              setLoadingEval,
+                              setEvalError,
+                              setEvalResult,
+                              setFrameEvaluations,
+                              setExpectedFrameCount,
+                              setEvaluatedFramesCount,
+                              fetchEvaluations,
+                              setShowEvalParams
+                            );
+                          } else {
+                            handleOpenEvalParams();
+                          }
+                        }}
+                        disabled={loadingEval}
+                        aria-busy={loadingEval}
+                        className={`cursor-pointer relative flex-1 inline-flex items-center justify-center rounded-xl text-sm transition-all duration-300 h-12 overflow-hidden focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40 group/button w-full ${
+                          loadingEval
+                            ? // use the "Cancel" button colors when evaluating (cursor disabled)
+                              "flex-1 inline-flex items-center justify-center rounded-xl text-sm font-medium border border-neutral-300/70 dark:border-neutral-600/60 bg-white/70 dark:bg-neutral-800/70 text-neutral-700 dark:text-neutral-200 shadow-sm backdrop-blur transition-colors h-12 cursor-not-allowed opacity-90"
+                            : // default gradient "Re-Evaluate" appearance
+                              "text-white font-semibold tracking-wide"
+                        }`}
+                      >
+                        {loadingEval ? (
+                          // plain neutral appearance while evaluating
+                          <span className="relative z-10">Evaluating...</span>
+                        ) : (
+                          <>
+                            {/* Gradient background */}
+                            <span
+                              aria-hidden
+                              className="absolute inset-0 bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b] transition-transform duration-300 group-hover:scale-105"
+                            />
+
+                            {/* Glass effect overlay */}
+                            <span
+                              aria-hidden
+                              className="absolute inset-[2px] rounded-[10px] bg-[linear-gradient(145deg,rgba(255,255,255,0.25),rgba(255,255,255,0.06))] backdrop-blur-[2px]"
+                            />
+
+                            {/* Light sweep animation */}
+                            <span
+                              aria-hidden
+                              className="absolute inset-y-0 -left-full w-1/2 bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 transition-all duration-700 group-hover/button:translate-x-[220%] group-hover/button:opacity-70"
+                            />
+
+                            <span className="relative z-10 flex items-center gap-2">
+                              <span>Re-Evaluate</span>
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+              {sidebarTab === "comments" && (
+                <div className="flex-1 flex flex-col">
+                  <CommentsSection
+                    comments={comments}
+                    newCommentText={newCommentText}
+                    setNewCommentText={setNewCommentText}
+                    currentUserId={currentUserId}
+                    handleAddComment={handleAddComment}
+                    handleAddReply={handleAddReply}
+                    editingId={editingId}
+                    setEditingId={setEditingId}
+                    replyingToId={replyingToId}
+                    setReplyingToId={setReplyingToId}
+                    handleDeleteComment={handleDeleteComment}
+                    postingComment={postingComment}
+                  />
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-        }
+        )}
         {sidebarWidth <= 20 && (
           <button
             onClick={() => {
@@ -1687,31 +2171,29 @@ export default function DesignDetailPage({
             <IconLayoutSidebarRightExpand size={22} />
           </button>
         )}
-
       </div>
-      {
-        showVersions && (
-          <VersionHistoryModal
-            open={showVersions}
-            onClose={() => setShowVersions(false)}
-            loadingVersions={loadingVersions}
-            versions={versions}
-            page={page}
-            pageSize={pageSize}
-            setPage={setPage}
-            design={design}
-            selectedVersion={selectedVersion}
-            setSelectedVersion={setSelectedVersion}
-            fetchDesignVersions={fetchDesignVersions}
-            deleteDesignVersion={deleteDesignVersion}
-            setVersions={setVersions}
-            setVersionChanged={setVersionChanged}
-            setEvalResult={setEvalResult}
-            setShowEval={setShowEval}
-            setFrameEvaluations={setFrameEvaluations}
-          />
-        )
-      }
-    </div >
+      {showVersions && (
+        <VersionHistoryModal
+          open={showVersions}
+          onClose={() => setShowVersions(false)}
+          loadingVersions={loadingVersions}
+          versions={versions}
+          page={page}
+          pageSize={pageSize}
+          setPage={setPage}
+          design={design}
+          selectedVersion={selectedVersion}
+          setSelectedVersion={setSelectedVersion}
+          fetchDesignVersions={fetchDesignVersions}
+          fetchWeaknesses={fetchWeaknesses}
+          deleteDesignVersion={deleteDesignVersion}
+          setVersions={setVersions}
+          setVersionChanged={setVersionChanged}
+          setEvalResult={setEvalResult}
+          setShowEval={setShowEval}
+          setFrameEvaluations={setFrameEvaluations}
+        />
+      )}
+    </div>
   );
 }

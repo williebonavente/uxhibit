@@ -118,6 +118,8 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+    /* light theme cursor (orange-ish) */
+  --chart-cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='22' stroke='%23000' fill='none' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 3l7 17 2-7 7-2-16-8Z'/></svg>") 3 3, pointer;
 }
 
 .dark {
@@ -152,6 +154,7 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --chart-cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='22' stroke='%23ffffff' fill='none' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 3l7 17 2-7 7-2-16-8Z'/></svg>") 3 3, pointer;
 }
 
 @layer base {
@@ -544,3 +547,47 @@ html {
   }
 }
 
+/* override global body cursor for the chart container */
+.uxh-chart-cursor,
+.uxh-chart-cursor * {
+  cursor: var(--chart-cursor) !important;
+}
+
+
+/* ensure SVG text uses currentColor */
+.uxh-axis-tick { fill: currentColor; }
+
+.uxh-pulse {
+  animation: uxh-pulse 1100ms cubic-bezier(.22,.9,.32,1) infinite;
+  transform-origin: center;
+}
+@keyframes uxh-pulse {
+  0% { opacity: 0.12; transform: scale(0.88); stroke-opacity: 0.12; }
+  50% { opacity: 0.04; transform: scale(1.06); stroke-opacity: 0.06; }
+  100% { opacity: 0.0; transform: scale(1.28); stroke-opacity: 0; }
+}
+/* Enforce a not-allowed cursor for disabled interactive controls */
+
+button[disabled],
+button[aria-disabled="true"] {
+  cursor: not-allowed !important;
+}
+button[disabled] * ,
+button[aria-disabled="true"] * {
+  cursor: not-allowed !important;
+  /* keep overlays clickable state off while disabled so they don't intercept hover/pointer */
+  pointer-events: none !important;
+}
+
+/* optional helper class */
+.cursor-not-allowed-important {
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
+
+.webkit-bg-clip-text {
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}

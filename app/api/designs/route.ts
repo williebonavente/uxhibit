@@ -5,6 +5,30 @@ import { uploadThumbnailFromUrl } from "@/lib/uploadThumbnail";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const fileKey = url.searchParams.get("file_key");
+  if (!fileKey) return NextResponse.json({ error: "file_key query param required" }, { status: 400 });
+
+  const supabase = await createClient();
+  try {
+    const { data, error } = await supabase
+      .from("designs")
+      .select("id, title, current_version_id, file_key, owner_id")
+      .eq("file_key", fileKey)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[api/designs GET] supabase error:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ design: data ?? null });
+  } catch (e: any) {
+    console.error("[api/designs GET] unexpected error:", e);
+    return NextResponse.json({ error: e?.message ?? "Server error" }, { status: 500 });
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const supabase = await createClient();

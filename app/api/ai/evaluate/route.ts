@@ -38,7 +38,7 @@ export async function POST(req: Request) {
     }
 
     const parseData = await parseRes.json();
-    console.log("[AI Evaluate] Parsed Figma data:", parseData);
+    // console.log("[AI Evaluate] Parsed Figma data:", parseData);
 
     const fileKey = parseData.fileKey;
     const frameImages = parseData.frameImages || {};
@@ -118,7 +118,7 @@ export async function POST(req: Request) {
 
     console.log("[Backend] Updating frame_evaluation_progress for job_id:", versionId);
 
-    await saveDesignVersion({
+    const saveResult = await saveDesignVersion({
         supabase,
         versionId,
         designId,
@@ -142,5 +142,6 @@ export async function POST(req: Request) {
         message: "AI evaluation started. Results will be available soon.",
         frameCount: frameIds.length,
         designId,
+        versionId: saveResult.versionId,
     });
 }

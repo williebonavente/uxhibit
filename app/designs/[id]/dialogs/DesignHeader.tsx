@@ -1,320 +1,771 @@
-import React from "react";
-import { useState } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import {
-    IconHistory,
-    IconSearch,
-    IconFilter,
-    IconSortAscending,
-    IconSortDescending,
-    IconSend,
+  IconHistory,
+  IconSearch,
+  IconFilter,
+  IconSortAscending,
+  IconSortDescending,
+  IconSend,
+  IconAlertTriangle,
 } from "@tabler/icons-react";
-import { Menu, MessageSquare } from "lucide-react";
+import { BarChart2, Menu, MessageSquare } from "lucide-react";
 import CommentModal from "./CommentModal";
 import { Comment } from "@/components/comments-user";
 import { Design, Versions } from "../page";
 import PublishConfirmModal from "./PublishConfirmModal";
+import ImprovementGraphs from "./ImprovementGraphs";
+import WeaknessesModal, { IWeakness } from "./WeaknessesModal";
+import { flushSync } from "react-dom";
+// import { useRouter } from "next/router";
 
 interface DesignHeaderActionsProps {
-    handleShowVersions: () => void;
-    handleOpenComments: () => void;
-    showComments: boolean;
-    setShowComments: (show: boolean) => void;
-    comments: Comment[];
-    loadingComments: boolean;
-    showSearch: boolean;
-    setShowSearch: (show: boolean) => void;
-    searchQuery: string;
-    setSearchQuery: (q: string) => void;
-    showSortOptions: boolean;
-    setShowSortOptions: (show: boolean) => void;
-    sortOrder: "default" | "asc" | "desc";
-    setSortOrder: (order: "default" | "asc" | "desc") => void;
-    sortRef: React.RefObject<HTMLDivElement | null>;
-    design: Design;
-    selectedVersion: Versions | null;
-    publishProject: () => Promise<void>;
-    unpublishProject: () => Promise<void>;
-    syncPublishedState: () => Promise<void>;
+  handleShowVersions: () => void;
+  handleOpenComments: () => void;
+  showComments: boolean;
+  setShowComments: (show: boolean) => void;
+  comments: Comment[];
+  loadingComments: boolean;
+  showSearch: boolean;
+  setShowSearch: (show: boolean) => void;
+  searchQuery: string;
+  setSearchQuery: (q: string) => void;
+  showSortOptions: boolean;
+  setShowSortOptions: (show: boolean) => void;
+  sortOrder: "default" | "asc" | "desc";
+  setSortOrder: (order: "default" | "asc" | "desc") => void;
+  sortRef: React.RefObject<HTMLDivElement | null>;
+  design: Design;
+  selectedVersion: Versions | null;
+  publishProject: () => Promise<void>;
+  unpublishProject: () => Promise<void>;
+  syncPublishedState: () => Promise<void>;
+  fetchWeaknesses?: (
+    designId?: string | null,
+    versionId?: string | null
+  ) => Promise<void>;
+  weaknesses?: IWeakness[];
+  loadingWeaknesses?: boolean;
+  displayVersionToShow?: string | null;
+  allVersions: Versions[];
 }
 
 const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
-    handleShowVersions,
-    handleOpenComments,
-    showComments,
-    setShowComments,
-    comments,
-    loadingComments,
-    showSearch,
-    setShowSearch,
-    searchQuery,
-    setSearchQuery,
-    showSortOptions,
-    setShowSortOptions,
-    sortOrder,
-    setSortOrder,
-    sortRef,
-    design,
-    publishProject,
-    unpublishProject,
-    syncPublishedState,
+  handleShowVersions,
+  handleOpenComments,
+  showComments,
+  setShowComments,
+  comments,
+  loadingComments,
+  showSearch,
+  setShowSearch,
+  searchQuery,
+  setSearchQuery,
+  showSortOptions,
+  setShowSortOptions,
+  sortOrder,
+  setSortOrder,
+  sortRef,
+  design,
+  selectedVersion,
+  publishProject,
+  unpublishProject,
+  syncPublishedState,
+  fetchWeaknesses,
+  weaknesses,
+  loadingWeaknesses,
+  allVersions,
 }) => {
-    const [showPublishModal, setShowPublishModal] = useState(false);
-    const handlePublishConfirm = async () => {
-        setShowPublishModal(false);
-        await publishProject();
-        await syncPublishedState();
-    };
+  const [showPublishModal, setShowPublishModal] = useState(false);
+  const [showGraphs, setShowGraphs] = useState(false);
+  const [evaluations, setEvaluations] = useState<
+    { timestamp: string; score: number }[]
+  >([]);
+  const [displayVersionToShow, setDisplayVersionToShow] = useState<
+    string | null
+  >(null);
+  const [loadingEvaluations, setLoadingEvaluations] = useState(false);
+  //   const [weaknesses, setWeaknesses] = useState<any[]>([]);
+  //   const [loadingWeaknesses, setLoadingWeaknesses] = useState(false);
+  const [showWeaknesses, setShowWeaknesses] = useState(false);
 
-    const handleUnpublishConfirm = async () => {
-        setShowPublishModal(false);
-        await unpublishProject();
-        await syncPublishedState();
+  // const router = useRouter();
+
+  const handlePublishConfirm = async () => {
+    setShowPublishModal(false);
+    await publishProject();
+    await syncPublishedState();
+  };
+
+  const handleUnpublishConfirm = async () => {
+    setShowPublishModal(false);
+    await unpublishProject();
+    await syncPublishedState();
+  };
+
+  async function markCommentAsRead(id: string) {
+    const supabase = createClient();
+    await supabase.from("comments").update({ is_read: true }).eq("id", id);
+    // TODO: refresh comments here
+  }
+  async function markCommentAsUnread(id: string) {
+    const supabase = createClient();
+    await supabase.from("comments").update({ is_read: false }).eq("id", id);
+    // TODO: refresh comments here
+  }
+
+  // Fetch evaluations (total_score from design_versions)
+
+  const fetchEvaluations = React.useCallback(async () => {
+    if (!design?.id) return;
+    setLoadingEvaluations(true);
+
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("design_versions")
+      .select("thumbnail_url, total_score, created_at")
+      .eq("design_id", design.id)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("fetching design_version failed", error.message);
+      setEvaluations([]);
+    } else {
+      const mapped = (data ?? []).map((r: any) => ({
+        timestamp: r.created_at ?? new Date().toISOString(),
+        score: Number(r.total_score) ?? 0,
+      }));
+      setEvaluations(mapped);
     }
+    setLoadingEvaluations(false);
+  }, [design?.id]);
 
-    async function markCommentAsRead(id: string) {
-        const supabase = createClient();
-        await supabase.from("comments").update({ is_read: true }).eq("id", id);
-        // TODO: refresh comments here
+  const fetchLatestVersionNumber = async (did?: string | null) => {
+    if (!did) return null;
+
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("design_versions")
+        .select("version")
+        .eq("design_id", did)
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) {
+        console.warn("fetchLatestVersionNumber failed", error.message);
+        return null;
+      }
+      return data ? String(data.version) : null;
+    } catch (e) {
+      console.error(e);
+      return null;
     }
-    async function markCommentAsUnread(id: string) {
-        const supabase = createClient();
-        await supabase.from("comments").update({ is_read: false }).eq("id", id);
-        // TODO: refresh comments here
-    }
+  };
 
-    // const router = useRouter();
+  // Fetch weaknesses from latest version  frame evaluation
+  //   const loadWeaknesses = React.useCallback(
+  //     async (designId?: string | null, versionId?: string | null) => {
+  //       const did = designId ?? design?.id ?? null;
+  //       setLoadingWeaknesses(true);
 
-    return (
-        <div className="flex gap-2 items-center justify-between">
-          
+  //       if (!did) {
+  //         console.warn("fetchWeaknesses: missing designId - aborting");
+  //         setLoadingWeaknesses(false);
+  //         return;
+  //       }
 
-            {/* Wrapper */}
-            <div className="relative flex gap-2 items-center mr-18">
-                <div className="relative group mr-2 mt-1">
-                    <button className="cursor-pointer" onClick={() => {
-                        setShowSortOptions(false);
-                        setShowSearch(false);
-                        setShowComments(false);
-                        setShowPublishModal(true);
-                    }} aria-label="Publish">
-                        {design.is_active ? (
-                            <div className="relative inline-flex items-center">
-                                <span className="absolute inline-flex h-6 w-6 rounded-full bg-green-400 opacity-65 animate-ping"></span>
-                                <IconSend
-                                    size={20}
-                                    className="relative z-10 text-green-500 drop-shadow-[0_0_8px_rgba(34,197,94,0.7)] animate-pulse"
-                                />
-                            </div>
-                        ) : (
-                            <IconSend size={20} />
-                        )}
-                    </button>
-                    {/* Tooltip  */}
-                    <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
-                        <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
-                            {design.is_active ? "Unpublish" : "Publish"}
-                        </div>
-                    </div>
-                    <PublishConfirmModal
-                        open={showPublishModal}
-                        onClose={() => setShowPublishModal(false)}
-                        onConfirm={design.is_active ? handleUnpublishConfirm : handlePublishConfirm}
-                        mode={design.is_active ? "unpublish" : "publish"}
-                    />
-                </div>
-                {/* Version History */}
-                <div className="relative group">
-                    <button
-                        onClick={() => {
-                            setShowSortOptions(false);
-                            setShowSearch(false);
-                            setShowComments(false);
-                            setShowPublishModal(false);
-                            handleShowVersions();
-                        }}
-                        className="cursor-pointer p-2 rounded hover:bg-[#ED5E20]/15 hover:text-[#ED5E20] transition"
-                        aria-label="Show Version History"
-                    >
-                        <IconHistory size={22} />
-                    </button>
-                    {/* Tooltip */}
-                    <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
-                        <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
-                            Version History
-                        </div>
-                    </div>
-                </div>
+  //       try {
+  //         const supabase = createClient();
 
-                {/* Comments */}
-                <div className="relative group">
-                    <button
-                        className="cursor-pointer p-2 rounded hover:bg-[#ED5E20]/15 hover:text-[#ED5E20] transition"
-                        aria-label="Show Comments"
-                        onClick={() => {
-                            setShowSortOptions(false);
-                            setShowSearch(false);
-                            setShowPublishModal(false);
-                            handleOpenComments();
-                        }}
-                    >
-                        <MessageSquare size={22} />
-                    </button>
-                    {/* Tooltip */}
-                    <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
-                        <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
-                            Comments
-                        </div>
-                    </div>
+  //         let vid = versionId ?? design?.current_version_id ?? null;
+  //         if (!vid) {
+  //           const { data: latest, error: latestError } = await supabase
+  //             .from("design_versions")
+  //             .select("id, thumbnail_url, ai_data, created_at")
+  //             .eq("design_id", did)
+  //             .order("created_at", { ascending: false })
+  //             .limit(1)
+  //             .maybeSingle();
+  //           if (latestError)
+  //             console.warn(
+  //               "fetchWeaknesses: latest version lookup failed",
+  //               latestError
+  //             );
+  //           vid = latest?.id ?? null;
+  //         }
 
-                </div>
-                <CommentModal
-                    open={showComments}
-                    onClose={() => setShowComments(false)}
-                    comments={comments}
-                    loading={loadingComments}
-                    markCommentAsRead={markCommentAsRead}
-                    markCommentAsUnread={markCommentAsUnread}
+  //         if (!vid) {
+  //           console.warn("fetchWeaknesses: no version found for design", did);
+  //           setWeaknesses([]);
+  //           return;
+  //         }
+
+  //         // load version row + frame evaluations for that version
+  //         const vPromise = supabase
+  //           .from("design_versions")
+  //           .select("id, thumbnail_url, ai_data, created_at")
+  //           .eq("id", vid)
+  //           .maybeSingle();
+
+  //         const fPromise = supabase
+  //           .from("design_frame_evaluations")
+  //           .select("id, ai_data, thumbnail_url, version_id, node_id")
+  //           .eq("design_id", did)
+  //           .eq("version_id", vid)
+  //           .order("created_at", { ascending: true });
+
+  //         const [
+  //           { data: versionData, error: vError },
+  //           { data: frames, error: fError },
+  //         ] = await Promise.all([vPromise, fPromise]);
+
+  //         if (vError)
+  //           console.warn("fetchWeaknesses: version query error", vError);
+  //         if (fError) console.warn("fetchWeaknesses: frames query error", fError);
+  //         //  console.error("fetchWeaknesses: vid=", vid, "versionData.id=", versionData?.id, "framesCount=", Array.isArray(frames) ? frames.length : 0);
+
+  //         const collected: any[] = [];
+
+  //         // helper: normalize server shapes -> array of entries
+  //         const normalizeEntries = (raw: any) => {
+  //           if (raw == null) return [];
+  //           if (Array.isArray(raw)) return raw;
+  //           // sometimes JSON stored as object with numeric keys: { "0": {...}, "1": {...} }
+  //           if (typeof raw === "object") {
+  //             const keys = Object.keys(raw);
+  //             if (keys.length && keys.every((k) => /^\d+$/.test(k)))
+  //               return Object.values(raw);
+  //             // fallback: single object
+  //             return [raw];
+  //           }
+  //           // string fallback (shouldn't happen here)
+  //           try {
+  //             const parsed = JSON.parse(raw);
+  //             return Array.isArray(parsed) ? parsed : [parsed];
+  //           } catch {
+  //             return [];
+  //           }
+  //         };
+
+  //         // parse version-level ai_data (supports nested `ai`, arrays, numeric-key objects)
+  //         if (versionData?.ai_data) {
+  //           try {
+  //             const parsed =
+  //               typeof versionData.ai_data === "string"
+  //                 ? JSON.parse(versionData.ai_data)
+  //                 : versionData.ai_data;
+  //             const entries = normalizeEntries(parsed);
+  //             entries.forEach((entry: any) => {
+  //               const root = entry?.ai ?? entry;
+  //               if (Array.isArray(root?.weaknesses)) {
+  //                 collected.push(
+  //                   ...root.weaknesses.map((it: any) => ({
+  //                     ...(it || {}),
+  //                     frameId: "version-global",
+  //                     versionId: versionData.id,
+  //                     thumbnail_url:
+  //                       it?.thumbnail_url ?? versionData.thumbnail_url,
+  //                   }))
+  //                 );
+  //               }
+  //               if (Array.isArray(root?.issues)) {
+  //                 collected.push(
+  //                   ...root.issues.map((it: any) => ({
+  //                     ...(it || {}),
+  //                     frameId: "version-global",
+  //                     versionId: versionData.id,
+  //                     thumbnail_url:
+  //                       it?.thumbnail_url ?? versionData.thumbnail_url,
+  //                   }))
+  //                 );
+  //               }
+  //             });
+  //           } catch (e) {
+  //             console.warn("fetchWeaknesses: failed to parse version ai_data", e);
+  //           }
+  //         }
+
+  //         // parse each frame evaluation's ai_data and attach metadata (frame-level)
+  //         if (Array.isArray(frames) && frames.length) {
+  //           frames.forEach((f: any) => {
+  //             if (!f?.ai_data) return;
+  //             try {
+  //               const parsed =
+  //                 typeof f.ai_data === "string"
+  //                   ? JSON.parse(f.ai_data)
+  //                   : f.ai_data;
+  //               const entries = normalizeEntries(parsed);
+  //               entries.forEach((entry: any) => {
+  //                 const root = entry?.ai ?? entry;
+  //                 const attachMeta = (item: any) => {
+  //                   const nodeFromItem =
+  //                     item?.frameId ?? item?.node_id ?? item?.nodeId ?? f.node_id;
+  //                   const normalizedFrameId = nodeFromItem ?? `eval-${f.id}`;
+  //                   return {
+  //                     ...(item || {}),
+  //                     frameId: normalizedFrameId,
+  //                     frameEvalId: f.id,
+  //                     thumbnail_url: f.thumbnail_url ?? item?.thumbnail_url,
+  //                     versionId: f.version_id ?? vid,
+  //                   };
+  //                 };
+  //                 if (Array.isArray(root?.weaknesses))
+  //                   collected.push(...root.weaknesses.map(attachMeta));
+  //                 if (Array.isArray(root?.issues))
+  //                   collected.push(...root.issues.map(attachMeta));
+  //               });
+  //             } catch (e) {
+  //               console.warn(
+  //                 "fetchWeaknesses: failed to parse frame ai_data",
+  //                 f.id,
+  //                 e
+  //               );
+  //             }
+  //           });
+  //         }
+
+  //         // dedupe by frame + id/message
+  //         const uniq: any[] = [];
+  //         const seen = new Set<string>();
+  //         collected.forEach((w: any) => {
+  //           const framePart =
+  //             w.frameId ?? w.frameEvalId ?? w.node_id ?? "frame:global";
+  //           const key = `${framePart}::${w.id ?? w.message ?? JSON.stringify(w)}`;
+  //           if (!seen.has(key)) {
+  //             seen.add(key);
+  //             uniq.push(w);
+  //           }
+  //         });
+
+  //         console.debug(
+  //           "fetchWeaknesses: collected, uniq counts:",
+  //           collected.length,
+  //           uniq.length
+  //         );
+  //         setWeaknesses(uniq);
+  //       } catch (err) {
+  //         console.error("Failed to fetch weaknesses (merged):", err);
+  //         setWeaknesses([]);
+  //       } finally {
+  //         setLoadingWeaknesses(false);
+  //       }
+  //     },
+  //     [design?.id, design?.current_version_id]
+  //   );
+
+  useEffect(() => {
+    fetchEvaluations();
+  }, [fetchEvaluations]);
+
+  // React.useEffect(() => {
+  //   console.error(
+  //     "DesignHeader - selectedVersion:",
+  //     selectedVersion?.id ?? null,
+  //     "showWeaknesses:",
+  //     showWeaknesses
+  //   );
+  // }, [selectedVersion?.id, showWeaknesses]);
+
+  const extraTickvalues = useMemo(() => {
+    return Array.from(
+      new Set(
+        evaluations.map((d) => Number(d.score)).filter((n) => !Number.isNaN(n))
+      )
+    ).sort((a, b) => a - b);
+  }, [evaluations]);
+
+  console.warn("This is fetchingWeaknesses: ",fetchWeaknesses);
+  return (
+    <div className="flex gap-2 items-center justify-between">
+      {/* Wrapper */}
+      <div className="relative flex gap-2 items-center mr-18">
+        <div className="relative group mr-2 mt-1">
+          <button
+            className="hover:text-[#ED5E20] transition cursor-pointer"
+            onClick={() => {
+              setShowSortOptions(false);
+              setShowSearch(false);
+              setShowComments(false);
+              setShowPublishModal(true);
+            }}
+            aria-label="Publish"
+          >
+            {design.is_active ? (
+              <div className="relative inline-flex items-center">
+                <span className="absolute inline-flex h-6 w-6 rounded-full bg-green-400 opacity-65 animate-ping"></span>
+                <IconSend
+                  size={20}
+                  className="relative z-10 text-green-500 drop-shadow-[0_0_8px_rgba(34,197,94,0.7)] animate-pulse"
                 />
-                {/* SEARCH */}
-                <div className="relative group">
-                    <button
-                        className="cursor-pointer p-2 rounded hover:bg-[#ED5E20]/15 hover:text-[#ED5E20] transition"
-                        aria-label="Search"
-                        onClick={() => {
-                            setShowSortOptions(false);
-                            setShowComments(false);
-                            setShowPublishModal(false);
-                            setShowSearch(!showSearch);
-                        }}
-                    >
-                        <IconSearch size={20} />
-                    </button>
-                    {/* Tooltip */}
-                    <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
-                        <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
-                            Search
-                        </div>
-                    </div>
-                    {/* Popover */}
-                    {showSearch && (
-                        <div
-                            className="absolute left-1/2 top-full mt-3 -translate-x-1/2 z-30 w-72 rounded-xl shadow-2xl border border-[#ED5E20]/20
+              </div>
+            ) : (
+              <IconSend size={20} />
+            )}
+          </button>
+          {/* Tooltip  */}
+          <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
+            <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
+              {design.is_active ? "Unpublish" : "Publish"}
+            </div>
+          </div>
+          <PublishConfirmModal
+            open={showPublishModal}
+            onClose={() => setShowPublishModal(false)}
+            onConfirm={
+              design.is_active ? handleUnpublishConfirm : handlePublishConfirm
+            }
+            mode={design.is_active ? "unpublish" : "publish"}
+          />
+        </div>
+        {/* Version History */}
+        <div className="relative group">
+          <button
+            onClick={() => {
+              setShowSortOptions(false);
+              setShowSearch(false);
+              setShowComments(false);
+              setShowPublishModal(false);
+              handleShowVersions();
+            }}
+            className="hover:text-[#ED5E20] transition cursor-pointer p-2 rounded"
+            aria-label="Show Version History"
+          >
+            <IconHistory size={22} />
+          </button>
+          {/* Tooltip */}
+          <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
+            <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
+              Version History
+            </div>
+          </div>
+        </div>
+        {/* Comments */}
+        <div className="relative group">
+          <button
+            className="cursor-pointer p-2 rounded hover:text-[#ED5E20] transition"
+            aria-label="Show Comments"
+            onClick={() => {
+              setShowSortOptions(false);
+              setShowSearch(false);
+              setShowPublishModal(false);
+              handleOpenComments();
+            }}
+          >
+            <MessageSquare size={22} />
+          </button>
+          {/* Tooltip */}
+          <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
+            <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
+              Comments
+            </div>
+          </div>
+        </div>
+        <CommentModal
+          open={showComments}
+          onClose={() => setShowComments(false)}
+          comments={comments}
+          loading={loadingComments}
+          markCommentAsRead={markCommentAsRead}
+          markCommentAsUnread={markCommentAsUnread}
+        />
+        {/* SEARCH */}
+        <div className="relative group">
+          <button
+            className="cursor-pointer p-2 rounded hover:text-[#ED5E20] transition"
+            aria-label="Search"
+            onClick={() => {
+              setShowSortOptions(false);
+              setShowComments(false);
+              setShowPublishModal(false);
+              setShowSearch(!showSearch);
+            }}
+          >
+            <IconSearch size={20} />
+          </button>
+          {/* Tooltip */}
+          <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
+            <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
+              Search
+            </div>
+          </div>
+          {/* Popover */}
+          {showSearch && (
+            <div
+              className="absolute left-1/2 top-full mt-3 -translate-x-1/2 z-30 w-72 rounded-xl shadow-2xl border border-[#ED5E20]/20
                             bg-white/80 dark:bg-[#232323]/80 backdrop-blur-lg animate-fade-in-up transition-all duration-300"
-                            style={{
-                                boxShadow: "0 8px 32px 0 rgba(237,94,32,0.18), 0 1.5px 8px 0 rgba(0,0,0,0.08)",
-                            }}
-                        >
-
-                            {/* Input with icon */}
-                            <div className="flex items-center gap-2 px-4 pt-5 pb-2">
-                                <IconSearch size={18} className="text-[#ED5E20] opacity-80" />
-                                <input
-                                    type="text"
-                                    className="w-full px-3 py-2 rounded border border-[#ED5E20]/30 focus:border-[#ED5E20] focus:ring-2 focus:ring-[#ED5E20]/20 outline-none bg-white/80 dark:bg-[#232323]/80 transition"
-                                    placeholder="Search frames…"
-                                    value={searchQuery}
-                                    onChange={e => setSearchQuery(e.target.value)}
-                                    autoFocus
-                                />
-                            </div>
-                            <div className="px-4 pb-4">
-                                <button
-                                    className="mt-2 w-full bg-gradient-to-r from-[#ED5E20] 
+              style={{
+                boxShadow:
+                  "0 8px 32px 0 rgba(237,94,32,0.18), 0 1.5px 8px 0 rgba(0,0,0,0.08)",
+              }}
+            >
+              {/* Input with icon */}
+              <div className="flex items-center gap-2 px-4 pt-5 pb-2">
+                <IconSearch size={18} className="text-[#ED5E20] opacity-80" />
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 rounded border focus:border-[#ED5E20] focus:ring-2 focus:ring-[#ED5E20]/20 outline-none bg-white/80 dark:bg-[#232323]/80 transition"
+                  placeholder="Search frames…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div className="px-4 pb-4">
+                <button
+                  className="mt-2 w-full bg-gradient-to-r from-[#ED5E20] 
                                     cursor-pointer
                                     to-orange-400 text-white rounded py-1 font-semibold shadow hover:from-orange-500 hover:to-[#ED5E20] transition"
-                                    onClick={() => setShowSearch(false)}
-                                >
-                                    Close
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-                {/* SORT */}
-                <div ref={sortRef} className="relative group">
-                    <button
-                        className={`flex items-center justify-center rounded-full cursor-pointer transition
-                        ${showSortOptions ? "ring-2 ring-[#ED5E20] bg-gradient-to-r from-[#ED5E20]/20 to-orange-400/20 shadow" : ""}
-                        hover:bg-[#ED5E20]/15 hover:text-[#ED5E20] focus:ring-2 focus:ring-[#ED5E20]`}
-                        tabIndex={0}
-                        onClick={() => {
-                            setShowSearch(false);
-                            setShowComments(false);
-                            setShowPublishModal(false);
-                            setShowSortOptions(!showSortOptions);
-                        }}
-                        type="button"
-                    >
-                        <IconFilter size={22} className="text-inherit" />
-                    </button>
-                    {/* Tooltip */}
-                    <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
-                        <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
-                            Sort Options
-                        </div>
-                    </div>
-                    {/* Sort Buttons Dropdown */}
-                    {showSortOptions && (
-                        <div
-                            className="absolute left-1/2 top-full mt-3 -translate-x-1/2 flex flex-col gap-2 bg-white dark:bg-[#232323] border border-[#ED5E20]/30 rounded-xl shadow-2xl p-3 z-30 min-w-[180px] animate-fade-in-up"
-                            tabIndex={-1}
-                            style={{
-                                transition: "box-shadow 0.2s, border 0.2s",
-                                boxShadow: "0 8px 32px 0 rgba(237,94,32,0.18), 0 1.5px 8px 0 rgba(0,0,0,0.08)",
-                            }}
-                        >
-                            <div className="mb-2 px-2 text-xs font-semibold text-[#ED5E20] tracking-widest uppercase opacity-80 select-none">
-                                Sort Frames By
-                            </div>
-                            {/* Ascending */}
-                            <button
-                                onClick={() => { setSortOrder("asc"); setShowSortOptions(false); }}
-                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base cursor-pointer font-medium transition
-                                    ${sortOrder === "asc"
-                                        ? "bg-gradient-to-r from-[#ED5E20]/20 to-orange-400/20 text-[#ED5E20] shadow-md scale-105"
-                                        : "bg-gray-100 dark:bg-[#232323] text-gray-700 dark:text-gray-200 hover:bg-[#ED5E20]/10 hover:text-[#ED5E20]"}group`}
-                                aria-label="Sort by Lowest Score"
-                            >
-                                <span className="transition-transform group-hover:-translate-y-1 group-hover:scale-110">
-                                    <IconSortAscending size={22} />
-                                </span>
-                                Lowest Score
-                            </button>
-                            {/* Descending */}
-                            <button
-                                onClick={() => { setSortOrder("desc"); setShowSortOptions(false); }}
-                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition cursor-pointer
-                                    ${sortOrder === "desc"
-                                        ? "bg-gradient-to-r from-[#ED5E20]/20 to-orange-400/20 text-[#ED5E20] shadow-md scale-105"
-                                        : "bg-gray-100 dark:bg-[#232323] text-gray-700 dark:text-gray-200 hover:bg-[#ED5E20]/10 hover:text-[#ED5E20]"} group`}
-                                aria-label="Sort by Highest Score"
-                            >
-                                <span className="transition-transform group-hover:-translate-y-1 group-hover:scale-110">
-                                    <IconSortDescending size={22} />
-                                </span>
-                                Highest Score
-                            </button>
-                            {/* Default */}
-                            <button
-                                onClick={() => { setSortOrder("default"); setShowSortOptions(false); }}
-                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition cursor-pointer
-                                    ${sortOrder === "default"
-                                        ? "bg-gradient-to-r from-[#ED5E20]/20 to-orange-400/20 text-[#ED5E20] shadow-md scale-105"
-                                        : "bg-gray-100 dark:bg-[#232323] text-gray-700 dark:text-gray-200 hover:bg-[#ED5E20]/10 hover:text-[#ED5E20]"} group`}
-                                aria-label="Default Order"
-                            >
-                                <span className="transition-transform group-hover:-translate-y-1 group-hover:scale-110">
-                                    <Menu size={22} />
-                                </span>
-                                Default Order
-                            </button>
-                        </div>
-                    )}
-                </div>
+                  onClick={() => setShowSearch(false)}
+                >
+                  Close
+                </button>
+              </div>
             </div>
-        </div >
-    )
+          )}
+        </div>
+        {/* SORT */}
+        <div ref={sortRef} className="relative group">
+          <button
+            className={`flex items-center justify-center rounded-full cursor-pointer transition
+                        ${
+                          showSortOptions
+                            ? "ring-2 ring-[#ED5E20] bg-gradient-to-r from-[#ED5E20]/20 to-orange-400/20 shadow"
+                            : ""
+                        }
+                        hover:bg-[#ED5E20]/15 hover:text-[#ED5E20] focus:ring-2 focus:ring-[#ED5E20]`}
+            tabIndex={0}
+            onClick={() => {
+              setShowSearch(false);
+              setShowComments(false);
+              setShowPublishModal(false);
+              setShowSortOptions(!showSortOptions);
+            }}
+            type="button"
+          >
+            <IconFilter size={22} className="text-inherit" />
+          </button>
+          {/* Tooltip */}
+          <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
+            <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
+              Sort Options
+            </div>
+          </div>
+          {/* Sort Buttons Dropdown */}
+          {showSortOptions && (
+            <div
+              className="absolute left-1/2 top-full mt-3 -translate-x-1/2 flex flex-col gap-2 bg-white dark:bg-[#232323] border border-[#ED5E20]/30 rounded-xl shadow-2xl p-3 z-30 min-w-[180px] animate-fade-in-up"
+              tabIndex={-1}
+              style={{
+                transition: "box-shadow 0.2s, border 0.2s",
+                boxShadow:
+                  "0 8px 32px 0 rgba(237,94,32,0.18), 0 1.5px 8px 0 rgba(0,0,0,0.08)",
+              }}
+            >
+              <div className="mb-2 px-2 text-xs font-semibold text-[#ED5E20] tracking-widest uppercase opacity-80 select-none">
+                Sort Frames By
+              </div>
+              {/* Ascending */}
+              <button
+                onClick={() => {
+                  setSortOrder("asc");
+                  setShowSortOptions(false);
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base cursor-pointer font-medium transition
+                                    ${
+                                      sortOrder === "asc"
+                                        ? "bg-gradient-to-r from-[#ED5E20]/20 to-orange-400/20 text-[#ED5E20] shadow-md scale-105"
+                                        : "bg-gray-100 dark:bg-[#232323] text-gray-700 dark:text-gray-200 hover:bg-[#ED5E20]/10 hover:text-[#ED5E20]"
+                                    }group`}
+                aria-label="Sort by Lowest Score"
+              >
+                <span className="transition-transform group-hover:-translate-y-1 group-hover:scale-110">
+                  <IconSortAscending size={22} />
+                </span>
+                Lowest Score
+              </button>
+              {/* Descending */}
+              <button
+                onClick={() => {
+                  setSortOrder("desc");
+                  setShowSortOptions(false);
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition cursor-pointer
+                                    ${
+                                      sortOrder === "desc"
+                                        ? "bg-gradient-to-r from-[#ED5E20]/20 to-orange-400/20 text-[#ED5E20] shadow-md scale-105"
+                                        : "bg-gray-100 dark:bg-[#232323] text-gray-700 dark:text-gray-200 hover:bg-[#ED5E20]/10 hover:text-[#ED5E20]"
+                                    } group`}
+                aria-label="Sort by Highest Score"
+              >
+                <span className="transition-transform group-hover:-translate-y-1 group-hover:scale-110">
+                  <IconSortDescending size={22} />
+                </span>
+                Highest Score
+              </button>
+              {/* Default */}
+              <button
+                onClick={() => {
+                  setSortOrder("default");
+                  setShowSortOptions(false);
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition cursor-pointer
+                                    ${
+                                      sortOrder === "default"
+                                        ? "bg-gradient-to-r from-[#ED5E20]/20 to-orange-400/20 text-[#ED5E20] shadow-md scale-105"
+                                        : "bg-gray-100 dark:bg-[#232323] text-gray-700 dark:text-gray-200 hover:bg-[#ED5E20]/10 hover:text-[#ED5E20]"
+                                    } group`}
+                aria-label="Default Order"
+              >
+                <span className="transition-transform group-hover:-translate-y-1 group-hover:scale-110">
+                  <Menu size={22} />
+                </span>
+                Default Order
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Showing improvement */}
+        <div className="relative group">
+          <button
+            className={`p-2 rounded cursor-pointer transition
+                    ${
+                      showGraphs
+                        ? "ring-2 ring-[#ED5E20] bg-gradient-to-r from-[#ED5E20]/20 to-orange-400/20 shadow"
+                        : ""
+                    }
+                 hover:text-[#ED5E20] ${
+                   loadingEvaluations ? "opacity-60 pointer-events-none" : ""
+                 }`}
+            aria-label="Show improvement graphs"
+            disabled={loadingEvaluations}
+            onClick={async () => {
+              // Close other UI panels when toggling graphs
+              setShowSortOptions(false);
+              setShowSearch(false);
+              setShowComments(false);
+              setShowPublishModal(false);
+
+              if (!showGraphs) {
+                // fetch first, then mount the graphs — prevents a remount flash / cut-off animation
+                try {
+                  await fetchEvaluations();
+                } catch (e) {
+                  console.error("fetchEvaluations failed:", e);
+                }
+                setShowGraphs(true);
+              } else {
+                // closing the graph
+                setShowGraphs(false);
+              }
+            }}
+          >
+            <BarChart2 size={18} className="text-inherit" />
+          </button>
+
+          {/* Tooltip */}
+          <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
+            <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
+              Improvement Graphs
+            </div>
+          </div>
+        </div>
+
+        <div className="relative group">
+          <button
+            className="p-2 rounded cursor-pointer transition hover:text-[#ED5E20]"
+            aria-label="Show Weaknesses"
+            onClick={async () => {
+              setShowSortOptions(false);
+              setShowSearch(false);
+              setShowComments(false);
+              setShowPublishModal(false);
+
+              const vid = selectedVersion?.id ?? null;
+
+              // immediate best-guess display value (no network)
+              let display: string | null = null;
+              if (selectedVersion?.version != null) {
+                display = String(selectedVersion.version);
+              } else if (selectedVersion?.id) {
+                const digits = String(selectedVersion.id)
+                  .match(/\d+/g)
+                  ?.join("");
+                display = digits ?? String(selectedVersion.id);
+              }
+
+              // If we don't have a reliable display, fetch it first to avoid flicker
+              if (!display) {
+                try {
+                  const fetched = await fetchLatestVersionNumber(design.id);
+                  if (fetched) display = fetched;
+                } catch (e) {
+                  console.error("failed to prefetch version:", e);
+                }
+              }
+
+              // force parent state update synchronously so modal receives prop immediately
+              flushSync(() => {
+                setDisplayVersionToShow(display ?? null);
+              });
+              setShowWeaknesses(true);
+
+              // still fetch weaknesses in background
+              (async () => {
+                try {
+                  await fetchWeaknesses?.(design.id, vid);
+                } catch (e) {
+                  console.error("background weakness fetch failed:", e);
+                }
+              })();
+            }}
+          >
+            <IconAlertTriangle size={18} />
+          </button>
+
+          {/* Tooltip */}
+          <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
+            <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
+              Weaknesses
+            </div>
+          </div>
+        </div>
+        {/* Render detached modal centered when open */}
+        {showGraphs && (
+          <ImprovementGraphs
+            evaluations={evaluations} // make sure `data` is in scope or replace with your evaluations array
+            metricName="Scores"
+            onClose={() => setShowGraphs(false)}
+            extraTickValues={extraTickvalues}
+          />
+        )}
+        {showWeaknesses && (
+          <WeaknessesModal
+            key={displayVersionToShow ?? "weaknesses-modal"}
+            open={showWeaknesses}
+            onClose={() => setShowWeaknesses(false)}
+            weaknesses={weaknesses ?? []}
+            // versionIdToShow={selectedVersion?.id ?? null}
+            // New prop: already-resolved/displayable version string (avoids modal flicker)
+            displayVersionToShow={displayVersionToShow}
+            onApplyFixes={async () => {
+              // TODO: implement apply fixes logic
+            }}
+            onRecheck={async () => {
+              await fetchWeaknesses?.(
+                design.id,
+                selectedVersion?.id ?? design?.current_version_id ?? null
+              );
+            }}
+            fetchWeaknesses={fetchWeaknesses}
+            designId={design.id}
+            allVersions={allVersions}
+          />
+        )}
+      </div>
+    </div>
+  );
 };
 
 export default DesignHeaderActions;

@@ -1,5 +1,3 @@
-// app/components/RegistrationForm.tsx or similar path
-
 "use client";
 
 import Link from "next/link";
@@ -12,7 +10,6 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import "react-datepicker/dist/react-datepicker.css";
 // import DatePicker from "react-datepicker";
-
 
 import {
   Form,
@@ -39,6 +36,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
+import BackgroundVideo from "./background_video/backgroundVideo";
 
 export default function RegistrationForm() {
   const router = useRouter();
@@ -129,7 +127,9 @@ export default function RegistrationForm() {
           ) {
             toast.error("This email is already registered.");
           } else {
-            toast.error(detailsError.message || "Failed to create profile details.");
+            toast.error(
+              detailsError.message || "Failed to create profile details."
+            );
           }
           return;
         }
@@ -137,10 +137,10 @@ export default function RegistrationForm() {
         if (profileDetails && profileDetails.id) {
           await supabase.from("profile_contacts").insert({
             profile_details_id: profileDetails.id,
-            email: "",         // or initial value
+            email: "", 
             website: "",
             open_to: "",
-            extra_fields: "[]"
+            extra_fields: "[]",
           });
         }
 
@@ -182,22 +182,19 @@ export default function RegistrationForm() {
         ...parsed,
       });
     }
-  }, [form])
+  }, [form]);
 
   return (
     <div
       style={whiteCursor}
       className="relative min-h-screen flex items-center justify-center w-full overflow-hidden p-5"
     >
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover"
-      >
-        <source src="/images/uxhibit-gif-3(webm).webm" type="video/webm" />
-      </video>
+      <BackgroundVideo
+        src="/images/uxhibit-gif-3(webm).webm"
+        type="video/webm"
+        overlay={true}
+        disabled={true}
+      />
 
       <div className="absolute inset-0 bg-black/40" />
 
@@ -367,7 +364,7 @@ export default function RegistrationForm() {
                         Birthday <span className="text-[#ED5E20]">*</span>
                       </label>
                       <FormControl>
-                      <Popover>
+                        <Popover>
                           <PopoverTrigger asChild>
                             <Button
                               variant="outline"
@@ -375,7 +372,13 @@ export default function RegistrationForm() {
                               id="birthday"
                               type="button"
                             >
-                              <span className={field.value ? "" : "text-gray-400 dark:text-gray-500 opacity-60"}>
+                              <span
+                                className={
+                                  field.value
+                                    ? ""
+                                    : "text-gray-400 dark:text-gray-500 opacity-60"
+                                }
+                              >
                                 {field.value
                                   ? format(new Date(field.value), "MM/dd/yyyy")
                                   : "MM/DD/YYYY"}
@@ -386,8 +389,10 @@ export default function RegistrationForm() {
                           <PopoverContent className="w-auto p-0" align="start">
                             <Calendar
                               mode="single"
-                              selected={field.value ? new Date(field.value) : undefined}
-                              onSelect={date =>
+                              selected={
+                                field.value ? new Date(field.value) : undefined
+                              }
+                              onSelect={(date) =>
                                 field.onChange(
                                   date ? format(date, "yyyy-MM-dd") : ""
                                 )
@@ -395,10 +400,14 @@ export default function RegistrationForm() {
                               captionLayout="dropdown"
                               hidden={{
                                 before: new Date(1900, 0, 1),
-                                after: new Date(new Date().getFullYear(), 11, 31),
+                                after: new Date(
+                                  new Date().getFullYear(),
+                                  11,
+                                  31
+                                ),
                               }}
                               disabled={[
-                                { from: new Date(), to: new Date(2100, 0, 1) }
+                                { from: new Date(), to: new Date(2100, 0, 1) },
                               ]}
                               autoFocus
                             />
@@ -438,11 +447,12 @@ export default function RegistrationForm() {
                             style={{ minHeight: "48px", lineHeight: "1.25rem" }}
                           >
                             {!field.value ? (
-                              <span className="text-gray-600 dark:text-gray-400 opacity-60">Select gender</span>
+                              <span className="text-gray-600 dark:text-gray-400 opacity-60">
+                                Select gender
+                              </span>
                             ) : (
                               <SelectValue />
                             )}
-
                           </SelectTrigger>
                           <SelectContent
                             className="w-full min-w-full"
@@ -452,7 +462,9 @@ export default function RegistrationForm() {
                             <SelectItem value="male">Male</SelectItem>
                             <SelectItem value="female">Female</SelectItem>
                             <SelectItem value="others">Others</SelectItem>
-                            <SelectItem value="prefer-not-to-say">Prefer not to Say</SelectItem>
+                            <SelectItem value="prefer-not-to-say">
+                              Prefer not to Say
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </FormControl>
@@ -544,42 +556,62 @@ export default function RegistrationForm() {
             </div>
 
             {/* Submit Button */}
-                         <Button
+            <button
               type="submit"
               disabled={isSubmitting || !isValid || !termsAccepted}
               aria-disabled={isSubmitting || !isValid || !termsAccepted}
+              // inline cursor fallback (guaranteed)
+              style={{
+                cursor:
+                  isSubmitting || !isValid || !termsAccepted
+                    ? "not-allowed"
+                    : undefined,
+              }}
               className={`group relative inline-flex items-center justify-center
-              w-full h-11 sm:h-12 rounded-xl text-base tracking-wide
-              transition-all duration-300
-              text-white shadow-[0_4px_18px_-4px_rgba(237,94,32,0.55)]
-              hover:shadow-[0_6px_26px_-6px_rgba(237,94,32,0.65)]
-              active:scale-[.97] focus:outline-none
-              focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40
-              ${(!isValid || !termsAccepted) ? "opacity-60 cursor-not-allowed pointer-events-none" : "cursor-pointer"}`}
+                w-full h-11 sm:h-12 rounded-xl text-base tracking-wide
+                transition-all duration-300
+                text-white shadow-[0_4px_18px_-4px_rgba(237,94,32,0.55)]
+                hover:shadow-[0_6px_26px_-6px_rgba(237,94,32,0.65)]
+                active:scale-[.97] focus:outline-none
+                focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40
+                ${
+                  !isValid || !termsAccepted ? "opacity-60" : "cursor-pointer"
+                }`}
             >
               <span
                 aria-hidden
-                className={`absolute inset-0 rounded-xl ${(!isValid || !termsAccepted) ? "bg-gradient-to-r from-gray-400 via-gray-500 to-gray-600" : "bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b]"}`}
+                // add pointer-events-none when disabled so overlay doesn't intercept cursor
+                className={`absolute inset-0 rounded-xl ${
+                  !isValid || !termsAccepted
+                    ? "bg-gradient-to-r from-gray-400 via-gray-500 to-gray-600"
+                    : "bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b]"
+                } ${!isValid || !termsAccepted ? "pointer-events-none" : ""}`}
               />
               <span
                 aria-hidden
-                className="absolute inset-[2px] rounded-[10px] bg-[linear-gradient(145deg,rgba(255,255,255,0.28),rgba(255,255,255,0.07))] backdrop-blur-[2px]"
+                className={`absolute inset-[2px] rounded-[10px] bg-[linear-gradient(145deg,rgba(255,255,255,0.28),rgba(255,255,255,0.07))] backdrop-blur-[2px] ${
+                  !isValid || !termsAccepted ? "pointer-events-none" : ""
+                }`}
               />
               <span
                 aria-hidden
-                className="absolute -left-1 -right-1 top-0 h-full overflow-hidden rounded-xl"
+                className={`absolute -left-1 -right-1 top-0 h-full overflow-hidden rounded-xl ${
+                  !isValid || !termsAccepted ? "pointer-events-none" : ""
+                }`}
               >
                 <span className="absolute inset-y-0 -left-full w-1/2 bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70" />
               </span>
               <span
                 aria-hidden
-                className="absolute inset-0 rounded-xl ring-1 ring-white/30 group-hover:ring-white/50"
+                className={`absolute inset-0 rounded-xl ring-1 ring-white/30 group-hover:ring-white/50 ${
+                  !isValid || !termsAccepted ? "pointer-events-none" : ""
+                }`}
               />
               <span className="relative z-10 flex items-center gap-2">
                 {isSubmitting && <Loader2 className="animate-spin h-5 w-5" />}
                 {isSubmitting ? "Signing Up..." : "Sign Up"}
               </span>
-            </Button>
+            </button>
           </form>
         </Form>
 

@@ -1,8 +1,16 @@
 import { createClient } from "@/utils/supabase/client";
-import { EvaluateInput, EvalResponse, evaluateDesign, Design } from "@/app/designs/[id]/page";
+import {
+  EvaluateInput,
+  EvalResponse,
+  evaluateDesign,
+  Design,
+  Snapshot,
+} from "@/app/designs/[id]/page";
 import { Dispatch, SetStateAction } from "react";
 
 let pollInterval: NodeJS.Timeout | null = null;
+
+type  SnapshotWithIteration = Snapshot & { iteration?: number };
 
 export async function handleEvaluateWithParams(
   params: EvaluateInput,
@@ -45,17 +53,27 @@ export async function handleEvaluateWithParams(
         .eq("version_id", currentVersionId);
 
       if (pollError) {
-        console.error("[Polling] Supabase error:", JSON.stringify(pollError, null));
+        console.error(
+          "[Polling] Supabase error:",
+          JSON.stringify(pollError, null)
+        );
       }
       console.log("[Polling] frameData:", frameData);
 
       const count = Array.isArray(frameData)
-        ? frameData.filter((f: { id: string }) => f.id !== "overallFrame").length
+        ? frameData.filter((f: { id: string }) => f.id !== "overallFrame")
+            .length
         : 0;
       setEvaluatedFramesCount(count);
-      console.log(`[Polling] Evaluated frames: ${count} / ${params.frameIds ? params.frameIds.length : 0}`);
+      console.log(
+        `[Polling] Evaluated frames: ${count} / ${
+          params.frameIds ? params.frameIds.length : 0
+        }`
+      );
       if (count >= (params.frameIds ? params.frameIds.length : 0)) {
-        console.log("[Polling] All frames evaluated. Stopping poll and fetching evaluations.");
+        console.log(
+          "[Polling] All frames evaluated. Stopping poll and fetching evaluations."
+        );
         if (pollInterval) clearInterval(pollInterval);
         setTimeout(async () => {
           setLoadingEval(false);
@@ -74,9 +92,15 @@ export async function handleEvaluateWithParams(
   }, 1000);
 
   try {
-    console.log("[handleEvaluateWithParams] Calling evaluateDesign with params:", params);
+    console.log(
+      "[handleEvaluateWithParams] Calling evaluateDesign with params:",
+      params
+    );
     const evalResult = await evaluateDesign(params);
-    console.log("[handleEvaluateWithParams] evaluateDesign result:", evalResult);
+    console.log(
+      "[handleEvaluateWithParams] evaluateDesign result:",
+      evalResult
+    );
   } catch (e) {
     if (e instanceof Error) {
       console.error("[handleEvaluateWithParams] Evaluation error:", e.message);
@@ -111,17 +135,83 @@ export async function handleEvalParamsSubmit(
   setExpectedFrameCount: React.Dispatch<React.SetStateAction<number>>,
   setEvaluatedFramesCount: React.Dispatch<React.SetStateAction<number>>,
   fetchEvaluations: () => Promise<void>,
-  setShowEvalParams: React.Dispatch<React.SetStateAction<boolean>>,
+  setShowEvalParams: React.Dispatch<React.SetStateAction<boolean>>
 ) {
   console.log("[handleEvalParamsSubmit] Closing modal and starting evaluation");
   setShowEvalParams(false);
 
-  const latestSnapshot = {
-    age: typeof params.generation === "string" ? params.generation : "",
-    occupation: typeof params.occupation === "string" ? params.occupation : "",
+  // Build a params-derived fallback snapshot
+  let latestSnapshot: SnapshotWithIteration = {
+    age:
+      typeof (params as any).generation === "string"
+        ? (params as any).generation
+        : "",
+    occupation:
+      typeof (params as any).occupation === "string"
+        ? (params as any).occupation
+        : "",
   };
 
-  console.log("[handleEvalParamsSubmit] Params for evaluation:", { ...params, snapshot: latestSnapshot });
+  try {
+    const supabase = createClient();
+
+    // get latest design_versions row for this design, select snapshot jsonb
+    const { data: latestVersionRow, error: dvError } = await supabase
+      .from("design_versions")
+      .select("version, snapshot")
+      .eq("design_id", design.id)
+      .order("version", { ascending: false })
+      .limit(1)
+      .single();
+
+
+       // Map version -> iteration target (1->1, 2->2, 3+->3)
+   const nextVersion = typeof latestVersionRow?.version === "number"
+     ? latestVersionRow.version + 1
+     : 1;
+   const iteration = nextVersion <= 1 ? 1 : nextVersion === 2 ? 2 : 3;
+ 
+
+
+    if (dvError) {
+      // If there are no rows, supabase returns an error; only warn for other errors
+      if ((dvError as any).code) {
+        // show warnings for unexpected errors
+        console.warn(
+          "[handleEvalParamsSubmit] design_versions query error:",
+          dvError
+        );
+      }
+    } else if (
+      latestVersionRow &&
+      typeof (latestVersionRow as any).snapshot === "object" &&
+      (latestVersionRow as any).snapshot !== null
+    ) {
+      latestSnapshot = { ...(latestVersionRow as any).snapshot } as Snapshot;
+      console.log(
+        "[handleEvalParamsSubmit] Using snapshot from design_versions:",
+        latestSnapshot
+      );
+    } else {
+      console.log(
+        "[handleEvalParamsSubmit] design_versions returned no snapshot; falling back to params:",
+        latestSnapshot
+      );
+    }
+
+    latestSnapshot = { ...latestSnapshot, iteration };
+  } catch (err) {
+    console.warn(
+      "[handleEvalParamsSubmit] Error fetching snapshot from design_versions, falling back to params:",
+      err
+    );
+  }
+
+  console.log(
+    "[handleEvalParamsSubmit] Final params for evaluation (snapshot resolved):",
+    { ...params, snapshot: latestSnapshot }
+  );
+
   setLoadingEval(true);
   setEvalError(null);
 
@@ -166,18 +256,25 @@ export async function handleEvalParamsSubmit(
     let done = false;
     while (!done) {
       try {
-        const progressRes = await fetch(`${baseUrl}/api/ai/evaluate/progress?jobId=${versionId}`);
+        const progressRes = await fetch(
+          `${baseUrl}/api/ai/evaluate/progress?jobId=${versionId}`
+        );
         const progressData = await progressRes.json();
 
-        setEvaluatedFramesCount(typeof progressData.progress === "number" ? progressData.progress : 0);
+        setEvaluatedFramesCount(
+          typeof progressData.progress === "number" ? progressData.progress : 0
+        );
         setExpectedFrameCount(100); // or use actual frame count if available
 
-        if (progressData.status === "completed" || progressData.status === "error") {
+        if (
+          progressData.status === "completed" ||
+          progressData.status === "error"
+        ) {
           done = true;
           setLoadingEval(false);
           await fetchEvaluations();
         } else {
-          await new Promise(res => setTimeout(res, 2000));
+          await new Promise((res) => setTimeout(res, 2000));
         }
       } catch (err) {
         if (err instanceof Error) {

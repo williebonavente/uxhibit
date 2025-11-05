@@ -25,6 +25,7 @@ import { useEffect, useState } from "react";
 import { avatarStyles } from "@/constants/randomAvatars";
 import { createClient } from "@/utils/supabase/client";
 import { Loader2 } from "lucide-react";
+import BackgroundVideo from "./background_video/backgroundVideo";
 
 
 const formSchema = loginFormSchema;
@@ -75,7 +76,6 @@ export default function LoginForm() {
   //     toast.error("Failed to start Figma authentication");
   //   }
   // }
-
 
   useEffect(() => {
     // Check for auth errors
@@ -156,7 +156,7 @@ export default function LoginForm() {
       setRedirecting(true);
       setTimeout(() => {
         router.push("/dashboard");
-      }, 1200);
+      }, 200);
     } catch (error) {
       console.error("Form submission error", error);
       // toast.error('Failed to submit the form. Please try again.')
@@ -177,17 +177,13 @@ export default function LoginForm() {
         style={whiteCursor}
         className="relative min-h-screen flex items-center justify-center w-full overflow-hidden p-5"
       >
-        {/* Fullscreen Video Background */}
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="absolute inset-0 w-full h-full object-cover"
-        >
-          <source src="/images/uxhibit-gif-3(webm).webm" type="video/webm" />
-          Your browser does not support the video tag.
-        </video>
+
+        <BackgroundVideo
+          src="/images/uxhibit-gif-3(webm).webm"
+          type="video/webm"
+          overlay={true}
+          disabled={true}
+        />
 
         {/* Overlay for darkening background */}
         <div className="absolute inset-0 bg-black/40" />
@@ -221,6 +217,7 @@ export default function LoginForm() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
+                    <FormMessage />
                     <FormControl>
                       <Input
                         id="email"
@@ -231,7 +228,6 @@ export default function LoginForm() {
                         {...field}
                       />
                     </FormControl>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -242,6 +238,7 @@ export default function LoginForm() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
+                      <FormMessage />
                     <FormControl>
                       <PasswordInput
                         id="password"
@@ -251,7 +248,6 @@ export default function LoginForm() {
                         {...field}
                       />
                     </FormControl>
-                    <FormMessage />
                   </FormItem>
                 )}
               />

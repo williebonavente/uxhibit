@@ -1,0 +1,9 @@
+﻿    /**
+     * detectSignup.ts
+     * Auto-generated detector for Signup interactive elements.
+     * This module should export detection and heuristic evaluation logic.
+     */
+    export function detectSignup(frame: any) {
+        // TODO: Implement detection logic for Signup
+        return [];
+    }
