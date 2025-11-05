@@ -155,6 +155,7 @@ export async function evaluateFrames({
             textNodes: frameTextNodes,
             textSummary,
             normalizedFrames: figmaContext.normalizedFrames,
+            frameId: nodeId,
           },
           snapshotObj
         );

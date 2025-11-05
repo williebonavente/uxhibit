@@ -10,7 +10,11 @@ import { Dispatch, SetStateAction } from "react";
 
 let pollInterval: NodeJS.Timeout | null = null;
 
-type  SnapshotWithIteration = Snapshot & { iteration?: number };
+type  SnapshotWithIteration = Snapshot & { 
+  iteration?: number;
+  totalIterations?: number;
+  versionId?: string;
+};
 
 export async function handleEvaluateWithParams(
   params: EvaluateInput,
@@ -164,12 +168,20 @@ export async function handleEvalParamsSubmit(
       .limit(1)
       .single();
 
+          // Next version number (current+1)
+    const nextVersion = typeof latestVersionRow?.version === "number"
+      ? latestVersionRow.version + 1
+      : 1;
 
-       // Map version -> iteration target (1->1, 2->2, 3+->3)
-   const nextVersion = typeof latestVersionRow?.version === "number"
-     ? latestVersionRow.version + 1
-     : 1;
-   const iteration = nextVersion <= 1 ? 1 : nextVersion === 2 ? 2 : 3;
+    // totalIterations: clamp to [3,5] (from params if provided, else default 3)
+    const requestedTotal = Number((params as any)?.totalIterations);
+    const totalIterations =
+      Number.isFinite(requestedTotal)
+        ? Math.max(3, Math.min(5, Math.floor(requestedTotal)))
+        : 3;
+
+    // iteration clamped by totalIterations (1..totalIterations)
+    const iteration = Math.max(1, Math.min(totalIterations, nextVersion));
  
 
 
@@ -199,7 +211,7 @@ export async function handleEvalParamsSubmit(
       );
     }
 
-    latestSnapshot = { ...latestSnapshot, iteration };
+    latestSnapshot = { ...latestSnapshot, iteration, totalIterations };
   } catch (err) {
     console.warn(
       "[handleEvalParamsSubmit] Error fetching snapshot from design_versions, falling back to params:",
@@ -235,6 +247,8 @@ export async function handleEvalParamsSubmit(
       setLoadingEval(false);
       return;
     }
+
+    latestSnapshot = { ...latestSnapshot, versionId}
 
     await handleEvaluateWithParams(
       {
