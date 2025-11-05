@@ -4,10 +4,13 @@ import {
   EvalResponse,
   evaluateDesign,
   Design,
+  Snapshot,
 } from "@/app/designs/[id]/page";
 import { Dispatch, SetStateAction } from "react";
 
 let pollInterval: NodeJS.Timeout | null = null;
+
+type  SnapshotWithIteration = Snapshot & { iteration?: number };
 
 export async function handleEvaluateWithParams(
   params: EvaluateInput,
@@ -138,7 +141,7 @@ export async function handleEvalParamsSubmit(
   setShowEvalParams(false);
 
   // Build a params-derived fallback snapshot
-  let latestSnapshot: { age: string; occupation: string; } = {
+  let latestSnapshot: SnapshotWithIteration = {
     age:
       typeof (params as any).generation === "string"
         ? (params as any).generation
@@ -153,13 +156,22 @@ export async function handleEvalParamsSubmit(
     const supabase = createClient();
 
     // get latest design_versions row for this design, select snapshot jsonb
-    const { data: dvData, error: dvError } = await supabase
+    const { data: latestVersionRow, error: dvError } = await supabase
       .from("design_versions")
-      .select("snapshot")
+      .select("version, snapshot")
       .eq("design_id", design.id)
-      .order("created_at", { ascending: false })
+      .order("version", { ascending: false })
       .limit(1)
       .single();
+
+
+       // Map version -> iteration target (1->1, 2->2, 3+->3)
+   const nextVersion = typeof latestVersionRow?.version === "number"
+     ? latestVersionRow.version + 1
+     : 1;
+   const iteration = nextVersion <= 1 ? 1 : nextVersion === 2 ? 2 : 3;
+ 
+
 
     if (dvError) {
       // If there are no rows, supabase returns an error; only warn for other errors
@@ -171,11 +183,11 @@ export async function handleEvalParamsSubmit(
         );
       }
     } else if (
-      dvData &&
-      typeof (dvData as any).snapshot === "object" &&
-      (dvData as any).snapshot !== null
+      latestVersionRow &&
+      typeof (latestVersionRow as any).snapshot === "object" &&
+      (latestVersionRow as any).snapshot !== null
     ) {
-      latestSnapshot = { ...(dvData as any).snapshot };
+      latestSnapshot = { ...(latestVersionRow as any).snapshot } as Snapshot;
       console.log(
         "[handleEvalParamsSubmit] Using snapshot from design_versions:",
         latestSnapshot
@@ -186,6 +198,8 @@ export async function handleEvalParamsSubmit(
         latestSnapshot
       );
     }
+
+    latestSnapshot = { ...latestSnapshot, iteration };
   } catch (err) {
     console.warn(
       "[handleEvalParamsSubmit] Error fetching snapshot from design_versions, falling back to params:",

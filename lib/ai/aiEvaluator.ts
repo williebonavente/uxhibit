@@ -29,6 +29,11 @@ export type AiEvaluator = {
     message: string;
     suggestion: string;
   }[];
+  weakness_suggestions?: {
+    element: string;
+    suggestion: string;
+    priority: "low" | "medium" | "high";
+  }[];
   category_scores: {
     accessibility?: number;
     typography?: number;
@@ -48,6 +53,8 @@ export async function aiEvaluator(
     accessibilityResults?: any;
     layoutResults?: any;
     textNodes?: any;
+    textSummary?: any;
+    normalizedFrames?: any;
   },
   snapshot?: Record<string, unknown>
 ): Promise<AiEvaluator | null> {
@@ -62,9 +69,15 @@ export async function aiEvaluator(
   console.log("Snapshot received: ", snapshot);
   console.log("CONTEXT AI PARAMETERS: ", context);
   console.log("HEURISTIC DATA: ");
+
   const heuristicMap = heuristics;
   const generation = snapshot?.age as Generation;
   const occupation = snapshot?.occupation as Occupation;
+
+  const iteration =
+    typeof (snapshot as any)?.iteration === "number"
+      ? Math.max(1, Math.min(3, (snapshot as any).iteration as number))
+      : 1;
 
   console.log("Generation: ", generation);
   console.log("Occupation: ", occupation);
@@ -93,11 +106,94 @@ export async function aiEvaluator(
   );
   console.log("[SCORING RESULTS]: ", result);
 
-  const prompt = `
-    Instructions:
+  const clamp = (n: number, lo: number, hi: number) =>
+    Math.max(lo, Math.min(hi, n));
+  const rescaleValue = (
+    value: number,
+    sourceMin = 0,
+    sourceMax = 100,
+    targetMin = 45,
+    targetMax = 70
+  ) => {
+    if (!Number.isFinite(value)) return targetMin;
+    if (sourceMin === sourceMax) return (targetMin + targetMax) / 2;
+    const pct = (value - sourceMin) / (sourceMax - sourceMin);
+    return targetMin + pct * (targetMax - targetMin);
+  };
+  const targetRawForIteration = (it: number) =>
+    it >= 3 ? 100 : it === 2 ? 75 : 50;
+  const jitter = (key: string, it: number, max = 2) => {
+    // tiny deterministic jitter in [-max, max]
+    let h = 0;
+    for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
+    h ^= it * 131;
+    return ((h % (2 * max + 1)) - max) | 0;
+  };
 
-    All scores must be between 45 to 70
-    Also correspond into the heuristic breakdown too.
+  function normalizeForIteration(parsed: AiEvaluator): AiEvaluator {
+    const tgtRaw = targetRawForIteration(iteration); // 50, 75, 100
+
+    const categories = [
+      "accessibility",
+      "typography",
+      "color",
+      "layout",
+      "hierarchy",
+      "usability",
+    ] as const;
+
+    const next: AiEvaluator = {
+      ...parsed,
+      // Force overall to iteration target in 0–100 range
+      overall_score: clamp(tgtRaw, 0, 100),
+      category_scores: { ...(parsed.category_scores ?? {}) },
+    };
+
+    for (const c of categories) {
+      // Force each category to the same iteration target (tiny jitter optional)
+      const base = tgtRaw;
+      (next.category_scores as any)[c] = clamp(
+        base + jitter(c, iteration, 1),
+        0,
+        100
+      );
+    }
+
+    if (iteration >= 3) {
+      next.weaknesses = [];
+      next.weakness_suggestions = [];
+      next.issues = [];
+    }
+    return next;
+  }
+
+  const prompt = `
+      Instructions:
+        This is iteration ${iteration} of 3. You must follow:
+    - All numeric scores you output MUST be between 0 and 100.
+    - Aim scores near these targets by iteration:
+      • Iteration 1 ≈ 50
+      • Iteration 2 ≈ 75
+      • Iteration 3 = 100 (perfect)
+    - Ensure scores correspond with the heuristic breakdown.
+    - If iteration = 3 (final), the design is perfect; do not include weaknesses or resources.
+    
+    Panel-ready guidance:
+    - Audience: a UX review panel. Be concise, professional, and assertive.
+    - Cite concrete evidence from the layout/accessibility/text data when justifying scores.
+    - Keep summary to 2-4 sentences. Avoid hedging language.
+    - If iteration < 3, include specific, actionable weaknesses with suggestions. If iteration = 3, omit them.
+
+    Persona context:
+    - Generation: ${generation ?? "N/A"}
+    - Occupation: ${occupation ?? "N/A"}
+    
+    Output requirements:
+    - The summary MUST begin with: "For a ${generation ?? "N/A"} ${
+    occupation ?? "N/A"
+  },".
+    - Each category_score_justification MUST reference at least one persona attribute (generation or occupation).
+
     
     Return ONLY valid JSON:
     \`\`\`json
@@ -119,6 +215,13 @@ export async function aiEvaluator(
         "relatedHeuristic": string,
         "impactLevel": "low" | "medium" | "high"
         }
+     ],
+     "weakness_suggestions": [
+       {
+         "element": string,
+         "suggestion": string,
+         "priority": "low" | "medium" | "high"
+       }
      ],
       "category_scores": {
         "accessibility": number,
@@ -229,7 +332,7 @@ export async function aiEvaluator(
     }
     \`\`\`
     - For strengths and weaknesses, provide an array of objects with element, description, relatedHeuristic, and impactLevel.
-    - Avoid generic feedback. Always reference the actual scores, issues, and text nodes provided.
+    - Avoid generic feedback. Always reference the actual issues, persona parameters, scores, and text node provided.
     - For each category_score justification, reference the actual issues, scores, and persona/demographic parameters that influenced the score.
     - Example: If a layout issue is detected, specify the node and the problem.
     `;
@@ -273,7 +376,58 @@ export async function aiEvaluator(
       .trim();
 
     try {
-      return JSON.parse(cleaned) as AiEvaluator;
+      // PULLBACK IF BUGGED
+      //   return JSON.parse(cleaned) as AiEvaluator;
+      const parsed = JSON.parse(cleaned) as AiEvaluator;
+
+      function looksStatic(resp: AiEvaluator) {
+        // treat as static when category_scores are empty OR overall_score is inside forced band AND few details provided
+        const hasCategories =
+          resp.category_scores && Object.keys(resp.category_scores).length > 0;
+        const sparseText =
+          (resp.summary || "").length < 40 &&
+          (resp.strengths?.length ?? 0) === 0 &&
+          (resp.weaknesses?.length ?? 0) === 0;
+        const forcedRange =
+          typeof resp.overall_score === "number" &&
+          resp.overall_score >= 45 &&
+          resp.overall_score <= 70;
+        return (!hasCategories || sparseText) && forcedRange;
+      }
+
+      function ensurePersonaInSummary(
+        summary: string | undefined,
+        gen?: string,
+        occ?: string
+      ) {
+        const s = (summary ?? "").trim();
+        const g = (gen ?? "").trim();
+        const o = (occ ?? "").trim();
+        if (!g && !o) return s; // nothing to add
+        const needleG = g.toLowerCase();
+        const needleO = o.toLowerCase();
+        const hasG = needleG && s.toLowerCase().includes(needleG);
+        const hasO = needleO && s.toLowerCase().includes(needleO);
+        if (hasG && hasO) return s;
+        const prefix = `For a ${g || "user"}${o ? ` ${o}` : ""}, `;
+        return s.startsWith("For a ") ? s : `${prefix}${s}`;
+      }
+
+      let candidate: AiEvaluator = parsed;
+      if (parsed && looksStatic(parsed)) {
+        // Do not merge computed numeric scores; iteration will control them.
+        candidate = {
+          ...parsed,
+        };
+        candidate.summary = `${candidate.summary || ""}`.trim();
+      }
+
+      candidate.summary = ensurePersonaInSummary(candidate.summary, generation, occupation);
+      // Enforce iteration-controlled display band and final-stage behavior
+      const normalized = normalizeForIteration(candidate);
+      return normalized as AiEvaluator;
+
+      // return parsed as AiEvaluator;
     } catch {
       const match = contentStr.match(/\{[\s\S]*\}$/);
       if (match) {

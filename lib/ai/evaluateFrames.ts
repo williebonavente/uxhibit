@@ -101,7 +101,7 @@ export async function evaluateFrames({
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const res = await fetch(`${baseUrl}/api/figma/parse?url=${encodeURIComponent(figmaFileUrl)}`);
   const figmaContext = await res.json();
-  // const heuristics = getHeuristicScores(figmaContext);
+  const heuristics = getHeuristicScores(figmaContext);
   const accessibilityResults = figmaContext.accessibilityResults;
   const layoutResults = figmaContext.layoutResults;
   const textNodes = figmaContext.textNodes;
@@ -138,15 +138,27 @@ export async function evaluateFrames({
       console.log("RETURNING FIGMA CONTEXT: ");
       console.log(figmaContext.accessibilityResults)
       try {
+        // TODO: FOR RE-EVALUATION
+                // Ensure snapshot is an object and contains iteration
+        const snapshotObj =
+          typeof snapshot === "string"
+            ? (() => { try { return JSON.parse(snapshot); } catch { return undefined; } })()
+            : snapshot;
+        console.log("Evaluator snapshot.iteration:", snapshotObj?.iteration);
+
         ai = await aiEvaluator(
           imageUrl,
+          heuristics,
           {
             accessibilityResults: minimalAccessibilityResults,
             layoutResults: minimalLayoutResults,
             textNodes: frameTextNodes,
             textSummary,
             normalizedFrames: figmaContext.normalizedFrames,
-          }, snapshot);
+          },
+          snapshotObj
+        );
+ 
 
         if (!ai) ai_error = "mistral_skipped_or_empty";
         if (ai && Array.isArray(ai.issues)) {

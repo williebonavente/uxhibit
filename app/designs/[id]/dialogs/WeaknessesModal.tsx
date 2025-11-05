@@ -558,7 +558,7 @@ export default function WeaknessesModal({
 
           <div
             ref={modalContentRef}
-            className="relative z-10 w-full max-w-6xl max-h-[90vh] bg-white dark:bg-[#0b0b0b] rounded-2xl shadow-2xl p-6 flex flex-col overflow-auto"
+            className="relative z-10 w-full max-w-7xl md:max-w-8xl lg:max-w-9xl max-h-[95vh] h-auto bg-white dark:bg-[#0b0b0b] rounded-2xl shadow-2xl p-6 flex flex-col overflow-auto"
           >
             <div className="flex items-center justify-between mb-4 w-full">
               {/* Left: Title and Version Selector */}
@@ -613,37 +613,6 @@ export default function WeaknessesModal({
 
               {/* Right: Pagination and Close Button */}
               <div className="flex items-center gap-2 flex-shrink-0">
-                {/* {groups.length > 0 && (
-                  <div className="flex items-center gap-2 mr-2">
-                    <button
-                      onClick={goPrev}
-                      disabled={!canPrev}
-                      aria-label="Previous frame"
-                      className={`p-2 rounded ${
-                        canPrev
-                          ? "hover:bg-gray-100 dark:hover:bg-neutral-800 cursor-pointer"
-                          : "opacity-40 cursor-not-allowed"
-                      }`}
-                    >
-                      <ChevronLeft size={16} />
-                    </button>
-                    <div className="text-sm font-mono text-slate-600 dark:text-slate-400 px-2">
-                      {`${Math.max(1, currentIndex + 1)} / ${groups.length}`}
-                    </div>
-                    <button
-                      onClick={goNext}
-                      disabled={!canNext}
-                      aria-label="Next frame"
-                      className={`p-2 rounded ${
-                        canNext
-                          ? "hover:bg-gray-100 dark:hover:bg-neutral-800 cursor-pointer"
-                          : "opacity-40 cursor-not-allowed"
-                      }`}
-                    >
-                      <ChevronRight size={16} />
-                    </button>
-                  </div>
-                )} */}
                 <button
                   className="absolute top-0 right-0 mt-2 mr-6 px-3 py-2 rounded border hover:bg-gray-100 dark:hover:bg-neutral-800 cursor-pointer z-10"
                   onClick={onClose}
@@ -678,23 +647,6 @@ export default function WeaknessesModal({
                     There are no weaknesses to show for the selected version or
                     frame. Try switching to another version.
                   </p>
-
-                  {/* <div className="flex gap-2 mt-2">
-                    <button
-                      onClick={() =>
-                        onRecheck?.({ frameId: expanded ?? undefined })
-                      }
-                      className="px-3 py-1 rounded border bg-white hover:bg-gray-50 dark:bg-neutral-900 dark:hover:bg-neutral-800"
-                    >
-                      Re-check
-                    </button>
-                    <button
-                      onClick={onClose}
-                      className="px-3 py-1 rounded border hover:bg-gray-50 dark:hover:bg-neutral-900/40"
-                    >
-                      Close
-                    </button>
-                  </div> */}
                 </div>
               ) : (
                 groups
@@ -720,18 +672,7 @@ export default function WeaknessesModal({
                         aria-labelledby={`frame-${g.id}-title`}
                       >
                         <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-4  flex-1 min-w-0">
-                            {g.thumbnail ? (
-                              <Image
-                                src={g.thumbnail}
-                                alt={`frame-${g.id}`}
-                                width={96}
-                                height={64}
-                                className="rounded object-cover"
-                              />
-                            ) : (
-                              <div className="w-24 h-16 bg-neutral-100 dark:bg-neutral-800 rounded" />
-                            )}
+                          <div className="flex items-center gap-4 flex-1 min-w-0">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between w-full">
                                 <h3
@@ -742,7 +683,7 @@ export default function WeaknessesModal({
                                 </h3>
 
                                 {/* Pagination (right-most) */}
-                                <div className="flex items-center gap-3 ml-auto">
+                                <div className="flex items-center gap-2 ml-auto">
                                   <div className="flex items-center gap-3 px-2 py-1 rounded-md border bg-white/60 dark:bg-neutral-900/40 shadow-sm">
                                     <button
                                       onClick={goPrev}
@@ -756,7 +697,6 @@ export default function WeaknessesModal({
                                     >
                                       <ChevronLeft size={20} />
                                     </button>
-
                                     {/* compact status with SVG ring */}
                                     <div className="flex items-center gap-2 px-2">
                                       <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-white/70 dark:bg-neutral-900/40 border shadow-sm">
@@ -796,317 +736,119 @@ export default function WeaknessesModal({
                                 >
                                   {/* {pending.length} pending */}
                                 </span>
-
-                                <span className="text-slate-400 dark:text-slate-500">
-                                  {/* <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-[#ECFDF5] text-[#059669] dark:bg-[#064E3B]/30">
-                                    {resolved.length} resolved
-                                  </span> */}
-                                </span>
-                                {/* optional: show version */}
-                                {/* <span className="ml-auto font-mono text-xs">{groupVersion}</span> */}
+                                <span className="text-slate-400 dark:text-slate-500"></span>
                               </p>
                             </div>
                           </div>
-
-                          {/* <div className="text-sm text-slate-500 dark:text-slate-400 font-mono">
-                          <button
-                            onClick={() =>
-                              setExpanded(g.id === expanded ? null : g.id)
-                            }
-                            className="px-2 py-1 rounded border hover:bg-gray-50 dark:hover:bg-neutral-900/40"
-                          >
-                            {expanded === g.id ? "Collapse" : "Expand"}
-                          </button>
-                        </div> */}
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                          {/* Pending */}
-
-                          {/* Pending (stylized header + body) */}
+                        <div className="grid grid-cols-2 items-start">
                           <div>
-                            <div
-                              className="flex items-center justify-between mb-3 p-3 rounded-md bg-gradient-to-r from-white/70 to-slate-50 dark:from-neutral-900/60 dark:to-neutral-900/40 border border-slate-200 dark:border-neutral-800"
-                              aria-hidden
-                            >
-                              <div className="flex items-center gap-3">
-                                {/* <div className="w-9 h-9 rounded-full bg-[#FEF3F2] dark:bg-[#4B1F1F]/30 flex items-center justify-center">
-                                <AlertTriangle
-                                  size={18}
-                                  className="text-[#E11D48]"
-                                />
-                              </div> */}
-                                <div>
-                                  <div className="text-sm font-semibold">
-                                    Issues
-                                  </div>
-                                  <div className="text-xs text-slate-500 dark:text-slate-400">
-                                    Issues that needed to be resolved.
-                                  </div>
+                            {/* Left: Thumbnail Column */}
+                            <div className="flex flex-col items-center justify-center gap-3">
+                              {g.thumbnail ? (
+                                <div className="w-full flex items-center justify-center">
+                                  <Image
+                                    src={g.thumbnail}
+                                    alt={`Frame ${headerLabel}`}
+                                    width={420}
+                                    height={240}
+                                    className="rounded-lg object-cover border border-slate-200 dark:border-neutral-800 shadow-sm"
+                                  />
                                 </div>
-                              </div>
-                              {/* <div className="flex items-center gap-2">
-                              <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
-                                {pending.length} issues
-                                {pending.length !== 1 ? "s" : ""}
-                              </span>
-                              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-[#FFEDD5] text-[#92400E] dark:bg-[#3F2B0D]/20">
-                                {pending.length === 0
-                                  ? "All Clear"
-                                  : pending.length >= 5
-                                  ? "High"
-                                  : pending.length >= 2
-                                  ? "Medium"
-                                  : "Low"}
-                              </span>
-                            </div> */}
-                            </div>
-
-                            <div className="space-y-3">
-                              {pending.length === 0 && (
-                                <div
-                                  role="status"
-                                  aria-live="polite"
-                                  className="flex items-center gap-3 p-4 rounded-md border border-slate-200 dark:border-neutral-800 bg-white/60 dark:bg-black/20"
-                                >
-                                  <div className="flex-shrink-0">
-                                    <div className="flex-shrink-0">
-                                      <div className="w-14 h-14 relative flex items-center justify-center">
-                                        {/* subtle green background + inner glow */}
-                                        <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#ECFDF5] to-[#BBF7D0] dark:from-[#064E3B]/30 dark:to-transparent shadow-inner" />
-                                        {/* greener check */}
-                                        <Check
-                                          size={22}
-                                          className="relative text-[#059669] drop-shadow-sm"
-                                        />
-                                        {/* decorative sparkles */}
-                                        <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[#86efac] opacity-95 animate-pulse" />
-                                        <span className="absolute top-0 left-3 w-1.5 h-1.5 rounded-full bg-[#bbf7d0] opacity-80 animate-ping" />
-                                        <span className="absolute bottom-0.5 -left-1 w-1.5 h-1.5 rounded-full bg-[#bbf7d0] opacity-85 animate-pulse" />
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="min-w-0">
-                                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                                      No pending issues
-                                    </div>
-                                    <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                                      Everything in this frame looks good — nice
-                                      work.
-                                    </div>
+                              ) : (
+                                <div className="w-full h-48 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center border border-slate-200 dark:border-neutral-700">
+                                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                                    No preview available
                                   </div>
                                 </div>
                               )}
-
-                              {pending.map((w) => {
-                                const key = stableId(w);
-                                const sev = (
-                                  w.impactLevel ?? "medium"
-                                ).toLowerCase();
-                                return (
-                                  <article
-                                    key={key}
-                                    className="p-3 rounded-lg border dark:border-neutral-800 bg-white/60 dark:bg-black/10 flex items-start gap-3"
-                                  >
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-start justify-between gap-3">
-                                        <div>
-                                          <div className="text-sm font-semibold">
-                                            {w.element ?? "Issue"}
-                                          </div>
-                                          <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                                            {w.description}
-                                          </div>
-                                        </div>
-                                        <div className="text-right ml-2">
-                                          <div className="mt-2">
-                                            <button
-                                              onClick={() =>
-                                                toggleResolved(key)
-                                              }
-                                              className="px-2 py-1 text-xs rounded border hover:bg-gray-100 dark:hover:bg-neutral-800"
-                                            >
-                                              Mark resolved
-                                            </button>
-                                          </div>
-                                        </div>
-                                      </div>
-                                      <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                                        <strong>What to do:</strong>{" "}
-                                        {w.suggestion ??
-                                          "Provide a clear label, reduce steps, and improve affordance for this control."}
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <span
-                                        className={`px-2 py-1 rounded-full text-xs font-semibold uppercase ${
-                                          sev === "high"
-                                            ? "bg-[#FF0000]/10 text-[#E11D48]"
-                                            : sev === "medium"
-                                            ? "bg-[#F59E0B]/10 text-[#F59E0B]"
-                                            : "bg-[#10B981]/10 text-[#10B981]"
-                                        }`}
-                                      >
-                                        {w.impactLevel ?? "medium"}
-                                      </span>
-                                    </div>
-                                  </article>
-                                );
-                              })}
                             </div>
                           </div>
 
-                          {/* Resolved (stylized header + body) */}
-                          <div>
-                            <div
-                              className="flex items-center justify-between mb-3 p-3 rounded-md bg-gradient-to-r from-white/70 to-slate-50 dark:from-neutral-900/60 dark:to-neutral-900/40 border border-slate-200 dark:border-neutral-800"
-                              aria-hidden
-                            >
-                              <div className="flex items-center gap-3">
-                                <div>
-                                  <div className="text-sm font-semibold">
-                                    Resolved
-                                  </div>
-                                  <div className="text-xs text-slate-500 dark:text-slate-400">
-                                    Issues you resolved.
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-2">
-                                {/* <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
-                                {resolved.length} item
-                                {resolved.length !== 1 ? "s" : ""}
-                              </span> */}
-
-                                {/* <button
-                                onClick={() =>
-                                  revertFixesForFrame(
-                                    g.id,
-                                    g.items.filter((w) =>
-                                      resolvedIds.has(stableId(w))
-                                    )
-                                  )
-                                }
-                                disabled={resolving || resolved.length === 0}
-                                className={`px-3 py-1 rounded border text-sm font-medium ${
-                                  resolved.length === 0
-                                    ? "opacity-60 cursor-not-allowed"
-                                    : "hover:bg-gray-50 dark:hover:bg-neutral-900/40"
-                                }`}
-                                title={
-                                  resolved.length === 0
-                                    ? "No resolved items to re-open"
-                                    : "Re-open all resolved items"
-                                }
+                          {/* Right: Issues Column (stylized header + body) */}
+                          <div className="space-y-3">
+                            {pending.length === 0 && (
+                              <div
+                                role="status"
+                                aria-live="polite"
+                                className="flex items-center gap-3 p-4 rounded-md border border-slate-200 dark:border-neutral-800 bg-white/60 dark:bg-black/20"
                               >
-                                {resolving ? "Working…" : "Re-open all"}
-                              </button>
-
-                              <button
-                                onClick={() => onRecheck?.({ frameId: g.id })}
-                                disabled={resolving}
-                                className="px-3 py-1 rounded border text-sm hover:bg-gray-50 dark:hover:bg-neutral-900/40"
-                              >
-                                Re-check frame
-                              </button> */}
-                              </div>
-                            </div>
-
-                            <div className="space-y-3">
-                              {resolved.length === 0 && (
-                                <div
-                                  role="status"
-                                  aria-live="polite"
-                                  className="flex items-center gap-4 p-6 rounded-lg border border-slate-200 dark:border-neutral-800 bg-white/60 dark:bg-black/20"
-                                >
+                                <div className="flex-shrink-0">
                                   <div className="flex-shrink-0">
                                     <div className="w-14 h-14 relative flex items-center justify-center">
-                                      {/* warmer yellow gradient + subtle ring for emphasis */}
-                                      <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#fff7cc] to-[#fff1a8] dark:from-[#4a2b00] dark:to-transparent shadow-inner ring-1 ring-yellow-100/40" />
-                                      {/* yellow lightbulb accent */}
-                                      <Lightbulb
+                                      {/* subtle green background + inner glow */}
+                                      <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#ECFDF5] to-[#BBF7D0] dark:from-[#064E3B]/30 dark:to-transparent shadow-inner" />
+                                      {/* greener check */}
+                                      <Check
                                         size={22}
-                                        className="relative text-amber-500 drop-shadow-lg"
+                                        className="relative text-[#059669] drop-shadow-sm"
                                       />
-                                      {/* yellow sparkles */}
-                                      <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[#ffd54f] opacity-95 animate-pulse" />
-                                      <span className="absolute top-0 left-3 w-1.5 h-1.5 rounded-full bg-[#fff59d] opacity-80 animate-ping" />
-                                      <span className="absolute bottom-0.5 -left-1 w-1.5 h-1.5 rounded-full bg-[#fff176] opacity-85 animate-pulse" />
-                                    </div>
-                                  </div>
-
-                                  <div className="min-w-0">
-                                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                                      Nothing has been resolved yet
-                                    </div>
-                                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                      No items in this frame are marked as
-                                      resolved. Mark issues as resolved when
-                                      fixed, or run a re-check.
+                                      {/* decorative sparkles */}
+                                      <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[#86efac] opacity-95 animate-pulse" />
+                                      <span className="absolute top-0 left-3 w-1.5 h-1.5 rounded-full bg-[#bbf7d0] opacity-80 animate-ping" />
+                                      <span className="absolute bottom-0.5 -left-1 w-1.5 h-1.5 rounded-full bg-[#bbf7d0] opacity-85 animate-pulse" />
                                     </div>
                                   </div>
                                 </div>
-                              )}
-                              {resolved.map((w) => {
-                                const key = stableId(w);
-                                const sev = (
-                                  w.impactLevel ?? "medium"
-                                ).toLowerCase();
-                                return (
-                                  <article
-                                    key={key}
-                                    className="p-3 rounded-lg border dark:border-neutral-800 bg-white/30 dark:bg-black/5 flex items-start gap-3 opacity-80"
-                                  >
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-start justify-between gap-3">
-                                        <div>
-                                          <div className="text-sm font-semiboldi">
-                                            {w.element ?? "Issue"}
-                                          </div>
-                                          <div className="text-xs text-slate-600 dark:text-slate-400 mt-1 ">
-                                            {w.description}
-                                          </div>
-                                        </div>
-                                        <div className="text-right ml-2">
-                                          <div>
-                                            <span className="px-2 py-1 rounded-full text-xs font-semibold uppercase flex items-center gap-2 bg-[#10B981]/10 text-[#10B981] dark:bg-[#10B981]/20">
-                                              <Check
-                                                size={14}
-                                                className="inline-block"
-                                              />
-                                              Resolved
-                                            </span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                      <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                                        <strong>What was suggested:</strong>{" "}
-                                        {w.suggestion ??
-                                          "No suggestion recorded."}
-                                      </div>
 
-                                      {/* moved severity badge below the suggestion */}
-                                      <div className="mt-2">
-                                        <span
-                                          className={`px-2 py-1 rounded-full text-xs font-semibold uppercase ${
-                                            sev === "high"
-                                              ? "bg-[#FF0000]/10 text-[#E11D48]"
-                                              : sev === "medium"
-                                              ? "bg-[#F59E0B]/10 text-[#F59E0B]"
-                                              : "bg-[#10B981]/10 text-[#10B981]"
-                                          }`}
-                                        >
-                                          {w.impactLevel ?? "medium"}
-                                        </span>
+                                <div className="min-w-0">
+                                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                    No pending issues
+                                  </div>
+                                  <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                                    Everything in this frame looks good — nice
+                                    work.
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {pending.map((w) => {
+                              const key = stableId(w);
+                              const sev = (
+                                w.impactLevel ?? "medium"
+                              ).toLowerCase();
+                              return (
+                                <article
+                                  key={key}
+                                  className="p-3 rounded-lg border dark:border-neutral-800 bg-white/60 dark:bg-black/10 flex items-start gap-3"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div>
+                                        <div className="text-base font-semibold">
+                                          {w.element ?? "Issue"}
+                                        </div>
+                                        <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                                          {w.description}
+                                        </div>
+                                      </div>
+                                      <div className="text-right ml-2">
                                       </div>
                                     </div>
-                                    {/* right column removed (badge moved above) */}
-                                  </article>
-                                );
-                              })}
-                            </div>
+                                    <div className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                                      <strong>Suggestion:</strong>{" "}
+                                      {w.suggestion ??
+                                        "Provide a clear label, reduce steps, and improve affordance for this control."}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <span
+                                      className={`px-2 py-1 rounded-full text-xs font-semibold uppercase ${
+                                        sev === "high"
+                                          ? "bg-[#FF0000]/10 text-[#E11D48]"
+                                          : sev === "medium"
+                                          ? "bg-[#F59E0B]/10 text-[#F59E0B]"
+                                          : "bg-[#10B981]/10 text-[#10B981]"
+                                      }`}
+                                    >
+                                      {w.impactLevel ?? "medium"}
+                                    </span>
+                                  </div>
+                                </article>
+                              );
+                            })}
                           </div>
                         </div>
                       </section>

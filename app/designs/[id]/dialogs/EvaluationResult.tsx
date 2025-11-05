@@ -184,6 +184,37 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
           </div>
         )}
 
+      {/* Weakness Suggestions */}
+      {Array.isArray(evalResult.ai?.weakness_suggestions) &&
+        evalResult.ai.weakness_suggestions.length > 0 && (
+          <div className="p-5 rounded-2xl bg-[#F97316]/10 dark:bg-[#FB923C]/10 mb-5 shadow-md">
+            <h3 className="font-bold mb-3 text-[#F97316] dark:text-[#FB923C] text-lg flex items-center gap-2">
+              <span className="text-xl">🛠️</span>
+              Suggestions
+            </h3>
+            <ul className="flex flex-col gap-3">
+              {evalResult.ai.weakness_suggestions.map((s: any, i: number) => (
+                <li
+                  key={`${s.element}-${i}`}
+                  className="flex flex-col gap-2 bg-white/90 dark:bg-[#232323]/90 rounded-lg p-4 shadow-sm"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold text-neutral-700 dark:text-neutral-200">
+                      {s.element}
+                    </span>
+                    {/* <span className="ml-auto px-3 py-1 rounded-full text-xs font-semibold uppercase bg-[#F97316]/10 dark:bg-[#FB923C]/5 text-[#F97316] dark:text-[#FB923C]">
+                      {s.priority}
+                    </span> */}
+                  </div>
+                  <div className="text-neutral-700 dark:text-neutral-200 leading-6">
+                    {s.suggestion}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
       {/* Issues */}
       {Array.isArray(currentFrame?.ai_data?.issues) &&
         currentFrame.ai_data.issues.length > 0 && (
@@ -585,11 +616,11 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
                     <span className="font-bold text-[#0D9488] dark:text-[#2DD4BF] tracking-wide">
                       {resource.title}
                     </span>
-                    {resource.issue_id && (
+                    {/* {resource.issue_id && (
                       <span className="ml-auto px-5 py-2 rounded-full text-xs font-semibold uppercase bg-[#0D9488]/10 dark:bg-[#2DD4BF]/5 text-[#0D9488] dark:text-[#2DD4BF]">
                         Issue: {resource.issue_id}
                       </span>
-                    )}
+                    )} */}
                   </div>
                   {issue && (
                     <div className="text-xs text-neutral-600 dark:text-neutral-400 mb-1">

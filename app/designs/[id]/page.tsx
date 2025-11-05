@@ -68,6 +68,7 @@ interface FrameEvaluation {
 export type Snapshot = {
   age: string;
   occupation: string;
+  iteration?: number;
 };
 
 export type HeuristicBreakdownItem = {
@@ -77,7 +78,7 @@ export type HeuristicBreakdownItem = {
   max_points: number;
   justification?: string;
   evaluation_focus?: string;
-}
+};
 
 export type Versions = {
   id: string;
@@ -155,6 +156,11 @@ export type EvalResponse = {
       severity: string;
       message: string;
       suggestions: string;
+    }[];
+    weakness_suggestions?: {
+      element: string;
+      suggestion: string;
+      priority: "low" | "medium" | "high";
     }[];
     category_scores?: Record<string, number>;
     category_score_justifications?: Record<string, string>;
@@ -1803,11 +1809,11 @@ export default function DesignDetailPage({
   }, [loadingEval]);
 
   useEffect(() => {
-  if (!design?.id) return;
-  fetchDesignVersions(design.id)
-    .then((versions) => setAllVersions(versions))
-    .catch((e) => console.error("Failed to fetch versions", e));
-}, [design?.id]);
+    if (!design?.id) return;
+    fetchDesignVersions(design.id)
+      .then((versions) => setAllVersions(versions))
+      .catch((e) => console.error("Failed to fetch versions", e));
+  }, [design?.id]);
 
   if (designLoading)
     return (
@@ -1881,7 +1887,6 @@ export default function DesignDetailPage({
               weaknesses={weaknesses}
               loadingWeaknesses={loadingWeaknesses}
               allVersions={allVersions}
-              
             />
           )}
         </div>
