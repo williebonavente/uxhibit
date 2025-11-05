@@ -144,6 +144,7 @@ export async function handleEvalParamsSubmit(
   console.log("[handleEvalParamsSubmit] Closing modal and starting evaluation");
   setShowEvalParams(false);
 
+  // This is the new change
   // Build a params-derived fallback snapshot
   let latestSnapshot: SnapshotWithIteration = {
     age:
@@ -153,7 +154,7 @@ export async function handleEvalParamsSubmit(
     occupation:
       typeof (params as any).occupation === "string"
         ? (params as any).occupation
-        : "",
+        : "", 
   };
 
   try {
