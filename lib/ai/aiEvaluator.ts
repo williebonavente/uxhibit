@@ -16,6 +16,7 @@ import {
 import { userScenarioMap } from "./prompts/context/userScenario";
 import { businessGoalsMap } from "./prompts/context/businessGoals";
 import { getAccessibilityRequirements } from "./prompts/context/accessibilityRequirements";
+import { Item } from "@radix-ui/react-select";
 // import { frameTypeDescriptions } from "./prompts/context/frameTypeDescription";
 
 export type AiEvaluator = {
@@ -41,6 +42,19 @@ export type AiEvaluator = {
     layout?: number;
     hierarchy?: number;
     usability?: number;
+  };
+  // Debug calculation info (optional)
+  debug_calc?: {
+    heuristics_avg: number;
+    categories_avg: number;
+    combined: number;
+    target: number;
+    alpha: number; // 0.35
+    blended: number; // alpha-blended value before extra pull
+    extra_pull_applied: boolean;
+    final: number; // final overall after all adjustments
+    iteration: number;
+    total_iterations: number;
   };
 };
 
@@ -165,7 +179,6 @@ export async function aiEvaluator(
 
   function normalizeForIteration(parsed: AiEvaluator): AiEvaluator {
     const tgtRaw = targetRawForIteration(iteration, totalIterations);
-
     const categories = [
       "accessibility",
       "typography",
@@ -175,7 +188,6 @@ export async function aiEvaluator(
       "usability",
     ] as const;
 
-    // Deviation narrows as we approach the final iteration (6 → 2)
     const t =
       totalIterations > 1
         ? (Math.max(1, Math.min(iteration, totalIterations)) - 1) /
@@ -184,7 +196,6 @@ export async function aiEvaluator(
     const dev = Math.max(2, Math.round(6 + (2 - 6) * t));
     const minFinal = 95;
 
-    // Include a per-run seed so different versions aren’t identical
     const runSeed = String(
       (snapshot as any)?.versionId ?? (snapshot as any)?.jobId ?? ""
     );
@@ -202,19 +213,18 @@ export async function aiEvaluator(
       category_scores: { ...(parsed.category_scores ?? {}) },
     };
 
-    // Build category scores with deterministic jitter + small heuristic nudge
     const catScores: number[] = [];
     const weights: number[] = [];
     for (const c of categories) {
       const seed = `${seedBase}|${c}`;
-      const n = noise(seed, dev); // ±dev
+      const n = noise(seed, dev);
       const h = Number.isFinite(heuristics?.[c as keyof typeof heuristics])
-        ? (Number((heuristics as any)[c]) - 50) / 50 // [-1, +1]
+        ? (Number((heuristics as any)[c]) - 50) / 50
         : 0;
       const hAdj = h * Math.min(3, dev / 2);
 
       let cat = tgtRaw + n + hAdj;
-      if (iteration >= totalIterations) cat = Math.max(minFinal, cat); // keep very high at final
+      if (iteration >= totalIterations) cat = Math.max(minFinal, cat);
       const catRounded = clamp(Math.round(cat), 0, 100);
       (next.category_scores as any)[c] = catRounded;
 
@@ -225,22 +235,7 @@ export async function aiEvaluator(
       weights.push(w);
     }
 
-    // Derive overall from categories, then pull toward the target
-    const wSum = weights.reduce((a, b) => a + b, 0) || 1;
-    const overallFromCats = Math.round(
-      catScores.reduce((sum, v, i) => sum + v * weights[i], 0) / wSum
-    );
-
-    let overall = overallFromCats;
-    if (iteration < totalIterations) {
-      const alpha = 0.35; // 35% pull toward target keeps it progressive but not fake-static
-      overall = Math.round((1 - alpha) * overallFromCats + alpha * tgtRaw);
-    } else {
-      overall = 100; // perfect at final iteration
-    }
-
-    next.overall_score = clamp(overall, 0, 100);
-
+    // Do NOT set overall_score here; reconciliation will finalize it.
     if (iteration >= totalIterations) {
       next.weaknesses = [];
       next.weakness_suggestions = [];
@@ -249,35 +244,203 @@ export async function aiEvaluator(
     return next;
   }
 
+  function computeOverallFromCategories(cat: Record<string, number>): number {
+    const vals = Object.values(cat).filter((v) => Number.isFinite(v));
+    if (!vals.length) return 0;
+    return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+  }
+
+  // Map Nielsen heuristic code, coarse category buckets (tune as needed)
+
+  const heuristicToCategory: Record<
+    string,
+    keyof AiEvaluator["category_scores"]
+  > = {
+    H1: "accessibility",
+    H9: "accessibility",
+    H2: "usability",
+    H4: "usability",
+    H5: "usability",
+    H7: "usability",
+    H8: "usability",
+    H3: "layout",
+    H6: "layout",
+    H10: "hierarchy",
+  };
+
+  function aggregateCategoriesFromHeuristics(
+    breakdown: any[]
+  ): Record<string, number> {
+    const acc: Record<string, { sum: number; count: number }> = {};
+    for (const item of breakdown) {
+      if (
+        !item ||
+        typeof item.score !== "number" ||
+        typeof item.max_points !== "number" ||
+        !item.code
+      )
+        continue;
+      const cat = heuristicToCategory[item.code];
+      if (!cat) continue;
+      const pct =
+        (Math.max(0, Math.min(item.score, item.max_points)) / item.max_points) *
+        100;
+      if (!acc[cat]) acc[cat] = { sum: 0, count: 0 };
+      acc[cat].sum += pct;
+      acc[cat].count += 1;
+    }
+    const out: Record<string, number> = {};
+    for (const k of Object.keys(acc)) {
+      out[k] = Math.round(acc[k].sum / acc[k].count);
+    }
+    return out;
+  }
+
+  function computeOverallFromHeuristics(breakdown: any[]): number {
+    let total = 0;
+    let count = 0;
+    for (const item of breakdown) {
+      if (
+        item &&
+        typeof item.score === "number" &&
+        typeof item.max_points === "number" &&
+        item.max_points > 0
+      ) {
+        total +=
+          (Math.max(0, Math.min(item.score, item.max_points)) /
+            item.max_points) *
+          100;
+        count++;
+      }
+    }
+    return count ? Math.round(total / count) : 0;
+  }
+
+  /**
+   * Reconcile: ensure heurisitc_breakdown, category_scores, and overall_score align.
+   * Priority:
+   * 1. If heuristic_breakdown present, derive categories (if missing of very off).
+   * 2. Derive overall from categories & heuristics; blend toward iteration progression target.
+   *
+   */
+
+  function reconcileScores(
+    candidate: AiEvaluator,
+    iteration: number,
+    totalIterations: number
+  ): AiEvaluator {
+    const out: AiEvaluator = { ...candidate };
+
+    const breakdown = (candidate as any).heuristic_breakdown;
+    const hasBreakdown = Array.isArray(breakdown) && breakdown.length > 0;
+
+    if (hasBreakdown) {
+      // Normalize scores (clamp) + ensure numeric
+      for (const item of breakdown) {
+        if (typeof item.max_points !== "number" || item.max_points <= 0) {
+          item.max_points = 4;
+        }
+        if (typeof item.score !== "number") {
+          item.score = Math.round(
+            (targetRawForIteration(iteration, totalIterations) / 100) *
+              item.max_points
+          );
+        }
+        item.score = Math.max(
+          0,
+          Math.min(item.max_points, Math.round(item.score))
+        );
+      }
+
+      // Derive categories from breakdown
+      const derivedCats = aggregateCategoriesFromHeuristics(breakdown);
+
+      // Merge/replace when existing category differs > 12 points
+      out.category_scores = { ...(out.category_scores || {}) };
+      for (const [k, v] of Object.entries(derivedCats)) {
+        const existing = (out.category_scores as any)[k];
+        if (
+          !Number.isFinite(existing) ||
+          Math.abs(existing - v) > 12 // threshold
+        ) {
+          (out.category_scores as any)[k] = v;
+        }
+      }
+
+      // Derive overall from heuristics & categories (average of both)
+      const overallFromHeuristics = computeOverallFromHeuristics(breakdown);
+      const overallFromCats = computeOverallFromCategories(
+        out.category_scores as any
+      );
+      const combined = Math.round(
+        (overallFromHeuristics + overallFromCats) / 2
+      );
+
+      // Progression target
+      const target = targetRawForIteration(iteration, totalIterations);
+
+      const alpha = 0.35;
+      const blended =
+        iteration >= totalIterations
+          ? 100
+          : Math.round((1 - alpha) * combined + alpha * target);
+
+      // Blend combined with target (progression) except at final (force 100)
+      let finalOverall = iteration >= totalIterations ? 100 : blended;
+      let extraPullApplied = false;
+
+      // If still off by >15 from target early on, pull a bit more
+      if (iteration < totalIterations && Math.abs(finalOverall - target) > 15) {
+        finalOverall = Math.round((finalOverall + target) / 2);
+        extraPullApplied = true;
+      }
+
+      out.overall_score = clamp(finalOverall, 0, 100);
+      out.debug_calc = {
+        heuristics_avg: overallFromHeuristics,
+        categories_avg: overallFromCats,
+        combined,
+        target,
+        alpha,
+        blended,
+        extra_pull_applied: extraPullApplied,
+        final: out.overall_score,
+        iteration,
+        total_iterations: totalIterations,
+      };
+    } else {
+      // No breakdown: fall back to categories → overall
+      if (!out.category_scores) out.category_scores = {};
+      out.overall_score = computeOverallFromCategories(
+        out.category_scores as any
+      );
+    }
+
+    return out;
+  }
+
   const prompt = `
-      Instructions:
-        This is iteration ${iteration} of ${totalIterations}. You must follow:
-    - All numeric scores you output MUST be between 0 and 100.
+  Instructions:
+  This is iteration ${iteration} of ${totalIterations}. You must follow:
+  - All numeric scores between 0 and 100.
+  - Aim scores near the current iteration target ≈ ${targetRawForIteration(
+    iteration,
+    totalIterations
+  )}.
+  - Final iteration (${totalIterations}) = 100 (perfect). No weaknesses or resources then.
+  - Heuristic breakdown MUST numerically justify category_scores and overall_score (they must be consistent).
+  - Do NOT reuse a canned heuristic_breakdown; generate it from the supplied context.
 
-        - Aim scores near the current iteration target: approximately ${targetRawForIteration(
-          iteration,
-          totalIterations
-        )}.
-    - The final iteration (${totalIterations}) should be 100 (perfect)
-
-    - Ensure scores correspond with the heuristic breakdown.
-    - If iteration = ${totalIterations} (final), the design is perfect; do not include weaknesses or resources.
-    
-    Panel-ready guidance:
-    - Audience: a UX review panel. Be concise, professional, and assertive.
-    - Cite concrete evidence from the layout/accessibility/text data when justifying scores.
-    - Keep summary to 2-4 sentences. Avoid hedging language.
-    - If iteration < 3, include specific, actionable weaknesses with suggestions. If iteration = 3, omit them.
-
-    Persona context:
-    - Generation: ${generation ?? "N/A"}
-    - Occupation: ${occupation ?? "N/A"}
-    
-    Output requirements:
-    - The summary MUST begin with: "For a ${generation ?? "N/A"} ${
+Panel-ready guidance:
+  - Concise, professional, evidence-based.
+  - Each justification references persona or concrete UI evidence.
+  - Summary 2-4 sentences, starts with: "For a ${generation ?? "N/A"} ${
     occupation ?? "N/A"
   },".
-    - Each category_score_justification MUST reference at least one persona attribute (generation or occupation).
+
+Persona:
+  - Generation: ${generation ?? "N/A"}
+  - Occupation: ${occupation ?? "N/A"}     
 
     
     Return ONLY valid JSON:
@@ -326,86 +489,14 @@ export async function aiEvaluator(
       },
       "heuristic_breakdown": [
       {
-      "principle": "Visibility of system status",
-      "code": "H1",
-      "max_points": 4,
-      "score": 4,
-      "evaluation_focus": "Clear labels, status indicators, and feedback",
-      "justification": "Navigation and feedback messages are clear and timely."
-      },
-      {
-      "principle": "Match between system and real world",
-      "code": "H2",
-      "max_points": 4,
-      "score": 4,
-      "evaluation_focus": "Natural, user-centered language",
-      "justification": "Terminology matches user expectations."
-    },
-    {
-      "principle": "Consistency & standards",
-      "code": "H3",
-      "max_points": 4,
-      "score": 4,
-      "evaluation_focus": "Uniform typography, spacing, and button style",
-      "justification": "Consistent design patterns throughout."
-    },
-    {
-      "principle": "Error prevention",
-      "code": "H4",
-      "max_points": 4,
-      "score": 3,
-      "evaluation_focus": "Field clarity, warning messages",
-      "justification": "Some forms lack inline error prevention."
-    },
-    {
-      "principle": "Recognition rather than recall",
-      "code": "H5",
-      "max_points": 4,
-      "score": 4,
-      "evaluation_focus": "Visible affordances, icons, tooltips",
-      "justification": "Icons and tooltips are present and helpful."
-    },
-    {
-      "principle": "Minimalist design",
-      "code": "H6",
-      "max_points": 4,
-      "score": 4,
-      "evaluation_focus": "Simplicity, removal of unnecessary clutter",
-      "justification": "Interface is clean and uncluttered."
-    },
-    {
-      "principle": "Flexibility & efficiency of use",
-      "code": "H7",
-      "max_points": 4,
-      "score": 4,
-      "evaluation_focus": "Support for shortcuts, focus states",
-      "justification": "Keyboard shortcuts and focus states are implemented."
-    },
-    {
-      "principle": "Help users recognize, diagnose, recover from errors",
-      "code": "H8",
-      "max_points": 4,
-      "score": 3,
-      "evaluation_focus": "Error feedback and correction hints",
-      "justification": "Error messages are present but could be more descriptive."
-    },
-    {
-      "principle": "Help and documentation",
-      "code": "H9",
-      "max_points": 4,
-      "score": 2,
-      "evaluation_focus": "Support content or onboarding guides",
-      "justification": "Minimal help content provided."
-    },
-    {
-      "principle": "Aesthetic and visual hierarchy",
-      "code": "H10",
-      "max_points": 4,
-      "score": 4,
-      "evaluation_focus": "Visual hierarchy, typography contrast",
-      "justification": "Strong use of headings and color contrast."
-    }
-  ],
+        "principle": string,
+        "code": "H1"|"H2"|"H3"|"H4"|"H5"|"H6"|"H7"|"H8"|"H9"|"H10",
+        "max_points": 4,
+        "score": number (0-4),
+        "evaluation_focus": string,
+        "justification": string
+      }
+    ],
       "resources": [
         {
           "issue_id": string,
@@ -415,6 +506,10 @@ export async function aiEvaluator(
         }
       ]
     }
+      Constraints:
+      - Heuristic scores (score/max_points) when converted to percentages must logically support category_scores and overall_score.
+      - If iteration < ${totalIterations}, include weaknesses & suggestions with impact/priority.
+      - If iteration = ${totalIterations}, omit weaknesses & suggestions.
     \`\`\`
     - For strengths and weaknesses, provide an array of objects with element, description, relatedHeuristic, and impactLevel.
     - Avoid generic feedback. Always reference the actual issues, persona parameters, scores, and text node provided.
@@ -461,8 +556,6 @@ export async function aiEvaluator(
       .trim();
 
     try {
-      // PULLBACK IF BUGGED
-      //   return JSON.parse(cleaned) as AiEvaluator;
       const parsed = JSON.parse(cleaned) as AiEvaluator;
 
       function looksStatic(resp: AiEvaluator) {
@@ -500,7 +593,6 @@ export async function aiEvaluator(
 
       let candidate: AiEvaluator = parsed;
       if (parsed && looksStatic(parsed)) {
-        // Do not merge computed numeric scores; iteration will control them.
         candidate = {
           ...parsed,
         };
@@ -512,9 +604,27 @@ export async function aiEvaluator(
         generation,
         occupation
       );
-      // Enforce iteration-controlled display band and final-stage behavior
-      const normalized = normalizeForIteration(candidate);
-      return normalized as AiEvaluator;
+
+      candidate = reconcileScores(candidate, iteration, totalIterations);
+      const progressed = normalizeForIteration(candidate);
+
+      // After progression, keep overall_score from reconcile (unless final iteration).
+      if (iteration >= totalIterations) {
+        progressed.overall_score = 100;
+      } else {
+        // Recompute overall again from reconciled categories for safety
+        const chkOverall = computeOverallFromCategories(
+          progressed.category_scores as any
+        );
+        // Blend lightly so overall stays aligned with categories (avoid mismatch)
+        progressed.overall_score = Math.round(
+          0.7 * progressed.overall_score + 0.3 * chkOverall
+        );
+      }
+      if (progressed.debug_calc) {
+        progressed.debug_calc.final = progressed.overall_score;
+      }
+      return progressed as AiEvaluator;
 
       // return parsed as AiEvaluator;
     } catch {

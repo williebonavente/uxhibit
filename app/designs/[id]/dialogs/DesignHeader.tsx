@@ -9,7 +9,7 @@ import {
   IconSend,
   IconAlertTriangle,
 } from "@tabler/icons-react";
-import { BarChart2, Menu, MessageSquare } from "lucide-react";
+import { BarChart2, Cpu, Menu, MessageSquare } from "lucide-react";
 import CommentModal from "./CommentModal";
 import { Comment } from "@/components/comments-user";
 import { Design, Versions } from "../page";
@@ -17,6 +17,7 @@ import PublishConfirmModal from "./PublishConfirmModal";
 import ImprovementGraphs from "./ImprovementGraphs";
 import WeaknessesModal, { IWeakness } from "./WeaknessesModal";
 import { flushSync } from "react-dom";
+import ComputationalBreakdown from "./ComputationalBreakdownModal";
 // import { useRouter } from "next/router";
 
 interface DesignHeaderActionsProps {
@@ -88,6 +89,20 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
   //   const [weaknesses, setWeaknesses] = useState<any[]>([]);
   //   const [loadingWeaknesses, setLoadingWeaknesses] = useState(false);
   const [showWeaknesses, setShowWeaknesses] = useState(false);
+  const [showComputationalBreakdown, setShowComputationalBreakdown] =
+    useState(false);
+  const [loadingBreakdown, setLoadingBreakdown] = useState(false);
+  const [breakdownFrames, setBreakdownFrames] = useState<
+    {
+      id: string;
+      name?: string;
+      ai?: {
+        overall_score?: number;
+        category_scores?: any;
+        heuristic_breakdown?: any[];
+      };
+    }[]
+  >([]);
 
   // const router = useRouter();
 
@@ -162,6 +177,199 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
       return null;
     }
   };
+
+  // Get the latest design_versions.id (UUID) for a design
+  const fetchLatestVersionId = async (did?: string | null) => {
+    if (!did) return null;
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("design_versions")
+        .select("id")
+        .eq("design_id", did)
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) {
+        console.warn("fetchLatestVersionId failed", error.message);
+        return null;
+      }
+      return data?.id ?? null;
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  };
+
+  function normalizeEntries(raw: any) {
+    if (raw === null) return [];
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === "object") {
+      const keys = Object.keys(raw);
+      if (keys.length && keys.every((k) => /^\d+$/.test(k)))
+        return Object.values(raw);
+      return [raw];
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [parsed];
+    } catch {
+      return [];
+    }
+  }
+
+  const fetchFramesForBreakdown = async (
+    designId?: string | null,
+    versionId?: string | null
+  ) => {
+    const did = designId ?? design?.id ?? null;
+    if (!did) return [];
+    const supabase = createClient();
+
+    console.groupCollapsed("[fetchFramesForBreakdown] start");
+    console.log(
+      "designId:",
+      did,
+      "requested versionId:",
+      versionId,
+      "selectedVersionId:",
+      selectedVersion?.id
+    );
+
+    let vid: string | null =
+      versionId ?? selectedVersion?.id ?? design?.current_version_id ?? null;
+
+    // Ensure we have a UUID. If missing, fetch latest UUID.
+    if (!vid) {
+      vid = await fetchLatestVersionId(did);
+      console.log("resolved latest versionId (uuid):", vid);
+    }
+    // If vid looks like a plain number (e.g., "1"), convert it to the UUID id.
+    if (vid && /^\d+$/.test(vid)) {
+      console.warn(
+        "[fetchFramesForBreakdown] numeric version detected, resolving to UUID:",
+        vid
+      );
+      const { data: vrow, error: verr } = await supabase
+        .from("design_versions")
+        .select("id")
+        .eq("design_id", did)
+        .eq("version", Number(vid))
+        .maybeSingle();
+      if (verr) {
+        console.error(
+          "[fetchFramesForBreakdown] failed to resolve version UUID:",
+          verr.message
+        );
+        console.groupEnd();
+        return [];
+      }
+      vid = vrow?.id ?? null;
+      console.log("[fetchFramesForBreakdown] resolved version UUID:", vid);
+    }
+
+    if (!vid) {
+      console.error("[fetchFramesForBreakdown] no version id resolved");
+      console.groupEnd();
+      return [];
+    }
+
+    const { data: frames, error } = await supabase
+      .from("design_frame_evaluations")
+      .select("id, ai_data, thumbnail_url, version_id, node_id")
+      .eq("design_id", did)
+      .eq("version_id", vid)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error(
+        "[fetchFramesForBreakdown] frames query error:",
+        error.message
+      );
+      console.groupEnd();
+      return [];
+    }
+
+    console.log("frames rows:", (frames ?? []).length);
+    try {
+      console.table(
+        (frames ?? []).map((f: any) => ({
+          id: f.id,
+          node_id: f.node_id,
+          has_ai_data: !!f.ai_data,
+          version_id: f.version_id,
+        }))
+      );
+    } catch {}
+
+    const out: any[] = [];
+    for (const f of frames || []) {
+      if (!f?.ai_data) {
+        console.warn(
+          "[fetchFramesForBreakdown] missing ai_data for frame:",
+          f?.id || f?.node_id
+        );
+        out.push({ id: f.node_id || f.id, ai: {} });
+        continue;
+      }
+      try {
+        console.log(
+          "[fetchFramesForBreakdown] parsing ai_data for frame:",
+          f.id
+        );
+        const entries = normalizeEntries(
+          typeof f.ai_data === "string" ? JSON.parse(f.ai_data) : f.ai_data
+        );
+        const entry = entries[0] ?? {};
+        const root = entry?.ai ?? entry;
+
+        // Optional: quick peek at heuristic codes
+        const hb = Array.isArray(root?.heuristic_breakdown)
+          ? root.heuristic_breakdown.map((h: any) => h?.code).filter(Boolean)
+          : [];
+        console.log(
+          "[fetchFramesForBreakdown] heuristic codes:",
+          f.node_id || f.id,
+          hb
+        );
+
+        out.push({
+          id: f.node_id || f.id,
+          ai: {
+            overall_score: root?.overall_score,
+            category_scores: root?.category_scores,
+            heuristic_breakdown: root?.heuristic_breakdown,
+          },
+        });
+      } catch (e) {
+        console.error(
+          "[fetchFramesForBreakdown] parse ai_data failed:",
+          f.id,
+          e
+        );
+        out.push({ id: f.node_id || f.id, ai: {} });
+      }
+    }
+
+    console.log("[fetchFramesForBreakdown] parsed frames:", out.length);
+    if (out.length) {
+      console.log("[fetchFramesForBreakdown] sample entry:", out[0]);
+    }
+    console.groupEnd();
+    return out;
+  };
+
+  const totalIters = Math.max(
+    3,
+    Math.min(
+      5,
+      Number((selectedVersion as any)?.snapshot?.totalIterations) || 3
+    )
+  );
+  const iterClamped = Math.max(
+    1,
+    Math.min(totalIters, Number(selectedVersion?.version) || 1)
+  );
 
   // Fetch weaknesses from latest version  frame evaluation
   //   const loadWeaknesses = React.useCallback(
@@ -354,19 +562,6 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
   //     [design?.id, design?.current_version_id]
   //   );
 
-  useEffect(() => {
-    fetchEvaluations();
-  }, [fetchEvaluations]);
-
-  // React.useEffect(() => {
-  //   console.error(
-  //     "DesignHeader - selectedVersion:",
-  //     selectedVersion?.id ?? null,
-  //     "showWeaknesses:",
-  //     showWeaknesses
-  //   );
-  // }, [selectedVersion?.id, showWeaknesses]);
-
   const extraTickvalues = useMemo(() => {
     return Array.from(
       new Set(
@@ -375,7 +570,11 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
     ).sort((a, b) => a - b);
   }, [evaluations]);
 
-  console.warn("This is fetchingWeaknesses: ",fetchWeaknesses);
+  useEffect(() => {
+    fetchEvaluations();
+  }, [fetchEvaluations]);
+
+  console.warn("This is fetchingWeaknesses: ", fetchWeaknesses);
   return (
     <div className="flex gap-2 items-center justify-between">
       {/* Wrapper */}
@@ -731,11 +930,55 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Add Computational Breakdown button */}
+        <div className="relative group">
+          <button
+            className="p-2 rounded cursor-pointer transition hover:text-[#ED5E20]"
+            aria-label="Show Computational Breakdown"
+            onClick={async () => {
+              setShowSortOptions(false);
+              setShowSearch(false);
+              setShowComments(false);
+              setShowPublishModal(false);
+              setShowWeaknesses(false);
+              setShowGraphs(false);
+
+              // load frames then open
+              try {
+                setLoadingBreakdown(true);
+                const frames = await fetchFramesForBreakdown(
+                  design.id,
+                  selectedVersion?.id ?? null
+                );
+                console.log(
+                  "[ComputationalBreakdown] frames fetch: ",
+                  frames.length
+                );
+                setBreakdownFrames(frames);
+              } catch (e) {
+                console.error("[ComputationalBreakdown] fetch failed: ", e);
+              } finally {
+                setLoadingBreakdown(false);
+                setShowComputationalBreakdown(true);
+              }
+            }}
+          >
+            <Cpu size={18} />
+          </button>
+
+          {/* Tooltip */}
+          <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
+            <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
+              Computational Breakdown
+            </div>
+          </div>
+        </div>
+
         {/* Render detached modal centered when open */}
         {showGraphs && (
           <ImprovementGraphs
-            evaluations={evaluations} // make sure `data` is in scope or replace with your evaluations array
-            metricName="Scores"
+            evaluations={evaluations}
             onClose={() => setShowGraphs(false)}
             extraTickValues={extraTickvalues}
           />
@@ -761,6 +1004,19 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
             fetchWeaknesses={fetchWeaknesses}
             designId={design.id}
             allVersions={allVersions}
+          />
+        )}
+
+        {/* ADDING here the computational breakdown for good measure */}
+        {showComputationalBreakdown && (
+          <ComputationalBreakdown
+            open={showComputationalBreakdown}
+            onClose={() => setShowComputationalBreakdown(false)}
+            frames={breakdownFrames}
+            initialFrameId={breakdownFrames[0]?.id}
+            loading={loadingBreakdown}
+            iteration={iterClamped}
+            totalIterations={totalIters}
           />
         )}
       </div>
