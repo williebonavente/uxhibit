@@ -591,3 +591,32 @@ button[aria-disabled="true"] * {
   background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
 }
+
+@keyframes shine {
+  0% { transform: translateX(-60%); }
+  100% { transform: translateX(140%); }
+}
+
+@keyframes vignettePulse {
+  0%, 100% { box-shadow: inset 0 0 220px 80px rgba(0,0,0,0.18); }
+  50% { box-shadow: inset 0 0 260px 110px rgba(0,0,0,0.28); }
+}
+.animate-vignette-pulse { animation: vignettePulse 2.2s ease-in-out infinite; }
+
+.eqbar {
+  height: 40%;
+  transform-origin: bottom;
+  animation: equalize 0.9s ease-in-out infinite;
+}
+@keyframes equalize {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+
+@keyframes progressStripes {
+  from { background-position: 0 0; }
+  to { background-position: 16px 0; }
+}
+.animate-progressStripes {
+  animation: progressStripes 0.9s linear infinite;
+}

@@ -1,9 +1,14 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 // import Image from "next/image";
 import { Spinner } from "@/components/ui/shadcn-io/spinner/index";
-import { IconTrash } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
+import { Eye } from "lucide-react";
+import {
+  fetchFramesForVersion,
+  hideDesignVersion,
+  unhideDesignVersion,
+} from "@/database/actions/versions/versionHistory";
 
 interface VersionHistoryModalProps {
   open: boolean;
@@ -27,6 +32,7 @@ interface VersionHistoryModalProps {
     designId?: string | null,
     versionId?: string | null
   ) => Promise<void>;
+  setSelectedFrameIndex: (i: number) => void;
 }
 
 const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
@@ -48,103 +54,103 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
   setShowEval,
   setFrameEvaluations,
   fetchWeaknesses,
+  setSelectedFrameIndex,
 }) => {
+  const [mutatingId, setMutatingId] = useState<string | null>(null);
+
+  const [showHidden, setShowHidden] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const saved = window.localStorage.getItem("vh_showHidden");
+    return saved === "true";
+  });
+
+  const hiddenCount = versions.filter((v) => v.is_hidden).length;
+
+  // Memoize filtered + paged list: keeps stable logic when page changes
+  const pagedVersions = useMemo(() => {
+    const base = showHidden ? versions : versions.filter((v) => !v.is_hidden);
+    const start = page * pageSize;
+    return base.slice(start, start + pageSize);
+  }, [versions, showHidden, page, pageSize]);
+
+  // Hide handler (replace inline logic)
+  async function handleHide(v: any) {
+    setMutatingId(v.id);
+    try {
+      await hideDesignVersion(v.id);
+      setVersions(
+        versions.map((ver) =>
+          ver.id === v.id ? { ...ver, is_hidden: true } : ver
+        )
+      );
+      if (selectedVersion?.id === v.id) setSelectedVersion(null);
+      toast.success(
+        <span>
+          <span className="font-bold text-[#ED5E20]">v{v.version}</span> hidden.
+        </span>
+      );
+    } catch (err: any) {
+      toast.error(
+        <span className="text-xs">
+          Failed to hide version. {err?.message || ""}
+        </span>
+      );
+    } finally {
+      setMutatingId(null);
+    }
+  }
+
+  // Unhide handler
+  async function handleUnhide(v: any) {
+    setMutatingId(v.id);
+    try {
+      await unhideDesignVersion(v.id);
+      setVersions(
+        versions.map((ver) =>
+          ver.id === v.id ? { ...ver, is_hidden: false } : ver
+        )
+      );
+      toast.success(
+        <span>
+          <span className="font-bold text-[#ED5E20]">v{v.version}</span>{" "}
+          unhidden.
+        </span>
+      );
+    } catch (err: any) {
+      toast.error(
+        <span className="text-xs">
+          Failed to unhide version. {err?.message || ""}
+        </span>
+      );
+    } finally {
+      setMutatingId(null);
+    }
+  }
+
+  //  Persist showHidden across pagination / modal reopen
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("vh_showHidden", String(showHidden));
+    }
+  }, [showHidden]);
+
+  useEffect(() => {
+    const baseLength = showHidden
+      ? versions.length
+      : versions.filter((v) => !v.is_hidden).length;
+    const maxPage = Math.max(0, Math.ceil(baseLength / pageSize) - 1);
+    if (page > maxPage) setPage(maxPage);
+  }, [showHidden, versions, page, pageSize, setPage]);
+
   if (!open) return null;
 
-  async function fetchFramesForVersion(versionId: string, designId: string) {
-    const supabase = createClient();
-
-    // Fetch the overall summary for this version
-    const { data: versionData, error: versionError } = await supabase
-      .from("design_versions")
-      .select(
-        `
-            id, design_id, version, file_key, node_id, thumbnail_url, created_by,
-            ai_summary, ai_data, snapshot, created_at, updated_at, total_score
-        `
-      )
-      .eq("design_id", designId)
-      .eq("id", versionId)
-      .maybeSingle();
-
-    if (versionError) {
-      console.error(
-        "Failed to fetch overall evaluation:",
-        versionError.message
-      );
-      return [];
-    }
-    if (!versionData) {
-      console.warn(
-        "No version data found for design:",
-        designId,
-        "version:",
-        versionId
-      );
-      return [];
-    }
-
-    // Parse AI data for the overall frame
-    let aiData = versionData.ai_data;
-    if (typeof aiData === "string") {
-      try {
-        aiData = JSON.parse(aiData);
-      } catch (e) {
-        console.log(e);
-        aiData = {};
-      }
-    }
-
-    const overall = {
-      id: "overallFrame",
-      design_id: versionData.design_id,
-      version_id: versionData.id,
-      file_key: versionData.file_key,
-      node_id: versionData.node_id,
-      thumbnail_url: versionData.thumbnail_url,
-      owner_id: versionData.created_by,
-      ai_summary: versionData.ai_summary,
-      ai_data: aiData,
-      snapshot: versionData.snapshot,
-      created_at: versionData.created_at,
-      updated_at: versionData.updated_at,
-      total_score: versionData.total_score,
-    };
-
-    // Fetch all frames for this version
-    const { data: frameData, error: frameError } = await supabase
-      .from("design_frame_evaluations")
-      .select("*")
-      .eq("design_id", designId)
-      .eq("version_id", versionId)
-      .order("created_at", { ascending: true });
-
-    if (frameError) {
-      console.error(
-        "Failed to fetch frame evaluations for version:",
-        frameError.message
-      );
-      return [overall];
-    }
-
-    const frames = (frameData || []).map((frame: any) => ({
-      ...frame,
-      ai_data:
-        typeof frame.ai_data === "string"
-          ? JSON.parse(frame.ai_data)
-          : frame.ai_data,
-    }));
-
-    // Combine overall and frames
-    return [overall, ...frames];
-  }
   return (
-    <div className="fixed inset-0 flex items-center justify-center pl-20 pr-20 cursor-pointer z-50">
+    <div className="fixed inset-0 flex items-center justify-center pl-20 pr-20 z-50">
       <div
         className="absolute inset-0 bg-black/50 transition-opacity backdrop-blur-md"
         onClick={onClose}
       />
-      <div className="bg-gray-50 border dark:bg-[#1A1A1A] relative rounded-xl p-10 w-[1100px] max-h-[85vh] overflow-y-auto w-full z-50">
+      <div className="bg-gray-50 border dark:bg-[#1A1A1A] relative rounded-xl p-10 max-h-[85vh] overflow-y-auto w-full z-50">
         <h2 className="text-lg font-semibold mb-3 relative flex items-center justify-center">
           <span className="mx-auto">Version History</span>
           <button
@@ -179,28 +185,28 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
             </span>
           </div>
         ) : (
-          <div className="border rounded-lg overflow-hidden">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="bg-[#ED5E20] dark:bg-[#ED5E20] text-white dark:text-white">
-                  {/* <th className="p-2 border">Version Id</th> */}
-                  <th className="p-2 border">Version</th>
-                  <th className="p-2 border">Score</th>
-                  <th className="p-2 border">AI Summary</th>
-                  {/* <th className="p-2 border">Parameter</th> */}
-                  {/* <th className="p-2 border">Thumbnail</th> */}
-                  <th className="p-2 border">Evaluated at</th>
-                  <th className="p-2 border text-center">Delete</th>
-                </tr>
-              </thead>
-              <tbody>
-                {versions
-                  .slice(page * pageSize, (page + 1) * pageSize)
-                  .map((v) => {
+          <>
+            <div className="border rounded-lg overflow-hidden">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-[#ED5E20] dark:bg-[#ED5E20] text-white dark:text-white">
+                    {/* <th className="p-2 border">Version Id</th> */}
+                    <th className="p-2 border">Version</th>
+                    <th className="p-2 border">Score</th>
+                    <th className="p-2 border">AI Summary</th>
+                    {/* <th className="p-2 border">Parameter</th> */}
+                    {/* <th className="p-2 border">Thumbnail</th> */}
+                    <th className="p-2 border">Evaluated at</th>
+                    <th className="p-2 border text-center">Hide</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagedVersions.map((v) => {
                     const isCurrent =
                       String(v.id).trim() ===
                       String(design?.current_version_id).trim();
                     const isSelected = selectedVersion?.id === v.id;
+                    const isHidden = !!v.is_hidden;
                     return (
                       <tr
                         key={v.id}
@@ -210,7 +216,8 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                             ? "hover:bg-[#ED5E20]/10 dark:hover:bg-[#ED5E20]/10"
                             : isSelected
                             ? "bg-[#ED5E20]/20 dark:bg-[#ED5E20]/20"
-                            : "hover:bg-[#ED5E20]/10 dark:hover:bg-[#ED5E20]/10")
+                            : "hover:bg-[#ED5E20]/10 dark:hover:bg-[#ED5E20]/10") +
+                          (isHidden ? " opacity-55 saturate-50" : "")
                         }
                         onClick={async () => {
                           setSelectedVersion(v);
@@ -219,12 +226,16 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                               v.id,
                               design.id
                             );
-                            setFrameEvaluations(frames);
+                            const framesOnly = Array.isArray(frames)
+                              ? frames.filter(
+                                  (f: any) => f?.id !== "overallFrame"
+                                )
+                              : [];
+                            setFrameEvaluations(framesOnly);
+                            setSelectedFrameIndex(0);
                             // TODO: here
                             try {
                               await fetchWeaknesses?.(design.id, v.id);
-                              // TODO: This is not an error
-                              // console.error("VERSION ID HERE: ", v.id);
                             } catch (wErr) {
                               console.warn(
                                 "fetchWeaknesses failed for selected version",
@@ -408,140 +419,75 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                             : "-"}
                         </td>
 
-                        {/*DELETE*/}
+                        {/* HIDE BUTTON */}
                         <td className="p-2 border text-center text-gray-700 dark:text-gray-200">
-                          {!isCurrent && (
+                          {!isCurrent && !isHidden && (
                             <button
                               onClick={async (e) => {
                                 e.stopPropagation();
                                 toast(
-                                  () => {
-                                    const toastId = `delete-version-${v.id}`;
+                                  (t) => {
+                                    const toastId = `hide-version-${v.id}`;
                                     return (
-                                      <div className="flex flex-col items-center justify-center gap-2 p-4 ml-8">
+                                      <div className="flex flex-col items-center gap-2 p-4 ml-8">
                                         <span className="text-base font-semibold text-[#ED5E20] text-center">
-                                          Delete version{" "}
+                                          Hide version{" "}
                                           <span className="font-bold">
                                             v{v.version}
                                           </span>
                                           ?
                                         </span>
                                         <span className="mt-1 text-xs text-gray-500 text-center">
-                                          This action cannot be undone.
+                                          You can unhide later. Data is
+                                          preserved.
                                         </span>
                                         <div className="flex gap-6 mt-4 justify-center w-full">
                                           <button
                                             onClick={async () => {
                                               toast.dismiss(toastId);
                                               try {
-                                                await deleteDesignVersion(v.id);
+                                                await hideDesignVersion(v.id);
                                                 setVersions(
-                                                  versions.filter(
-                                                    (ver) => ver.id !== v.id
+                                                  versions.map((ver) =>
+                                                    ver.id === v.id
+                                                      ? {
+                                                          ...ver,
+                                                          is_hidden: true,
+                                                        }
+                                                      : ver
                                                   )
                                                 );
-                                                // If the deleted version was the current one, select the latest remaining version
                                                 if (
-                                                  design.current_version_id ===
-                                                  v.id
-                                                ) {
-                                                  const remainingVersions =
-                                                    versions.filter(
-                                                      (ver) => ver.id !== v.id
-                                                    );
-                                                  const latestVersion =
-                                                    remainingVersions.sort(
-                                                      (a, b) =>
-                                                        new Date(
-                                                          b.created_at
-                                                        ).getTime() -
-                                                        new Date(
-                                                          a.created_at
-                                                        ).getTime()
-                                                    )[0];
-
-                                                  if (latestVersion) {
-                                                    setSelectedVersion(
-                                                      latestVersion
-                                                    );
-                                                    design.current_version_id =
-                                                      latestVersion.id;
-                                                  }
-                                                }
-                                                setVersionChanged((v) => v + 1);
+                                                  selectedVersion?.id === v.id
+                                                )
+                                                  setSelectedVersion(null);
+                                                setVersionChanged((x) => x + 1);
                                                 toast.success(
                                                   <span>
                                                     <span className="font-bold text-[#ED5E20]">
                                                       v{v.version}
                                                     </span>{" "}
-                                                    deleted successfully!
+                                                    hidden.
                                                   </span>
                                                 );
-                                              } catch (err: unknown) {
-                                                const errorMsg =
-                                                  err instanceof Error
-                                                    ? err.message
-                                                    : typeof err === "string"
-                                                    ? err
-                                                    : JSON.stringify(err);
-
-                                                // Check for foreign key violation (published version)
-                                                let isPublishedConstraint =
-                                                  false;
-                                                try {
-                                                  const parsed =
-                                                    typeof err === "string"
-                                                      ? JSON.parse(err)
-                                                      : err;
-                                                  if (
-                                                    parsed &&
-                                                    parsed.code === "23503"
-                                                  ) {
-                                                    isPublishedConstraint =
-                                                      true;
-                                                  }
-                                                } catch {}
-
+                                              } catch (err: any) {
                                                 toast.error(
-                                                  <span>
-                                                    <span className="font-bold text-[#ED5E20]">
-                                                      v{v.version}
-                                                    </span>{" "}
-                                                    could not be deleted.
-                                                    <br />
-                                                    {isPublishedConstraint ? (
-                                                      <span>
-                                                        This version is
-                                                        currently published.
-                                                        <br />
-                                                        Please unpublish the
-                                                        design before deleting
-                                                        this version.
-                                                      </span>
-                                                    ) : (
-                                                      <>
-                                                        {errorMsg && (
-                                                          <span className="text-xs text-red-400">
-                                                            {errorMsg}
-                                                            <br />
-                                                          </span>
-                                                        )}
-                                                        Please try again.
-                                                      </>
-                                                    )}
+                                                  <span className="text-xs">
+                                                    Failed to hide version.{" "}
+                                                    {err?.message || ""}
                                                   </span>
                                                 );
                                               }
                                             }}
-                                            className="px-6 py-2 rounded-full bg-gradient-to-r from-[#ED5E20] to-orange-400 text-white font-bold shadow-lg hover:scale-105 hover:from-orange-500 hover:to-[#ED5E20] transition-all duration-200 cursor-pointer"
+                                            className="px-6 py-2 rounded-full bg-gradient-to-r from-[#ED5E20] to-orange-400 text-white font-bold shadow-lg hover:scale-105 hover:from-orange-500 hover:to-[#ED5E20] transition-all duration-200"
                                           >
-                                            Yes, Delete
+                                            Yes, Hide
                                           </button>
                                           <button
                                             onClick={() =>
                                               toast.dismiss(toastId)
                                             }
-                                            className="px-6 py-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-semibold shadow hover:bg-gray-200 dark:hover:bg-gray-700 hover:scale-105 transition-all duration-200 cursor-pointer"
+                                            className="px-6 py-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-semibold shadow hover:bg-gray-200 dark:hover:bg-gray-700 hover:scale-105 transition-all duration-200"
                                           >
                                             Cancel
                                           </button>
@@ -550,44 +496,126 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                                     );
                                   },
                                   {
-                                    duration: 10000,
-                                    id: `delete-version-${v.id}`,
+                                    id: `hide-version-${v.id}`,
+                                    duration: 9000,
                                   }
                                 );
                               }}
-                              className="text-red-500 hover:text-white hover:bg-red-500 rounded-full p-1 cursor-pointer transition-all duration-200"
-                              title="Delete version"
+                              className="text-orange-600 hover:text-white hover:bg-orange-500 rounded-full p-1 transition-all duration-200"
+                              title="Hide version"
                             >
-                              <IconTrash size={18} />
+                            </button>
+                          )}
+                          {!isCurrent && !isHidden && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleHide(v);
+                              }}
+                              disabled={mutatingId === v.id}
+                              className={`text-orange-600 rounded-full p-1 transition ${
+                                mutatingId === v.id
+                                  ? "opacity-50 cursor-wait"
+                                  : "hover:text-white hover:bg-orange-500 cursor-pointer"
+                              }`}
+                              title="Hide version"
+                            >
+                              <Eye size={18} />
+                            </button>
+                          )}
+                          {isHidden && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleUnhide(v);
+                              }}
+                              disabled={mutatingId === v.id}
+                              className={`text-green-600 rounded-full p-1 transition ${
+                                mutatingId === v.id
+                                  ? "opacity-50 cursor-wait"
+                                  : "hover:text-white hover:bg-green-500 cursor-pointer"
+                              }`}
+                              title="Unhide version"
+                            >
+                              <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M1 1l22 22" />
+                                <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.77 21.77 0 0 1 5.06-6.94M9.88 9.88A3 3 0 0 0 12 15a3 3 0 0 0 2.12-5.12" />
+                                <path d="M12 5c7 0 11 7 11 7a21.77 21.77 0 0 1-2.38 3.16" />
+                              </svg>
                             </button>
                           )}
                         </td>
                       </tr>
                     );
                   })}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {versions.length > pageSize && (
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 px-2">
-            {/* Progress Bar */}
-            <div className="w-full sm:w-1/2 h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden shadow-inner">
-              <div
-                className="h-full bg-gradient-to-r from-[#ED5E20] to-orange-400 transition-all duration-500"
-                style={{
-                  width: `${
-                    ((page + 1) / Math.ceil(versions.length / pageSize)) * 100
-                  }%`,
-                }}
-              />
+                </tbody>
+              </table>
             </div>
-            {/* Pagination Controls */}
-            <div className="flex items-center gap-3">
+
+            {/* Hide Button */}
+
+            <div className="mt-4 flex items-center gap-3">
               <button
-                onClick={() => setPage(Math.max(0, page - 1))}
-                disabled={page === 0}
-                className={`group relative flex items-center justify-center px-4 py-2 rounded-full
+                onClick={() => hiddenCount > 0 && setShowHidden((x) => !x)}
+                disabled={hiddenCount === 0}
+                className={`px-4 py-2 rounded-full border text-sm font-semibold transition
+                  ${
+                    hiddenCount === 0
+                      ? "bg-gray-100 dark:bg-gray-800 border-gray-300 text-gray-400 cursor-not-allowed"
+                      : "bg-white/80 dark:bg-[#232323]/80 border-[#ED5E20]/40 text-[#ED5E20] hover:bg-[#ED5E20] hover:text-white cursor-pointer"
+                  }`}
+              >
+                {hiddenCount === 0
+                  ? "No hidden versions"
+                  : showHidden
+                  ? "Hide hidden versions"
+                  : `Show hidden versions`}
+              </button>
+              {/* <span className="text-xs text-gray-500">
+                {hiddenCount === 0
+                  ? "All versions are visible."
+                  : showHidden
+                  ? "Displaying all versions (including hidden)."
+                  : "Hidden versions are excluded."}
+              </span> */}
+            </div>
+
+            {/* Pagination  */}
+            {versions.length > pageSize && (
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 px-2">
+                {/* Progress Bar */}
+                <div className="w-full sm:w-1/2 h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden shadow-inner">
+                  <div
+                    className="h-full bg-gradient-to-r from-[#ED5E20] to-orange-400 transition-all duration-500"
+                    style={{
+                      width: `${
+                        ((page + 1) /
+                          Math.ceil(
+                            (showHidden
+                              ? versions.length
+                              : versions.filter((v) => !v.is_hidden).length) /
+                              pageSize
+                          )) *
+                        100
+                      }%`,
+                    }}
+                  />
+                </div>
+                {/* Pagination Controls */}
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setPage(Math.max(0, page - 1))}
+                    disabled={page === 0}
+                    className={`group relative flex items-center justify-center px-4 py-2 rounded-full
                                     bg-white/80 dark:bg-[#232323]/80 shadow-lg border border-[#ED5E20]/30
                                     text-[#ED5E20] dark:text-[#ED5E20] font-bold text-base
                                     transition-all duration-300
@@ -596,40 +624,46 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                                     outline-none focus:ring-2 focus:ring-[#ED5E20]/40
                                     cursor-pointer
                                     `}
-                aria-label="Previous Page"
-              >
-                <svg
-                  width="20"
-                  height="20"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  className="mr-1"
-                >
-                  <path
-                    d="M15 19l-7-7 7-7"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                Back
-                <span className="absolute -inset-1 rounded-full pointer-events-none group-hover:animate-pulse" />
-              </button>
-              <span className="mx-2 text-sm font-semibold tracking-wide bg-gradient-to-r from-[#ED5E20]/80 to-orange-400/80 text-white px-4 py-1 rounded-full shadow">
-                Page {page + 1} of {Math.ceil(versions.length / pageSize)}
-              </span>
-              <button
-                onClick={() =>
-                  setPage(
-                    Math.min(
-                      Math.ceil(versions.length / pageSize) - 1,
-                      page + 1
-                    )
-                  )
-                }
-                disabled={(page + 1) * pageSize >= versions.length}
-                className={`group relative flex items-center justify-center px-4 py-2 rounded-full
+                    aria-label="Previous Page"
+                  >
+                    <svg
+                      width="20"
+                      height="20"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      className="mr-1"
+                    >
+                      <path
+                        d="M15 19l-7-7 7-7"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    Back
+                    <span className="absolute -inset-1 rounded-full pointer-events-none group-hover:animate-pulse" />
+                  </button>
+                  <span className="mx-2 text-sm font-semibold tracking-wide bg-gradient-to-r from-[#ED5E20]/80 to-orange-400/80 text-white px-4 py-1 rounded-full shadow">
+                    Page {page + 1} of{" "}
+                    {Math.ceil(
+                      (showHidden
+                        ? versions.length
+                        : versions.filter((v) => !v.is_hidden).length) /
+                        pageSize
+                    )}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setPage(
+                        Math.min(
+                          Math.ceil(versions.length / pageSize) - 1,
+                          page + 1
+                        )
+                      )
+                    }
+                    disabled={(page + 1) * pageSize >= versions.length}
+                    className={`group relative flex items-center justify-center px-4 py-2 rounded-full
                                     bg-white/80 dark:bg-[#232323]/80 shadow-lg border border-[#ED5E20]/30
                                     text-[#ED5E20] dark:text-[#ED5E20] font-bold text-base
                                     transition-all duration-300
@@ -637,28 +671,30 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                                     disabled:opacity-40 disabled:cursor-not-allowed
                                     outline-none focus:ring-2 focus:ring-[#ED5E20]/40
                                     cursor-pointer`}
-                aria-label="Next Page"
-              >
-                Next
-                <svg
-                  width="20"
-                  height="20"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  className="ml-1"
-                >
-                  <path
-                    d="M9 5l7 7-7 7"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <span className="absolute -inset-1 rounded-full pointer-events-none group-hover:animate-pulse" />
-              </button>
-            </div>
-          </div>
+                    aria-label="Next Page"
+                  >
+                    Next
+                    <svg
+                      width="20"
+                      height="20"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      className="ml-1"
+                    >
+                      <path
+                        d="M9 5l7 7-7 7"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    <span className="absolute -inset-1 rounded-full pointer-events-none group-hover:animate-pulse" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -177,7 +177,24 @@ export async function aiEvaluator(
     return ((h % (2 * max + 1)) - max) | 0;
   };
 
+  const scoringMode: "raw" | "progressive" =
+    (snapshot as any)?.scoringMode === "raw" ? "raw" : "progressive";
+
   function normalizeForIteration(parsed: AiEvaluator): AiEvaluator {
+    // In raw mode, do not reshape category_scores toward targets.
+    if (scoringMode === "raw") {
+      const next: AiEvaluator = {
+        ...parsed,
+        category_scores: { ...(parsed.category_scores ?? {}) },
+      };
+      if (iteration >= totalIterations) {
+        next.weaknesses = [];
+        next.weakness_suggestions = [];
+        next.issues = [];
+      }
+      return next;
+    }
+
     const tgtRaw = targetRawForIteration(iteration, totalIterations);
     const categories = [
       "accessibility",
@@ -213,8 +230,6 @@ export async function aiEvaluator(
       category_scores: { ...(parsed.category_scores ?? {}) },
     };
 
-    const catScores: number[] = [];
-    const weights: number[] = [];
     for (const c of categories) {
       const seed = `${seedBase}|${c}`;
       const n = noise(seed, dev);
@@ -227,15 +242,8 @@ export async function aiEvaluator(
       if (iteration >= totalIterations) cat = Math.max(minFinal, cat);
       const catRounded = clamp(Math.round(cat), 0, 100);
       (next.category_scores as any)[c] = catRounded;
-
-      catScores.push(catRounded);
-      const w = Number.isFinite(heuristics?.[c as keyof typeof heuristics])
-        ? Math.max(0.1, Number((heuristics as any)[c]))
-        : 1;
-      weights.push(w);
     }
 
-    // Do NOT set overall_score here; reconciliation will finalize it.
     if (iteration >= totalIterations) {
       next.weaknesses = [];
       next.weakness_suggestions = [];
@@ -379,18 +387,30 @@ export async function aiEvaluator(
       // Progression target
       const target = targetRawForIteration(iteration, totalIterations);
 
-      const alpha = 0.35;
+      // NEW: allow raw mode (no progression blending)
+
+      const alpha = scoringMode === "raw" ? 0 : 0.35;
+
       const blended =
-        iteration >= totalIterations
+        iteration >= totalIterations && scoringMode !== "raw"
           ? 100
           : Math.round((1 - alpha) * combined + alpha * target);
 
-      // Blend combined with target (progression) except at final (force 100)
-      let finalOverall = iteration >= totalIterations ? 100 : blended;
+      let finalOverall =
+        scoringMode === "raw"
+          ? combined
+          : iteration >= totalIterations
+          ? 100
+          : blended;
+
       let extraPullApplied = false;
 
       // If still off by >15 from target early on, pull a bit more
-      if (iteration < totalIterations && Math.abs(finalOverall - target) > 15) {
+      if (
+        scoringMode !== "raw" &&
+        iteration < totalIterations &&
+        Math.abs(finalOverall - target) > 15
+      ) {
         finalOverall = Math.round((finalOverall + target) / 2);
         extraPullApplied = true;
       }
@@ -610,13 +630,14 @@ Persona:
 
       // After progression, keep overall_score from reconcile (unless final iteration).
       if (iteration >= totalIterations) {
-        progressed.overall_score = 100;
-      } else {
-        // Recompute overall again from reconciled categories for safety
+        progressed.overall_score =
+          (snapshot as any)?.scoringMode === "raw"
+            ? progressed.overall_score
+            : 100;
+      } else if ((snapshot as any)?.scoringMode !== "raw") {
         const chkOverall = computeOverallFromCategories(
           progressed.category_scores as any
         );
-        // Blend lightly so overall stays aligned with categories (avoid mismatch)
         progressed.overall_score = Math.round(
           0.7 * progressed.overall_score + 0.3 * chkOverall
         );

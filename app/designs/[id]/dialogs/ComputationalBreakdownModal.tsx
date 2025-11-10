@@ -229,8 +229,6 @@ const ComputationalBreakdown: React.FC<ComputationalBreakdownProps> = ({
 
   // Progression adjustment (mirrors aiEvaluator reconciliation)
   const dbg = selected?.ai?.debug_calc;
-  const showProgression =
-    Number.isFinite(iteration) && Number.isFinite(totalIterations);
   const iter = typeof iteration === "number" ? iteration : 1;
   const totalIters = typeof totalIterations === "number" ? totalIterations : 3;
   const progressionTarget =
@@ -549,47 +547,110 @@ const ComputationalBreakdown: React.FC<ComputationalBreakdownProps> = ({
                             <h4 className="font-semibold mb-2 text-gray-700 dark:text-gray-200">
                               Overall Calculation
                             </h4>
-                                                      <div className="text-gray-600 dark:text-gray-300 leading-relaxed space-y-1 text-sm">
-                           {dbg ? (
-                             <>
-                               <p>
-                                 Heuristics Avg = {dbg.heuristics_avg}%, Categories Avg = {dbg.categories_avg}% → Combined (mean) = <span className="font-medium">{dbg.combined}%</span>
-                               </p>
-                               <p>
-                                 Progression target (iteration {dbg.iteration}/{dbg.total_iterations}) ≈ <span className="font-medium">{dbg.target}%</span>
-                               </p>
-                               <p>
-                                 Blended = round((1 - {dbg.alpha}) × {dbg.combined}% + {dbg.alpha} × {dbg.target}%) = <span className="font-medium">{dbg.blended}%</span>
-                                 {dbg.extra_pull_applied ? " → extra pull applied (>15 diff)" : ""}
-                               </p>
-                               <p>
-                                 Displayed Overall = <span className="font-medium">{dbg.final}%</span>
-                                 {" (derived by evaluator)"}
-                               </p>
-                             </>
-                           ) : (
-                             <>
-                                <p>
-                                  Heuristics Avg = {overallHeuristicsAvg}%, Categories Avg = {overallCategoriesAvg}% → Combined (mean) ={" "}
-                                  <span className="font-medium">{combinedOverall}%</span>
-                                </p>
-                                {showProgression ? (
-                                  <>
-                                    <p>
-                                      Progression target (iteration {iter}/{totalIters}) ≈ <span className="font-medium">{progressionTarget}%</span>
-                                    </p>
-                                    <p>
-                                      Blended overall = round(0.65 × {combinedOverall}% + 0.35 × {progressionTarget}%) ={" "}
-                                      <span className="font-medium">{blendedOverall}%</span>
-                                    </p>
-                                  </>
-                                ) : null}
-                                <p>
-                                  Displayed Overall = <span className="font-medium">{selected.ai?.overall_score ?? "—"}%</span>
-                                </p>
-                             </>
-                           )}
-                          </div>
+                            <div className="space-y-4 text-xs md:text-sm">
+                              {dbg ? (
+                                <>
+                                  {/* Step 1: Mean of Heuristics & Categories */}
+                                  <EqRow>
+                                    <Pill
+                                      label="Heuristics Avg"
+                                      value={dbg.heuristics_avg}
+                                    />
+                                    <EqSep op="+" />
+                                    <Pill
+                                      label="Categories Avg"
+                                      value={dbg.categories_avg}
+                                    />
+                                    <EqSep op="÷ 2 =" />
+                                    <Pill
+                                      label="Combined"
+                                      value={dbg.combined}
+                                      variant="accent"
+                                    />
+                                  </EqRow>
+                                  {/* Step 2: Progressive blend (if enabled) */}
+                                  {dbg.alpha !== 0 && (
+                                    <>
+                                      <EqRow>
+                                        <Pill
+                                          label="Combined"
+                                          value={dbg.combined}
+                                        />
+                                        <EqSep
+                                          op="⊕"
+                                          title="Blend towards target"
+                                        />
+                                        <Pill
+                                          label="Target"
+                                          value={dbg.target}
+                                          variant="info"
+                                        />
+                                        <EqSep
+                                          op={`α ${dbg.alpha}`}
+                                          title="alpha"
+                                        />
+                                        <EqSep op="=" />
+                                        <Pill
+                                          label="Blended"
+                                          value={dbg.blended}
+                                          variant="purple"
+                                        />
+                                      </EqRow>
+                                      {dbg.extra_pull_applied && (
+                                        <div className="text-[11px] text-gray-500 dark:text-gray-400">
+                                          Extra pull applied ({">"}|15| from
+                                          target)
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+
+                                  {/* Step 3: Final */}
+                                  <EqRow>
+                                    <Pill
+                                      label={
+                                        dbg.alpha === 0 ? "Combined" : "Blended"
+                                      }
+                                      value={
+                                        dbg.alpha === 0
+                                          ? dbg.combined
+                                          : dbg.blended
+                                      }
+                                    />
+                                    <EqSep op="→" />
+                                    <Pill
+                                      label="Final"
+                                      value={dbg.final}
+                                      variant="success"
+                                    />
+                                  </EqRow>
+                                </>
+                              ) : (
+                                <>
+                                  <EqRow>
+                                    <Pill
+                                      label="Heuristics Avg"
+                                      value={overallHeuristicsAvg}
+                                    />
+                                    <EqSep op="+" />
+                                    <Pill
+                                      label="Categories Avg"
+                                      value={overallCategoriesAvg}
+                                    />
+                                    <EqSep op="÷ 2 =" />
+                                    <Pill
+                                      label="Combined"
+                                      value={combinedOverall}
+                                      variant="accent"
+                                    />
+                                  </EqRow>
+                                  <div className="text-gray-600 dark:text-gray-300">
+                                    Displayed Overall = {combinedOverall}% (raw
+                                    mean)
+                                  </div>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
                       )}
@@ -604,5 +665,43 @@ const ComputationalBreakdown: React.FC<ComputationalBreakdownProps> = ({
     </div>
   );
 };
+
+const Pill: React.FC<{
+  label: string;
+  value: number;
+  variant?: "base" | "accent" | "info" | "purple" | "success";
+}> = ({ label, value, variant = "base" }) => {
+  const v = clamp(Math.round(value || 0), 0, 100);
+  const cls =
+    variant === "accent"
+      ? "bg-[#ED5E20]/10 text-[#ED5E20]"
+      : variant === "info"
+      ? "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+      : variant === "purple"
+      ? "bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300"
+      : variant === "success"
+      ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300"
+      : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300";
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded ${cls}`}>
+      <span className="opacity-80">{label}:</span>
+      <span className="font-medium">{v}%</span>
+    </span>
+  );
+};
+
+const EqSep: React.FC<{ op: string; title?: string }> = ({ op, title }) => (
+  <span
+    className="mx-1 md:mx-2 text-gray-500 dark:text-gray-400 select-none"
+    title={title}
+    aria-label={title}
+  >
+    {op}
+  </span>
+);
+
+const EqRow: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="flex flex-wrap items-center gap-1 md:gap-2">{children}</div>
+);
 
 export default ComputationalBreakdown;

@@ -1,5 +1,8 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import { EvalResponse } from "../page";
+import { Popover, PopoverContent } from "@/components/ui/popover";
+import { PopoverTrigger } from "@radix-ui/react-popover";
+import { Info } from "lucide-react";
 
 interface EvaluationResultProps {
   evalResult: EvalResponse;
@@ -16,6 +19,67 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
   frameEvaluations,
   selectedFrameIndex,
 }) => {
+  const mappedIndex = selectedFrameIndex < 0 ? 0 : selectedFrameIndex;
+  const activeFrame = frameEvaluations[mappedIndex];
+  const [
+    isHoveringOverScoringLegendPopover,
+    setIsHoveringOverScoringLegendPopover,
+  ] = useState(false);
+
+  const root = useMemo(() => {
+    const aiData = activeFrame?.ai_data;
+    if (!aiData) return {};
+    const possible = (aiData as any).ai ?? aiData;
+    return possible || {};
+  }, [activeFrame]);
+
+  const debugCalc = root?.debug_calc;
+
+  const realFrames = useMemo(
+    () =>
+      Array.isArray(frameEvaluations)
+        ? frameEvaluations.filter((_, i) => i !== 0)
+        : [],
+    [frameEvaluations]
+  );
+
+  const fallbackFromData = React.useMemo(() => {
+    // mirror getFrameScore fallback
+    const cats = root?.category_scores;
+    let catsAvg: number | undefined;
+    if (cats && typeof cats === "object") {
+      const vals = Object.values(cats).filter(
+        (v: any): v is number => typeof v === "number" && Number.isFinite(v)
+      );
+      if (vals.length)
+        catsAvg = Math.round(
+          vals.reduce((a: number, b: number) => a + b, 0) / vals.length
+        );
+    }
+    const hb: any[] = Array.isArray(root?.heuristic_breakdown)
+      ? root.heuristic_breakdown
+      : [];
+    let heurAvg: number | undefined;
+    if (hb.length) {
+      const pctSum = hb.reduce((acc, h) => {
+        const s = typeof h.score === "number" ? h.score : 0;
+        const m =
+          typeof h.max_points === "number" && h.max_points > 0
+            ? h.max_points
+            : 4;
+        return acc + (s / m) * 100;
+      }, 0);
+      heurAvg = Math.round(pctSum / hb.length);
+    }
+    if (typeof debugCalc?.final === "number") return debugCalc.final;
+    if (typeof root?.overall_score === "number") return root.overall_score;
+    if (typeof catsAvg === "number" && typeof heurAvg === "number")
+      return Math.round((catsAvg + heurAvg) / 2);
+    if (typeof catsAvg === "number") return catsAvg;
+    if (typeof heurAvg === "number") return heurAvg;
+    return 0;
+  }, [root, debugCalc]);
+
   if (!evalResult || loadingEval) return null;
 
   const HEURISTIC_LABELS: Record<string, string> = {
@@ -30,92 +94,86 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
     "09": "Help Users Recognize, Diagnose, and Recover from Errors",
     "10": "Help and Documentation",
   };
+
+  const combinedMean =
+    typeof debugCalc?.combined === "number" ? debugCalc.combined : undefined;
+  const score = Math.round(
+    typeof combinedMean === "number" ? combinedMean : fallbackFromData
+  );
+
+  // 4. If you also need category scores and heuristics for active frame:
+  const categoryScores = activeFrame?.ai?.category_scores || {};
+  const heuristicBreakdown = activeFrame?.ai?.heuristic_breakdown || [];
+
+  const title = `Frame ${mappedIndex + 1} Score`;
+
+  const percent = Math.max(0, Math.min(score, 100));
+  const radius = 60;
+  const stroke = 10;
+  const normalizedRadius = radius - stroke / 2;
+  const circumference = normalizedRadius * 2 * Math.PI;
+  const strokeDashoffset = circumference - (percent / 100) * circumference;
+
+  let color = "#ED5E20";
+  if (score >= 75) color = "#16A34A";
+  else if (score < 50) color = "#DC2626";
+
   return (
     <>
-      {/* Score */}
-      {typeof (selectedFrameIndex === 0
-        ? currentFrame?.total_score
-        : evalResult.overall_score) === "number" &&
-        (() => {
-          const score = Math.round(
-            selectedFrameIndex === 0
-              ? currentFrame?.total_score
-              : evalResult.overall_score
-          );
-          const percent = Math.max(0, Math.min(score, 100));
-          const radius = 60;
-          const stroke = 10;
-          const normalizedRadius = radius - stroke / 2;
-          const circumference = normalizedRadius * 2 * Math.PI;
-          const strokeDashoffset =
-            circumference - (percent / 100) * circumference;
-
-          let color = "#ED5E20";
-          if (score >= 75) color = "#16A34A";
-          else if (score < 50) color = "#DC2626";
-
-          return (
-            <div className="flex flex-col items-center justify-center p-6 mb-8">
-              <div className="relative w-32 h-32 mb-3">
-                <svg height="128" width="128">
-                  <circle
-                    stroke="#e5e7eb"
-                    fill="transparent"
-                    strokeWidth={stroke}
-                    r={normalizedRadius}
-                    cx="64"
-                    cy="64"
-                  />
-                  <circle
-                    stroke={color}
-                    fill="transparent"
-                    strokeWidth={stroke}
-                    strokeLinecap="round"
-                    strokeDasharray={circumference + " " + circumference}
-                    style={{
-                      strokeDashoffset,
-                      transition: "stroke-dashoffset 0.8s ease, stroke 0.3s",
-                    }}
-                    r={normalizedRadius}
-                    cx="64"
-                    cy="64"
-                  />
-                </svg>
-                <span
-                  className="absolute inset-0 flex items-center justify-center text-4xl sm:text-5xl font-extrabold"
-                  style={{ color }}
-                >
-                  {score}
-                </span>
-              </div>
-              <h3
-                className="font-semibold text-center text-xl sm:text-2xl mb-1"
-                style={{ color }}
-              >
-                {selectedFrameIndex === 0
-                  ? "Overall Score"
-                  : frameEvaluations[selectedFrameIndex]?.ai_summary ||
-                    frameEvaluations[selectedFrameIndex]?.node_id
-                  ? `Frame ${selectedFrameIndex} Score`
-                  : "Frame Score"}
-              </h3>
-              <span className="text-md text-neutral-500">out of 100</span>
-            </div>
-          );
-        })()}
+      <div className="flex flex-col items-center justify-center p-6 mb-8">
+        <div className="relative w-32 h-32 mb-3">
+          <svg height="128" width="128">
+            <circle
+              stroke="#e5e7eb"
+              fill="transparent"
+              strokeWidth={stroke}
+              r={normalizedRadius}
+              cx="64"
+              cy="64"
+            />
+            <circle
+              stroke={color}
+              fill="transparent"
+              strokeWidth={stroke}
+              strokeLinecap="round"
+              strokeDasharray={circumference + " " + circumference}
+              style={{
+                strokeDashoffset,
+                transition: "stroke-dashoffset 0.8s ease, stroke 0.3s",
+              }}
+              r={normalizedRadius}
+              cx="64"
+              cy="64"
+            />
+          </svg>
+          <span
+            className="absolute inset-0 flex items-center justify-center text-4xl sm:text-5xl font-extrabold"
+            style={{ color }}
+          >
+            {score}
+          </span>
+        </div>
+        <h3
+          className="font-semibold text-center text-xl sm:text-2xl mb-1"
+          style={{ color }}
+        >
+          {title}
+        </h3>
+        <span className="text-md text-neutral-500">out of 100</span>
+      </div>
 
       {/* Summary */}
-      <div className="p-5 rounded-2xl bg-[#2563EB]/10 dark:bg-[#60A5FA]/10 b-5 shadow-md flex items-start gap-5">
-        <div className="flex-1">
+      {activeFrame?.summary && (
+        <div className="p-5 rounded-2xl bg-[#2563EB]/10 dark:bg-[#60A5FA]/10 mb-5 shadow-md">
           <h3 className="font-bold mb-3 text-[#2563EB] dark:text-[#60A5FA] text-lg flex items-center gap-2">
             <span className="text-xl">💡</span>
             Summary
           </h3>
           <p className="text-neutral-900 dark:text-neutral-100 leading-8">
-            {evalResult.summary}
+            {activeFrame.summary}
           </p>
         </div>
-      </div>
+      )}
       {/* Strengths */}
       {Array.isArray(evalResult.strengths) &&
         evalResult.strengths.length > 0 && (
@@ -440,6 +498,91 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
                 />
               </svg>
               Heuristic Breakdown
+              <Popover open={isHoveringOverScoringLegendPopover} onOpenChange={setIsHoveringOverScoringLegendPopover} >
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Show scoring legend"
+                    className="ml-1 inline-flex items-center justify-center rounded-full p-1 text-[#0891b2] hover:bg-[#0ea5e9]/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#0891b2] transition"
+                    onMouseEnter={() =>
+                      setIsHoveringOverScoringLegendPopover(true)
+                    }
+                    onMouseLeave={() =>
+                      setIsHoveringOverScoringLegendPopover(false)
+                    }
+                  >
+                    <Info size={16} />
+                  </button>
+                </PopoverTrigger>
+
+                <PopoverContent
+                  align="end"
+                  side="top"
+                  className="w-[360px] p-4"
+                  onMouseEnter={() =>
+                    setIsHoveringOverScoringLegendPopover(true)
+                  }
+                  onMouseLeave={() =>
+                    setIsHoveringOverScoringLegendPopover(false)
+                  }
+                >
+                  <div className="rounded-lg border-2 border-[#ED5E20]/40 bg-white/90 dark:bg-[#232323]/90 p-4">
+                    <h5 className="text-sm font-bold text-[#ED5E20] mb-3">
+                      Scoring Legend
+                    </h5>
+                    <div className="grid gap-3 grid-cols-2 text-sm">
+                      {/* 0 */}
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300 font-semibold">
+                          0
+                        </span>
+                        <span className="text-gray-700 dark:text-gray-200 text-xs">
+                          Missing
+                        </span>
+                      </div>
+                      {/* 1 */}
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-md bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 font-semibold">
+                          1
+                        </span>
+                        <span className="text-gray-700 dark:text-gray-200 text-xs">
+                          Poor
+                        </span>
+                      </div>
+                      {/* 2 */}
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-md bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300 font-semibold">
+                          2
+                        </span>
+                        <span className="text-gray-700 dark:text-gray-200 text-xs">
+                          Adequate
+                        </span>
+                      </div>
+                      {/* 3 */}
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-semibold">
+                          3
+                        </span>
+                        <span className="text-gray-700 dark:text-gray-200 text-xs">
+                          Good
+                        </span>
+                      </div>
+                      {/* 4 */}
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-md bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 font-semibold">
+                          4
+                        </span>
+                        <span className="text-gray-700 dark:text-gray-200 text-xs">
+                          Excellent
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-3 text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                      Scores show how well each heuristic is satisfied. Compare the value to the maximum (4) to see which principles need improvement and which are fully met.
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </h4>
 
             {/* Desktop / tablet: table */}

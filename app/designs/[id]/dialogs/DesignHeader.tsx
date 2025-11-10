@@ -9,7 +9,13 @@ import {
   IconSend,
   IconAlertTriangle,
 } from "@tabler/icons-react";
-import { BarChart2, Cpu, Menu, MessageSquare } from "lucide-react";
+import {
+  AlignEndHorizontal,
+  BarChart2,
+  Cpu,
+  Menu,
+  MessageSquare,
+} from "lucide-react";
 import CommentModal from "./CommentModal";
 import { Comment } from "@/components/comments-user";
 import { Design, Versions } from "../page";
@@ -18,7 +24,8 @@ import ImprovementGraphs from "./ImprovementGraphs";
 import WeaknessesModal, { IWeakness } from "./WeaknessesModal";
 import { flushSync } from "react-dom";
 import ComputationalBreakdown from "./ComputationalBreakdownModal";
-// import { useRouter } from "next/router";
+import HeuristicLegendModal from "./HeuristicLegendModal";
+import { getHeuristicLegendFromVersion } from "@/database/actions/versions/heuristicLegend";
 
 interface DesignHeaderActionsProps {
   handleShowVersions: () => void;
@@ -103,6 +110,10 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
       };
     }[]
   >([]);
+
+  const [showHeuristicLegend, setShowHeuristicLegend] = useState(false);
+  const [heuristicLegend, setHeuristicLegend] = useState<any[]>([]);
+  const [loadingLegend, setLoadingLegend] = useState(false);
 
   // const router = useRouter();
 
@@ -339,6 +350,7 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
             overall_score: root?.overall_score,
             category_scores: root?.category_scores,
             heuristic_breakdown: root?.heuristic_breakdown,
+            debug_calc: root?.debug_calc,
           },
         });
       } catch (e) {
@@ -975,6 +987,74 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
           </div>
         </div>
 
+        {/* Heuristic Legend */}
+        <div className="relative group">
+          <button
+            className="p-2 rounded cursor-pointer transition hover:text-[#ED5E20]"
+            aria-label="Show Heuristic Legend"
+            onClick={async () => {
+              setShowSortOptions(false);
+              setShowSearch(false);
+              setShowComments(false);
+              setShowPublishModal(false);
+              setShowWeaknesses(false);
+              setShowGraphs(false);
+              setShowComputationalBreakdown(false);
+              try {
+                setLoadingLegend(true);
+
+                // Resolve a usable version UUID:
+                let vid: string | null =
+                  selectedVersion?.id ??
+                  (design?.current_version_id as string | null) ??
+                  null;
+
+                // If a plain number sneaks in, resolve it to UUID
+                if (vid && /^\d+$/.test(String(vid))) {
+                  const supabase = createClient();
+                  const { data } = await supabase
+                    .from("design_versions")
+                    .select("id")
+                    .eq("design_id", design.id)
+                    .eq("version", Number(vid))
+                    .maybeSingle();
+                  vid = data?.id ?? null;
+                }
+
+                // Fallback to latest version UUID
+                if (!vid) {
+                  vid = await fetchLatestVersionId(design.id);
+                }
+
+                const legend = vid
+                  ? await getHeuristicLegendFromVersion(vid)
+                  : [];
+
+                // In the place you set legend
+                console.log(
+                  "[Legend raw ai_data]",
+                  typeof selectedVersion?.ai_data,
+                  selectedVersion?.ai_data
+                );
+                console.log("[Legend extracted]", legend);
+                setHeuristicLegend(legend);
+              } catch (e) {
+                console.error("[Heuristic Legend] fetch failed: ", e);
+              } finally {
+                setLoadingLegend(false);
+                setShowHeuristicLegend(true);
+              }
+            }}
+          >
+            <AlignEndHorizontal size={18} />
+          </button>
+          <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
+            <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
+              Heuristic Legend
+            </div>
+          </div>
+        </div>
+
         {/* Render detached modal centered when open */}
         {showGraphs && (
           <ImprovementGraphs
@@ -1017,6 +1097,16 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
             loading={loadingBreakdown}
             iteration={iterClamped}
             totalIterations={totalIters}
+          />
+        )}
+
+        {showHeuristicLegend && (
+          <HeuristicLegendModal
+            open={showHeuristicLegend}
+            onClose={() => setShowHeuristicLegend(false)}
+            loading={loadingLegend}
+            items={heuristicLegend}
+            versionLabel={selectedVersion?.version ?? null}
           />
         )}
       </div>

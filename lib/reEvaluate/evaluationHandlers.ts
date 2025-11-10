@@ -14,6 +14,7 @@ type  SnapshotWithIteration = Snapshot & {
   iteration?: number;
   totalIterations?: number;
   versionId?: string;
+  scoringMode?: "raw" | "progressive";
 };
 
 export async function handleEvaluateWithParams(
@@ -212,7 +213,7 @@ export async function handleEvalParamsSubmit(
       );
     }
 
-    latestSnapshot = { ...latestSnapshot, iteration, totalIterations };
+    latestSnapshot = { ...latestSnapshot, iteration, totalIterations, scoringMode: "raw" };
   } catch (err) {
     console.warn(
       "[handleEvalParamsSubmit] Error fetching snapshot from design_versions, falling back to params:",
