@@ -127,6 +127,44 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
     }
   }
 
+  function computeCombinedAverage(aiData: any): number | null {
+  if (!aiData) return null;
+  let raw = aiData;
+  if (typeof raw === "string") {
+    try { raw = JSON.parse(raw); } catch { return null; }
+  }
+  const collect = (x: any): any[] => {
+    if (!x) return [];
+    if (Array.isArray(x)) return x;
+    if (typeof x === "object") {
+      const keys = Object.keys(x);
+      if (keys.length && keys.every(k => /^\d+$/.test(k))) {
+        return keys.sort((a,b)=>Number(a)-Number(b)).map(k => x[k]);
+      }
+      // single ai wrapper
+      if ("ai" in x) return [x];
+      return [x];
+    }
+    return [];
+  };
+  const entries = collect(raw).map(e => (e && e.ai ? e.ai : e));
+  const nums: number[] = [];
+  for (const e of entries) {
+    const dc = e?.debug_calc;
+    if (dc && typeof dc.combined === "number") nums.push(dc.combined);
+    else if (typeof e?.overall_score === "number") nums.push(e.overall_score);
+  }
+  if (!nums.length) return null;
+  return Math.round(nums.reduce((a,b)=>a+b,0)/nums.length);
+}
+
+const augmentedPaged = useMemo(() => {
+  return pagedVersions.map(v => {
+    const combinedAvg = computeCombinedAverage(v.ai_data);
+    return { ...v, combinedAvg };
+  });
+}, [pagedVersions]);
+
   //  Persist showHidden across pagination / modal reopen
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -143,6 +181,8 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
   }, [showHidden, versions, page, pageSize, setPage]);
 
   if (!open) return null;
+
+  
 
   return (
     <div className="fixed inset-0 flex items-center justify-center pl-20 pr-20 z-50">
@@ -201,7 +241,8 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedVersions.map((v) => {
+                  
+                  {augmentedPaged.map((v) => {
                     const isCurrent =
                       String(v.id).trim() ===
                       String(design?.current_version_id).trim();
@@ -351,11 +392,13 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                         </td>
 
                         {/*SCORE*/}
-                        <td className="p-2 border text-gray-700 dark:text-gray-200 text-center">
-                          {v.total_score !== undefined && v.total_score !== null
-                            ? Math.round(v.total_score)
-                            : "-"}
-                        </td>
+                             <td className="p-2 border text-gray-700 dark:text-gray-200 text-center">
+          {v.combinedAvg != null
+            ? v.combinedAvg
+            : v.total_score != null
+            ? Math.round(v.total_score)
+            : "-"}
+        </td>
 
                         {/*AI SUMMARY*/}
                         <td className="p-2 border text-gray-700 dark:text-gray-200">

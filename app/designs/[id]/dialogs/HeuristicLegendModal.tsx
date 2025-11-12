@@ -92,7 +92,7 @@ const HeuristicLegendModal: React.FC<HeuristicLegendModalProps> = ({
           <>
             {/* Scoring Legend */}
             <div className="mb-8 rounded-lg border-2 border-[#ED5E20]/40 bg-white/70 dark:bg-[#232323]/70 p-6">
-              <h3 className="text-xl font-bold text-[#fafafa] mb-4 tracking-wide">
+              <h3 className="text-xl font-bold dark:text-[#fafafa]  text-[#0b0b0b] mb-4 tracking-wide">
                 Scoring Legend
               </h3>
 
@@ -157,7 +157,7 @@ const HeuristicLegendModal: React.FC<HeuristicLegendModalProps> = ({
 
             {/* Radar Chart (overall heuristic distribution) */}
             <div className="mb-8 rounded-lg border border-[#ED5E20]/30 bg-white/60 dark:bg-[#232323]/60 p-4">
-              <h2 className="text-xl font-bold text-[#fafafa] mb-3">
+              <h2 className="text-xl font-bold dark:text-[#fafafa] text-[#0b0b0b] mb-3">
                 Heuristic Principle Scores
               </h2>
               <div className="flex items-center justify-between mb-2">
@@ -188,11 +188,11 @@ const HeuristicLegendModal: React.FC<HeuristicLegendModalProps> = ({
                 const barColor =
                   pct == null
                     ? "bg-gray-400"
-                    : pct < 25
+                    : pct <= 25
                     ? "bg-red-500"
-                    : pct < 60
+                    : pct <= 60
                     ? "bg-yellow-500"
-                    : pct < 85
+                    : pct <= 85
                     ? "bg-blue-500"
                     : "bg-green-500";
                 return (
@@ -243,7 +243,7 @@ const HeuristicLegendModal: React.FC<HeuristicLegendModalProps> = ({
                               ? "Good"
                               : pct >= 50
                               ? "Adequate"
-                              : pct > 0
+                              : pct >= 25
                               ? "Poor"
                               : "Missing"}{" "}
                           </span>

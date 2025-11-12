@@ -12,6 +12,7 @@ import {
 import {
   AlignEndHorizontal,
   BarChart2,
+  Columns,
   Cpu,
   Menu,
   MessageSquare,
@@ -56,6 +57,10 @@ interface DesignHeaderActionsProps {
   loadingWeaknesses?: boolean;
   displayVersionToShow?: string | null;
   allVersions: Versions[];
+  onToggleCompare?: () => void;
+  compareActive?: boolean;
+  canCompare?: boolean;
+  compareWhy?: string | null;
 }
 
 const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
@@ -83,6 +88,10 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
   weaknesses,
   loadingWeaknesses,
   allVersions,
+  onToggleCompare,
+  compareActive,
+  canCompare,
+  compareWhy
 }) => {
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [showGraphs, setShowGraphs] = useState(false);
@@ -141,28 +150,41 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
   }
 
   // Fetch evaluations (total_score from design_versions)
-
-  const fetchEvaluations = React.useCallback(async () => {
+    const fetchEvaluations = React.useCallback(async () => {
     if (!design?.id) return;
     setLoadingEvaluations(true);
 
     const supabase = createClient();
+    console.groupCollapsed("[DesignHeader] fetchEvaluations");
+    console.log("designId:", design.id);
     const { data, error } = await supabase
       .from("design_versions")
-      .select("thumbnail_url, total_score, created_at")
+      .select("id, version, thumbnail_url, total_score, created_at")
       .eq("design_id", design.id)
       .order("created_at", { ascending: true });
 
     if (error) {
-      console.error("fetching design_version failed", error.message);
+      console.error("design_versions query failed:", error.message);
       setEvaluations([]);
     } else {
+      console.log("rows fetched:", (data ?? []).length);
+      try {
+        console.table(
+          (data ?? []).map((r: any) => ({
+            id: r.id,
+            version: r.version,
+            total_score: Number(r.total_score) ?? null,
+            created_at: r.created_at,
+          }))
+        );
+      } catch {}
       const mapped = (data ?? []).map((r: any) => ({
         timestamp: r.created_at ?? new Date().toISOString(),
         score: Number(r.total_score) ?? 0,
       }));
       setEvaluations(mapped);
     }
+    console.groupEnd();
     setLoadingEvaluations(false);
   }, [design?.id]);
 
@@ -585,6 +607,30 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
   useEffect(() => {
     fetchEvaluations();
   }, [fetchEvaluations]);
+
+    useEffect(() => {
+    console.groupCollapsed("[DesignHeader] Props snapshot");
+    console.log("design.id:", design?.id);
+    console.log("selectedVersion:", {
+      id: selectedVersion?.id,
+      version: selectedVersion?.version,
+      total_score: selectedVersion?.total_score,
+    });
+    console.log("allVersions count:", allVersions?.length);
+    try {
+      console.table(
+        (allVersions || []).map((v) => ({
+          id: v.id,
+          version: v.version,
+          total_score: v.total_score,
+          created_at: v.created_at,
+        }))
+      );
+    } catch {}
+    console.log("compareActive:", compareActive, "canCompare:", canCompare);
+    console.groupEnd();
+  }, [design?.id, selectedVersion?.id, selectedVersion?.version, allVersions?.length, compareActive, 
+    canCompare, allVersions, selectedVersion?.total_score]);
 
   console.warn("This is fetchingWeaknesses: ", fetchWeaknesses);
   return (
@@ -1050,7 +1096,56 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
           </button>
           <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
             <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
-              Heuristic Legend
+              Heuristic Breakdown
+            </div>
+          </div>
+        </div>
+
+        {/* Compare Versions */}
+        <div className="relative group">
+          <button
+            className={`p-2 rounded cursor-pointer transition
+              ${
+                compareActive
+                  ? "ring-2 ring-[#ED5E20] bg-gradient-to-r from-[#ED5E20]/20 to-orange-400/20 shadow"
+                  : ""
+              }
+              hover:text-[#ED5E20]
+              ${!canCompare ? "opacity-40 pointer-events-none" : ""}`}
+            aria-label="Toggle version comparison"
+            disabled={!canCompare}
+            onMouseEnter={() => {
+              console.groupCollapsed("[DesignHeader] Compare availability (hover)");
+              console.log("canCompare:", canCompare, "reason:", compareWhy || "(none)");
+              console.log("allVersions count:", allVersions?.length);
+              console.log("selectedVersion:", { id: selectedVersion?.id, version: selectedVersion?.version });
+              console.log("design.current_version_id:", design?.current_version_id);
+              console.groupEnd();
+            }}
+            onFocus={() => {
+              // Keyboard users
+              console.groupCollapsed("[DesignHeader] Compare availability (focus)");
+              console.log("canCompare:", canCompare, "reason:", compareWhy || "(none)");
+              console.groupEnd();
+            }}
+            onClick={() => {
+              // Will only fire if canCompare is true
+              setShowSortOptions(false);
+              setShowSearch(false);
+              setShowComments(false);
+              setShowPublishModal(false);
+              onToggleCompare?.();
+            }}
+          >
+            <Columns size={18} className="text-inherit" />
+          </button>
+        
+          {/* Tooltip */}
+          <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
+            <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
+              {canCompare
+                ? (compareActive ? "Exit Comparison" : "Compare Versions")
+                : (compareWhy || "Need at least 2 versions")}
             </div>
           </div>
         </div>
