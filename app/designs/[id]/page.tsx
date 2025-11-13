@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import { useEffect, useState, useRef, useCallback } from "react";
 import Image from "next/image";
 import { createClient } from "@/utils/supabase/client";
@@ -1841,7 +1841,7 @@ export default function DesignDetailPage({
     }
   }, [searchQuery, sortedFrameEvaluations]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (isResizing) {
       document.body.style.userSelect = "col-resize";
     } else {
@@ -2106,13 +2106,13 @@ export default function DesignDetailPage({
     }
   }, [frameEvaluations.length, selectedFrameIndex]);
 
-  const compareDiag = React.useMemo(() => {
+  const compareDiag = useMemo(() => {
     const reasons: string[] = [];
     const count = allVersions?.length ?? 0;
     if (count < 2) reasons.push(`only ${count} version(s) available`);
     if (!currentVersionScores?.id) reasons.push("missing currentVersionScores");
-    if (!previousVersionScores?.id)
-      reasons.push("missing previousVersionScores");
+    // if (!previousVersionScores?.id)
+    //   reasons.push("missing previousVersionScores");
     return {
       canCompare: reasons.length === 0,
       why: reasons,
@@ -2120,10 +2120,10 @@ export default function DesignDetailPage({
   }, [
     allVersions?.length,
     currentVersionScores?.id,
-    previousVersionScores?.id,
+    // previousVersionScores?.id,
   ]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     console.groupCollapsed("[page] Compare availability");
     console.log(
       "versions:",

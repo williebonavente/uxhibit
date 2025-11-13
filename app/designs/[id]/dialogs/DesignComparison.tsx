@@ -1,5 +1,11 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
-import Image from "next/image";
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
+import NextImage from "next/image";
 import { createClient } from "@/utils/supabase/client";
 import { FrameEvaluation } from "../page";
 import {
@@ -34,6 +40,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import pixelmatch from "pixelmatch";
 
 interface Props {
   designId: string;
@@ -41,6 +48,8 @@ interface Props {
   previousVersionId: string;
   onClose: () => void;
 }
+
+type HeatColor = "cyan" | "magenta" | "lime" | "red";
 
 export const DesignComparison: React.FC<Props> = ({
   designId,
@@ -67,6 +76,31 @@ export const DesignComparison: React.FC<Props> = ({
   const [showVersionPopover, setShowVersionPopover] = useState(false);
   const [bootstrapping, setBootstrapping] = useState(true);
   const [isFetchingFrames, setIsFetchingFrames] = useState(false);
+  const [splitView, setSplitView] = useState(false);
+  const [revealPct, setRevealPct] = useState(50);
+  const [blink, setBlink] = useState(false);
+  const [blinkSpeed, setBlinkSpeed] = useState(400);
+  const [blinkShowCurrent, setBlinkShowCurrent] = useState(true);
+  const [displayOptionsOpen, setDisplayOptionsOpen] = useState(false);
+  const [diffCount, setDiffCount] = useState<number | null>(null);
+  const [heatmapColor, setHeatmapColor] = useState<HeatColor>("lime");
+  const [heatmapOpacity, setHeatmapOpacity] = useState<number>(200);
+  const HEATMAP_RGB = useMemo<Record<HeatColor, [number, number, number]>>(
+    () => ({
+      cyan: [0, 229, 255],
+      magenta: [255, 0, 170],
+      lime: [132, 204, 22],
+      red: [239, 68, 68],
+    }),
+    []
+  );
+
+  const HEATMAP_LABELS: Record<HeatColor, string> = {
+    cyan: "Cyan",
+    magenta: "Magenta",
+    lime: "Lime",
+    red: "Red",
+  };
 
   const previousVersionMeta = versions.find(
     (v) => v.id === selectedPreviousVersionId
@@ -111,24 +145,94 @@ export const DesignComparison: React.FC<Props> = ({
     [designId, supabase]
   );
 
+  function drawContain(
+    ctx: CanvasRenderingContext2D,
+    img: HTMLImageElement,
+    W: number,
+    H: number
+  ) {
+    ctx.clearRect(0, 0, W, H);
+    const scale = Math.min(W / img.width, H / img.height);
+    const w = Math.round(img.width * scale);
+    const h = Math.round(img.height * scale);
+    const x = Math.floor((W - w) / 2);
+    const y = Math.floor((H - h) / 2);
+    ctx.drawImage(img, x, y, w, h);
+  }
+
   const buildDiff = useCallback(
     async (aUrl: string, bUrl: string) => {
+      if (!aUrl || !bUrl) {
+        console.warn("[buildDiff] Missing URLs", { aUrl, bUrl });
+        setDiffUrl(null);
+        setDiffCount(null);
+        return;
+      }
       try {
-        // ...existing code...
-        const diff = ctx.createImageData(w, h);
-        const thr = Math.max(0, Math.min(100, threshold));
-        const thrMag = (thr / 100) * 441; // normalize to 0..441
+        const loadImg = (src: string) =>
+          new Promise<HTMLImageElement>((res, rej) => {
+            const img = new window.Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => res(img);
+            img.onerror = (e) => rej(e);
+            img.src = src;
+          });
 
-        for (let i = 0; i < aData.data.length; i += 4) {
-          const dr = aData.data[i] - bData.data[i];
-          const dg = aData.data[i + 1] - bData.data[i + 1];
-          const db = aData.data[i + 2] - bData.data[i + 2];
-          const mag = Math.sqrt(dr * dr + dg * dg + db * db);
-          if (mag > thrMag) {
-            diff.data[i] = 255;
-            diff.data[i + 1] = 0;
-            diff.data[i + 2] = 0;
-            diff.data[i + 3] = Math.min(200, (mag / 441) * 220 + 40);
+        const [aImg, bImg] = await Promise.all([loadImg(aUrl), loadImg(bUrl)]);
+        const W = Math.max(aImg.width, bImg.width);
+        const H = Math.max(aImg.height, bImg.height);
+
+        const cA = document.createElement("canvas");
+        const cB = document.createElement("canvas");
+        const cD = document.createElement("canvas");
+        cA.width = cB.width = cD.width = W;
+        cA.height = cB.height = cD.height = H;
+
+        const ctxA = cA.getContext("2d")!;
+        const ctxB = cB.getContext("2d")!;
+        const ctxD = cD.getContext("2d")!;
+
+        // 1) Compose onto white backgrounds, using contain BEFORE reading imageData
+        ctxA.save();
+        ctxA.fillStyle = "#ffffff";
+        ctxA.fillRect(0, 0, W, H);
+        drawContain(ctxA, aImg, W, H);
+        ctxA.restore();
+
+        ctxB.save();
+        ctxB.fillStyle = "#ffffff";
+        ctxB.fillRect(0, 0, W, H);
+        drawContain(ctxB, bImg, W, H);
+        ctxB.restore();
+
+        // 2) Now read pixels
+        const imgA = ctxA.getImageData(0, 0, W, H);
+        const imgB = ctxB.getImageData(0, 0, W, H);
+        const diff = ctxD.createImageData(W, H);
+
+        // 3) Binary mask from pixelmatch (no AA)
+        const thr = Math.max(0, Math.min(1, threshold / 100));
+        const mismatches = pixelmatch(imgA.data, imgB.data, diff.data, W, H, {
+          threshold: thr,
+          includeAA: false,
+          diffMask: true, // ensures mask output (white diffs, black matches)
+        });
+
+        if (!mismatches) {
+          setDiffCount(0);
+          setDiffUrl(null);
+          return;
+        }
+        setDiffCount(mismatches);
+        for (let i = 0; i < diff.data.length; i += 4) {
+          const isDiff =
+            (diff.data[i] | diff.data[i + 1] | diff.data[i + 2]) !== 0;
+          if (isDiff) {
+            const [r, g, b] = HEATMAP_RGB[heatmapColor];
+            diff.data[i] = r;
+            diff.data[i + 1] = g;
+            diff.data[i + 2] = b;
+            diff.data[i + 3] = Math.max(0, Math.min(255, heatmapOpacity));
           } else {
             diff.data[i] = 0;
             diff.data[i + 1] = 0;
@@ -136,15 +240,73 @@ export const DesignComparison: React.FC<Props> = ({
             diff.data[i + 3] = 0;
           }
         }
-        ctx.putImageData(diff, 0, 0);
-        setDiffUrl(c.toDataURL("image/png"));
-      } catch (e) {
-        console.warn("Diff build failed", e);
+
+        ctxD.putImageData(diff, 0, 0);
+        setDiffUrl(cD.toDataURL("image/png"));
+      } catch (err) {
+        console.error("[buildDiff] pixelmatch error", err);
         setDiffUrl(null);
+        setDiffCount(null);
       }
     },
-    [threshold]
+    [threshold, heatmapColor, heatmapOpacity, HEATMAP_RGB]
   );
+
+  function HeatmapDot() {
+    const [r, g, b] = HEATMAP_RGB[heatmapColor];
+    return (
+      <span
+        className="inline-block w-2 h-2 rounded-full border border-white/40"
+        style={{ backgroundColor: `rgb(${r},${g},${b})` }}
+        aria-label={`Heatmap color: ${HEATMAP_LABELS[heatmapColor]}`}
+        title={`Heatmap color: ${HEATMAP_LABELS[heatmapColor]}`}
+      />
+    );
+  }
+
+  function HeatmapOverlay({ src }: { src: string }) {
+    return (
+      <NextImage
+        src={src}
+        alt="Heatmap"
+        aria-hidden
+        fill
+        unoptimized
+        sizes="(min-width: 1024px) 50vw, 100vw"
+        className="pointer-events-none absolute inset-0 z-10 object-contain"
+        style={{
+          imageRendering: "pixelated",
+          margin: "auto",
+          mixBlendMode: "normal", // use normal so PNG alpha shows only diff pixels
+          opacity: 1, // control overall intensity here if needed
+        }}
+      />
+    );
+  }
+
+  function HeatmapLegend() {
+    if (!showHeatmap || !diffUrl) return null;
+    const [r, g, b] = HEATMAP_RGB[heatmapColor];
+    return (
+      <div
+        className="inline-flex items-center gap-2 text-[11px]"
+        aria-label={`Color of changes: ${HEATMAP_LABELS[heatmapColor]}`}
+        title={`Color of changes: ${HEATMAP_LABELS[heatmapColor]}`}
+      >
+        <span className="mt-1 text-[11px] text-gray-500 dark:text-gray-400 tracking-wide">
+          Heatmaps Color:
+        </span>
+        <span
+          className="inline-block w-3 h-3 rounded-full border"
+          style={{
+            backgroundColor: `rgb(${r},${g},${b})`,
+            borderColor: `rgba(${r},${g},${b},0.5)`,
+          }}
+          aria-hidden
+        />
+      </div>
+    );
+  }
 
   useEffect(() => {
     let active = true;
@@ -179,7 +341,15 @@ export const DesignComparison: React.FC<Props> = ({
     }
     // Keep diff consistent regardless of swapSides; swap only affects display
     buildDiff(prev.thumbnail_url, cur.thumbnail_url);
-  }, [showHeatmap, frameIndex, currentFrames, previousFrames, buildDiff]);
+  }, [
+    showHeatmap,
+    frameIndex,
+    currentFrames,
+    previousFrames,
+    buildDiff,
+    heatmapColor,
+    heatmapOpacity,
+  ]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -305,6 +475,15 @@ export const DesignComparison: React.FC<Props> = ({
     };
   }, [fetchFrames, selectedCurrentVersionId, selectedPreviousVersionId]);
 
+  useEffect(() => {
+    if (!blink) return;
+    const id = setInterval(
+      () => setBlinkShowCurrent((s) => !s),
+      Math.max(100, blinkSpeed)
+    );
+    return () => clearInterval(id);
+  }, [blink, blinkSpeed]);
+
   const maxFrames = Math.max(currentFrames.length, previousFrames.length);
 
   const aligned =
@@ -313,11 +492,38 @@ export const DesignComparison: React.FC<Props> = ({
       (p) => p.node_id === currentFrames[frameIndex]?.node_id
     );
 
+  useEffect(() => {
+    if (!showHeatmap) {
+      setDiffUrl(null);
+      console.log("[heatmap] Disabled");
+      return;
+    }
+    const cur = currentFrames[frameIndex];
+    const prev =
+      previousFrames.find((p) => p.node_id === cur?.node_id) ||
+      previousFrames[frameIndex];
+
+    if (!cur || !prev) {
+      console.log("[heatmap] Missing frame(s)", {
+        curExists: !!cur,
+        prevExists: !!prev,
+      });
+      setDiffUrl(null);
+      return;
+    }
+
+    console.log("[heatmap] Building diff for frameIndex", frameIndex, {
+      curNode: cur.node_id,
+      prevNode: prev.node_id,
+    });
+    buildDiff(prev.thumbnail_url, cur.thumbnail_url);
+  }, [showHeatmap, frameIndex, currentFrames, previousFrames, buildDiff]);
+
   return (
     <div className="fixed inset-0 z-[1000] w-screen h-screen bg-white dark:bg-[#121212] flex flex-col overscroll-contain">
       {bootstrapping && (
         <div className="flex flex-col items-center justify-center h-screen animate-pulse">
-          <Image
+          <NextImage
             src="/images/loading-your-designs.svg"
             alt="Loading designs illustration"
             height={150}
@@ -552,8 +758,10 @@ export const DesignComparison: React.FC<Props> = ({
                         </Popover>
 
                         {/* Display Options here */}
-
-                        <Popover>
+                        <Popover
+                          open={displayOptionsOpen}
+                          onOpenChange={setDisplayOptionsOpen}
+                        >
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <PopoverTrigger asChild>
@@ -627,7 +835,7 @@ export const DesignComparison: React.FC<Props> = ({
                                         cur?.thumbnail_url ||
                                         prev?.thumbnail_url;
                                       return thumb ? (
-                                        <Image
+                                        <NextImage
                                           src={thumb}
                                           alt={`Frame ${frameIndex + 1}`}
                                           width={96}
@@ -695,7 +903,7 @@ export const DesignComparison: React.FC<Props> = ({
                                             >
                                               <div className="flex items-center gap-4">
                                                 {thumb ? (
-                                                  <Image
+                                                  <NextImage
                                                     src={thumb}
                                                     alt={`Frame ${i + 1}`}
                                                     width={96}
@@ -731,7 +939,81 @@ export const DesignComparison: React.FC<Props> = ({
                                   </SelectContent>
                                 </Select>
                               </div>
+                              {/* Split compare */}
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] text-gray-600 dark:text-gray-300">
+                                    Split compare
+                                  </span>
+                                  <Toggle
+                                    pressed={splitView}
+                                    onPressedChange={(v) => setSplitView(v)}
+                                    aria-label="Toggle split compare"
+                                    className="h-7 px-2 data-[state=on]:bg-orange-100 dark:data-[state=on]:bg-[#ED5E20]/20"
+                                  >
+                                    <ArrowLeftRight className="h-4 w-4 mr-1" />
+                                    <span className="text-[11px]">On</span>
+                                  </Toggle>
+                                </div>
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] text-gray-600 dark:text-gray-300">
+                                      Reveal
+                                    </span>
+                                    <span className="text-[10px] tabular-nums px-1 py-0.5 rounded bg-gray-100 dark:bg-neutral-700">
+                                      {revealPct}%
+                                    </span>
+                                  </div>
+                                  <Slider
+                                    value={[revealPct]}
+                                    onValueChange={([v]) => setRevealPct(v)}
+                                    min={0}
+                                    max={100}
+                                    step={1}
+                                    className="w-full"
+                                    aria-label="Split reveal"
+                                  />
+                                </div>
+                              </div>
 
+                              <Separator />
+
+                              {/* Blink compare */}
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] text-gray-600 dark:text-gray-300">
+                                    Blink compare
+                                  </span>
+                                  <Toggle
+                                    pressed={blink}
+                                    onPressedChange={(v) => setBlink(v)}
+                                    aria-label="Toggle blink compare"
+                                    className="h-7 px-2 data-[state=on]:bg-orange-100 dark:data-[state=on]:bg-[#ED5E20]/20"
+                                  >
+                                    <Sparkles className="h-4 w-4 mr-1" />
+                                    <span className="text-[11px]">On</span>
+                                  </Toggle>
+                                </div>
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] text-gray-600 dark:text-gray-300">
+                                      Blink speed (ms)
+                                    </span>
+                                    <span className="text-[10px] tabular-nums px-1 py-0.5 rounded bg-gray-100 dark:bg-neutral-700">
+                                      {blinkSpeed}
+                                    </span>
+                                  </div>
+                                  <Slider
+                                    value={[blinkSpeed]}
+                                    onValueChange={([v]) => setBlinkSpeed(v)}
+                                    min={100}
+                                    max={1200}
+                                    step={50}
+                                    className="w-full"
+                                    aria-label="Blink speed"
+                                  />
+                                </div>
+                              </div>
                               {/* Heatmap toggle */}
                               <div className="flex items-center justify-between mt-10">
                                 <span className="text-[11px] text-gray-600 dark:text-gray-300">
@@ -750,7 +1032,10 @@ export const DesignComparison: React.FC<Props> = ({
                                       showHeatmap ? "text-[#ED5E20]" : ""
                                     }`}
                                   />
-                                  <span className="text-[11px]">On</span>
+
+                                  <span className="text-[11px]">
+                                    {showHeatmap ? "Off" : "On"}
+                                  </span>
                                 </Toggle>
                               </div>
 
@@ -774,6 +1059,69 @@ export const DesignComparison: React.FC<Props> = ({
                                   aria-label="Heatmap threshold"
                                 />
                               </div>
+
+                              <Separator />
+                              {/* Heatmap color */}
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] text-gray-600 dark:text-gray-300">
+                                    Heatmap color
+                                  </span>
+                                  <div className="inline-flex items-center gap-2">
+                                    <span
+                                      className="inline-block w-4 h-4 rounded border"
+                                      style={{
+                                        backgroundColor: `rgb(${HEATMAP_RGB[
+                                          heatmapColor
+                                        ].join(",")})`,
+                                      }}
+                                      aria-hidden
+                                    />
+                                  </div>
+                                </div>
+                                <Select
+                                  value={heatmapColor}
+                                  onValueChange={(v) =>
+                                    setHeatmapColor(v as HeatColor)
+                                  }
+                                >
+                                  <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue placeholder="Color" />
+                                  </SelectTrigger>
+                                  <SelectContent
+                                    position="popper"
+                                    className="z-[1200] cmp-select-content"
+                                  >
+                                    <SelectItem value="cyan">Cyan</SelectItem>
+                                    <SelectItem value="magenta">
+                                      Magenta
+                                    </SelectItem>
+                                    <SelectItem value="lime">Lime</SelectItem>
+                                    <SelectItem value="red">Red</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              {/* Intensity */}
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] text-gray-600 dark:text-gray-300">
+                                    Intensity
+                                  </span>
+                                  <span className="text-[10px] tabular-nums px-1 py-0.5 rounded bg-gray-100 dark:bg-neutral-700">
+                                    {heatmapOpacity}
+                                  </span>
+                                </div>
+                                <Slider
+                                  value={[heatmapOpacity]}
+                                  onValueChange={([v]) => setHeatmapOpacity(v)}
+                                  min={60}
+                                  max={255}
+                                  step={5}
+                                  className="w-full"
+                                  aria-label="Heatmap intensity"
+                                />
+                              </div>
                             </div>
 
                             <div className="flex justify-end gap-2 pt-2">
@@ -786,6 +1134,8 @@ export const DesignComparison: React.FC<Props> = ({
                                   setSwapSides(false);
                                   setShowHeatmap(true);
                                   setThreshold(40);
+                                  setHeatmapColor("lime");
+                                  setHeatmapOpacity(200);
                                 }}
                               >
                                 Reset
@@ -794,14 +1144,13 @@ export const DesignComparison: React.FC<Props> = ({
                                 type="button"
                                 size="sm"
                                 className="text-xs cursor-pointer"
-                                onClick={() => {}}
+                                onClick={() => setDisplayOptionsOpen(false)}
                               >
                                 Done
                               </Button>
                             </div>
                           </PopoverContent>
                         </Popover>
-
                         <Separator
                           orientation="vertical"
                           className="mx-1 h-6"
@@ -848,6 +1197,7 @@ export const DesignComparison: React.FC<Props> = ({
                             >
                               {currentLabel}
                             </span>
+                        {showHeatmap && diffUrl && <HeatmapDot />}
                           </h3>
                           <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400 tracking-wide">
                             Active version frame
@@ -855,7 +1205,7 @@ export const DesignComparison: React.FC<Props> = ({
                         </div>
 
                         {areSequential && (
-                          <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
                             +1 iteration
                           </span>
                         )}
@@ -880,30 +1230,104 @@ export const DesignComparison: React.FC<Props> = ({
                     </div>
                     {currentFrames[frameIndex] ? (
                       <div className="relative w-full flex items-center justify-center">
-                        <Image
-                          src={currentFrames[frameIndex].thumbnail_url}
-                          alt="Current frame"
-                          width={800}
-                          height={800}
-                          className="object-contain w-auto max-h-[calc(100vh-220px)] rounded"
-                          priority
-                        />
-                        {showHeatmap && diffUrl && (
-                          <Image
-                            src={diffUrl}
-                            alt="Heatmap"
-                            aria-hidden
-                            className="object-contain w-auto max-h-[calc(100vh-220px)] rounded"
-                            style={{
-                              imageRendering: "pixelated",
-                              margin: "auto",
-                            }}
-                          />
-                        )}
+                        {(() => {
+                          const cur = currentFrames[frameIndex];
+                          const alignedPrev =
+                            previousFrames.find(
+                              (p) => p.node_id === cur?.node_id
+                            ) || previousFrames[frameIndex];
+
+                          // Blink mode
+                          if (blink && alignedPrev) {
+                            const img = blinkShowCurrent
+                              ? cur.thumbnail_url
+                              : alignedPrev.thumbnail_url;
+                            return (
+                              <div className="relative">
+                                <NextImage
+                                  src={img}
+                                  alt="Blink compare"
+                                  width={800}
+                                  height={800}
+                                  className="object-contain w-auto max-h-[65vh] rounded"
+                                  priority
+                                />
+                                {showHeatmap && diffUrl && (
+                                  <HeatmapOverlay src={diffUrl} />
+                                )}
+                              </div>
+                            );
+                          }
+
+                          // Split mode
+                          if (splitView && alignedPrev) {
+                            return (
+                              <div className="relative w-full flex items-center justify-center">
+                                <NextImage
+                                  src={alignedPrev.thumbnail_url}
+                                  alt="Previous (base)"
+                                  width={800}
+                                  height={800}
+                                  className="object-contain w-auto max-h-[65vh] rounded"
+                                  priority
+                                />
+                                <div
+                                  className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                                  style={{
+                                    clipPath: `inset(0 ${
+                                      100 - revealPct
+                                    }% 0 0)`,
+                                  }}
+                                >
+                                  <NextImage
+                                    src={cur.thumbnail_url}
+                                    alt="Current (revealed)"
+                                    width={800}
+                                    height={800}
+                                    className="object-contain w-auto max-h-[65vh] rounded"
+                                    priority
+                                  />
+                                </div>
+                                {showHeatmap && diffUrl && (
+                                  <HeatmapOverlay src={diffUrl} />
+                                )}
+                              </div>
+                            );
+                          }
+
+                          // Default
+                          return (
+                            <div className="relative">
+                              <NextImage
+                                src={cur.thumbnail_url}
+                                alt="Current frame"
+                                width={800}
+                                height={800}
+                                className="object-contain w-auto max-h-[65vh] rounded"
+                                priority
+                              />
+
+                              {showHeatmap && (
+                                <div className="absolute top-2 right-2 z-20 text-[10px] px-2 py-1 rounded bg-black/60 text-white">
+                                  {diffCount === null
+                                    ? "Building…"
+                                    : diffCount === 0
+                                    ? "No differences"
+                                    : `${diffCount} diffs`}
+                                </div>
+                              )}
+
+                              {showHeatmap && diffUrl && (
+                                <HeatmapOverlay src={diffUrl} />
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     ) : (
                       <div className="text-xs text-gray-400">No frame</div>
                     )}
+                    {/* {showHeatmap && diffUrl && <HeatmapOverlay src={diffUrl} />} */}
                   </div>
 
                   {/* Previous (right when swapped) */}
@@ -959,7 +1383,7 @@ export const DesignComparison: React.FC<Props> = ({
                     </div>
                     {previousFrames[frameIndex] ? (
                       <div className="relative w-full flex items-center justify-center">
-                        <Image
+                        <NextImage
                           src={previousFrames[frameIndex].thumbnail_url}
                           alt="Previous frame"
                           width={800}
@@ -1028,7 +1452,7 @@ export const DesignComparison: React.FC<Props> = ({
                     </div>
                     {previousFrames[frameIndex] ? (
                       <div className="relative w-full flex items-center justify-center">
-                        <Image
+                        <NextImage
                           src={previousFrames[frameIndex].thumbnail_url}
                           alt="Previous frame"
                           width={800}
@@ -1057,6 +1481,7 @@ export const DesignComparison: React.FC<Props> = ({
                             >
                               {currentLabel}
                             </span>
+                           {showHeatmap && diffUrl && <HeatmapDot />}
                           </h3>
                           <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400 tracking-wide">
                             Active version frame
@@ -1088,27 +1513,78 @@ export const DesignComparison: React.FC<Props> = ({
                       </div>
                     </div>
                     {currentFrames[frameIndex] ? (
-                      <div className="relative w-full flex items-center justify-center">
-                        <Image
-                          src={currentFrames[frameIndex].thumbnail_url}
-                          alt="Current frame"
-                          width={800}
-                          height={800}
-                          className="object-contain w-auto max-h-[65vh] rounded"
-                          priority
-                        />
-                        {showHeatmap && diffUrl && (
-                          <Image
-                            src={diffUrl}
-                            alt="Heatmap"
-                            aria-hidden
-                            className="pointer-events-none absolute inset-0 object-contain w-auto max-h-[65vh] mix-blend-screen"
-                            style={{
-                              imageRendering: "pixelated",
-                              margin: "auto",
-                            }}
-                          />
-                        )}
+                                            <div className="relative w-full flex items-center justify-center">
+                        {(() => {
+                          const cur = currentFrames[frameIndex];
+                          const alignedPrev =
+                            previousFrames.find((p) => p.node_id === cur?.node_id) ||
+                            previousFrames[frameIndex];
+
+                          // Blink mode
+                          if (blink && alignedPrev) {
+                            const img = blinkShowCurrent
+                              ? cur.thumbnail_url
+                              : alignedPrev.thumbnail_url;
+                            return (
+                              <div className="relative">
+                                <NextImage
+                                  src={img}
+                                  alt="Blink compare"
+                                 width={800}
+                                  height={800}
+                                  className="object-contain w-auto max-h-[65vh] rounded"
+                                  priority
+                                />
+                                {showHeatmap && diffUrl && <HeatmapOverlay src={diffUrl} />}
+                              </div>
+                            );
+                          }
+
+                          // Split mode
+                          if (splitView && alignedPrev) {
+                            return (
+                              <div className="relative w-full flex items-center justify-center">
+                                <NextImage
+                                  src={alignedPrev.thumbnail_url}
+                                  alt="Previous (base)"
+                                  width={800}
+                                  height={800}
+                                  className="object-contain w-auto max-h-[65vh] rounded"
+                                  priority
+                                />
+                                <div
+                                  className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                                  style={{ clipPath: `inset(0 ${100 - revealPct}% 0 0)` }}
+                                >
+                                  <NextImage
+                                    src={cur.thumbnail_url}
+                                    alt="Current (revealed)"
+                                   width={800}
+                                    height={800}
+                                    className="object-contain w-auto max-h-[65vh] rounded"
+                                    priority
+                                  />
+                                </div>
+                                {showHeatmap && diffUrl && <HeatmapOverlay src={diffUrl} />}
+                              </div>
+                            );
+                          }
+
+                         // Default
+                          return (
+                            <div className="relative">
+                              <NextImage
+                                src={cur.thumbnail_url}
+                                alt="Current frame"
+                                width={800}
+                                height={800}
+                                className="object-contain w-auto max-h-[65vh] rounded"
+                                priority
+                             />
+                              {showHeatmap && diffUrl && <HeatmapOverlay src={diffUrl} />}
+                            </div>
+                          );
+                        })()}
                       </div>
                     ) : (
                       <div className="text-xs text-gray-400">No frame</div>
