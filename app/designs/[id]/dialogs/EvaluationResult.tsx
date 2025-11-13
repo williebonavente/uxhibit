@@ -1,8 +1,16 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { EvalResponse } from "../page";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import { PopoverTrigger } from "@radix-ui/react-popover";
 import { Info } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface EvaluationResultProps {
   evalResult: EvalResponse;
@@ -35,15 +43,42 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
 
   const debugCalc = root?.debug_calc;
 
-  const realFrames = useMemo(
-    () =>
-      Array.isArray(frameEvaluations)
-        ? frameEvaluations.filter((_, i) => i !== 0)
-        : [],
-    [frameEvaluations]
-  );
+  // Heuristic Average
+  const heurAvg =
+    typeof debugCalc?.heuristics_avg === "number"
+      ? debugCalc.heuristics_avg
+      : undefined;
 
-  const fallbackFromData = React.useMemo(() => {
+  const catScoresObj =
+    (root as any)?.ai?.category_scores ??
+    (root as any)?.category_scores ??
+    undefined;
+
+  const catNumbers = Array.isArray(catScoresObj)
+    ? (catScoresObj as number[]).filter((n) => Number.isFinite(n))
+    : catScoresObj && typeof catScoresObj === "object"
+    ? Object.values(catScoresObj).filter(
+        (v: any): v is number => typeof v === "number" && Number.isFinite(v)
+      )
+    : [];
+
+  const catAvg =
+    catNumbers.length > 0
+      ? Math.round(
+          catNumbers.reduce((sum, n) => sum + n, 0) / catNumbers.length
+        )
+      : undefined;
+
+
+  // BiasWeighted Average
+  const biasWeighted =
+    typeof debugCalc?.bias_weighted_overall === "number"
+      ? debugCalc.bias_weighted_overall
+      : typeof (root as any)?.bias?.weighted_overall === "number"
+      ? (root as any).bias.weighted_overall
+      : undefined;
+
+  const fallbackFromData = useMemo(() => {
     // mirror getFrameScore fallback
     const cats = root?.category_scores;
     let catsAvg: number | undefined;
@@ -80,6 +115,20 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
     return 0;
   }, [root, debugCalc]);
 
+  const customTriAverage =
+    typeof heurAvg === "number" &&
+    typeof catAvg === "number" &&
+    typeof biasWeighted === "number"
+      ? Math.round((heurAvg + catAvg + biasWeighted) / 3)
+      : undefined;
+
+  const score =
+    typeof customTriAverage === "number"
+      ? customTriAverage
+      : typeof debugCalc?.final === "number"
+      ? debugCalc.final
+      : fallbackFromData;
+
   if (!evalResult || loadingEval) return null;
 
   const HEURISTIC_LABELS: Record<string, string> = {
@@ -95,15 +144,13 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
     "10": "Help and Documentation",
   };
 
-  const combinedMean =
-    typeof debugCalc?.combined === "number" ? debugCalc.combined : undefined;
-  const score = Math.round(
-    typeof combinedMean === "number" ? combinedMean : fallbackFromData
-  );
+  // const combinedMean =
+  //   typeof debugCalc?.combined === "number" ? debugCalc.combined : undefined;
+  // const score = Math.round(
+  //   typeof combinedMean === "number" ? combinedMean : fallbackFromData
+  // );
 
   // 4. If you also need category scores and heuristics for active frame:
-  const categoryScores = activeFrame?.ai?.category_scores || {};
-  const heuristicBreakdown = activeFrame?.ai?.heuristic_breakdown || [];
 
   const title = `Frame ${mappedIndex + 1} Score`;
 
@@ -498,7 +545,10 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
                 />
               </svg>
               Heuristic Breakdown
-              <Popover open={isHoveringOverScoringLegendPopover} onOpenChange={setIsHoveringOverScoringLegendPopover} >
+              <Popover
+                open={isHoveringOverScoringLegendPopover}
+                onOpenChange={setIsHoveringOverScoringLegendPopover}
+              >
                 <PopoverTrigger asChild>
                   <button
                     type="button"
@@ -578,106 +628,184 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
                       </div>
                     </div>
                     <div className="mt-3 text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
-                      Scores show how well each heuristic is satisfied. Compare the value to the maximum (4) to see which principles need improvement and which are fully met.
+                      Scores show how well each heuristic is satisfied. Compare
+                      the value to the maximum (4) to see which principles need
+                      improvement and which are fully met.
                     </div>
                   </div>
                 </PopoverContent>
               </Popover>
             </h4>
 
+            {/* Inline legend (0–4) for quick reference */}
+            <div className="mb-4 rounded-lg border border-[#0891b2]/25 bg-white/80 dark:bg-[#0f172a]/40 p-3">
+              <div
+                className="grid grid-cols-5 gap-3 text-xs"
+                aria-label="Heuristic score legend from 0 (Missing) to 4 (Excellent)"
+                role="list"
+              >
+                <div
+                  className="flex flex-col items-center gap-1"
+                  role="listitem"
+                >
+                  <span className="px-2 py-0.5 w-8 text-center rounded-md bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300 font-semibold tabular-nums">
+                    0
+                  </span>
+                  <span className="text-gray-700 dark:text-gray-200">
+                    Missing
+                  </span>
+                </div>
+                <div
+                  className="flex flex-col items-center gap-1"
+                  role="listitem"
+                >
+                  <span className="px-2 py-0.5 w-8 text-center rounded-md bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 font-semibold tabular-nums">
+                    1
+                  </span>
+                  <span className="text-gray-700 dark:text-gray-200">Poor</span>
+                </div>
+                <div
+                  className="flex flex-col items-center gap-1"
+                  role="listitem"
+                >
+                  <span className="px-2 py-0.5 w-8 text-center rounded-md bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300 font-semibold tabular-nums">
+                    2
+                  </span>
+                  <span className="text-gray-700 dark:text-gray-200">
+                    Adequate
+                  </span>
+                </div>
+                <div
+                  className="flex flex-col items-center gap-1"
+                  role="listitem"
+                >
+                  <span className="px-2 py-0.5 w-8 text-center rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-semibold tabular-nums">
+                    3
+                  </span>
+                  <span className="text-gray-700 dark:text-gray-200">Good</span>
+                </div>
+                <div
+                  className="flex flex-col items-center gap-1"
+                  role="listitem"
+                >
+                  <span className="px-2 py-0.5 w-8 text-center rounded-md bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 font-semibold tabular-nums">
+                    4
+                  </span>
+                  <span className="text-gray-700 dark:text-gray-200">
+                    Excellent
+                  </span>
+                </div>
+              </div>
+            </div>
+
             {/* Desktop / tablet: table */}
             <div className="hidden sm:block">
-              <table className="w-full table-auto text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-neutral-500 dark:text-neutral-400">
-                    <th className="px-3 py-2 w-24">Code</th>
-                    <th className="px-3 py-2">Principle</th>
-                    <th className="px-3 py-2 w-56">Evaluation focus</th>
-                    <th className="px-3 py-2">Justification</th>
-                    <th className="px-3 py-2 w-32 text-right">Score</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y bg-white/90 dark:bg-[#232323]/90">
-                  {evalResult.ai.heuristic_breakdown.map(
-                    (h: any, idx: number) => {
-                      const score = typeof h.score === "number" ? h.score : 0;
-                      const max =
-                        typeof h.max_points === "number" ? h.max_points : 4;
-                      const pct = Math.round((score / Math.max(1, max)) * 100);
-                      const badgeClass =
-                        pct >= 85
-                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200"
-                          : pct >= 65
-                          ? "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-200"
-                          : pct >= 40
-                          ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
-                          : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200";
+              <div className="overflow-auto rounded-xl border border-[#0891b2]/20 shadow-sm max-h-[60vh]">
+                <Table className="w-full text-xs table-fixed">
+                  <TableHeader className="bg-[#0ea5e9]/10 dark:bg-[#38bdf8]/10 sticky top-0 z-10">
+                    <TableRow>
+                      <TableHead className="px-2 py-1.5 w-20 text-neutral-600 dark:text-neutral-300 font-semibold uppercase tracking-wide whitespace-nowrap">
+                        Code
+                      </TableHead>
+                      <TableHead className="px-2 py-1.5 text-neutral-600 dark:text-neutral-300 font-semibold uppercase tracking-wide">
+                        Principle
+                      </TableHead>
+                      <TableHead className="px-2 py-1.5 w-44 text-neutral-600 dark:text-neutral-300 font-semibold uppercase tracking-wide whitespace-nowrap">
+                        Evaluation focus
+                      </TableHead>
+                      {/* <TableHead className="px-2 py-1.5 text-neutral-600 dark:text-neutral-300 font-semibold uppercase tracking-wide">
+                                  Justification
+                                </TableHead> */}
+                      <TableHead className="px-2 py-1.5 w-24 text-right text-neutral-600 dark:text-neutral-300 font-semibold uppercase tracking-wide">
+                        Score
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
 
-                      return (
-                        <tr
-                          key={`heuristic-${h.code ?? idx}`}
-                          className="align-top"
-                        >
-                          <td className="px-3 py-3 align-top">
-                            <span className="inline-block px-2 py-1 rounded-full text-xs font-mono font-bold border border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800 text-slate-700 dark:text-slate-200">
-                              {h.code}
-                            </span>
-                          </td>
+                  <TableBody className="bg-white/90 dark:bg-[#232323]/90">
+                    {evalResult.ai.heuristic_breakdown.map(
+                      (h: any, idx: number) => {
+                        const score = typeof h.score === "number" ? h.score : 0;
+                        const max =
+                          typeof h.max_points === "number" ? h.max_points : 4;
+                        const pct = Math.round(
+                          (score / Math.max(1, max)) * 100
+                        );
+                        const badgeClass =
+                          pct >= 85
+                            ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200"
+                            : pct >= 65
+                            ? "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+                            : pct >= 40
+                            ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+                            : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200";
 
-                          <td className="px-3 py-3 align-top">
-                            <div className="font-semibold text-neutral-800 dark:text-neutral-100">
-                              {h.principle}
-                            </div>
-                          </td>
+                        return (
+                          <TableRow
+                            key={`heuristic-${h.code ?? idx}`}
+                            className="align-top"
+                          >
+                            <TableCell className="px-2 py-2 align-top whitespace-nowrap">
+                              <span className="inline-block px-2 py-0.5 rounded-full text-xs font-mono font-bold border border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800 text-slate-700 dark:text-slate-200">
+                                {h.code}
+                              </span>
+                            </TableCell>
 
-                          <td className="px-3 py-3 align-top text-xs text-neutral-500 dark:text-neutral-400">
-                            {h.evaluation_focus}
-                          </td>
+                            {/* Allow long principle to wrap without pushing score out of view */}
+                            <TableCell className="px-2 py-2 align-top min-w-[12rem] break-words whitespace-normal leading-5">
+                              <div className="font-semibold text-neutral-800 dark:text-neutral-100">
+                                {h.principle}
+                              </div>
+                            </TableCell>
 
-                          <td className="px-3 py-3 align-top text-xs text-neutral-600 dark:text-neutral-400">
-                            {h.justification}
-                          </td>
+                            {/* Wrap evaluation focus too */}
+                            <TableCell className="px-2 py-2 align-top text-[11px] text-neutral-500 dark:text-neutral-400 min-w-[10rem] break-words whitespace-normal leading-5">
+                              {h.evaluation_focus}
+                            </TableCell>
 
-                          <td className="px-3 py-3 align-top text-right">
-                            <div
-                              className="flex flex-col items-end gap-2"
-                              aria-label={`Score ${score} out of ${max}, ${pct} percent`}
-                            >
-                              {/* compact badge for the numeric score */}
-                              <span
-                                className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-mono font-semibold ${badgeClass} border border-transparent shadow-sm`}
-                                role="status"
+                            {/* <TableCell className="px-2 py-2 align-top text-[11px] text-neutral-600 dark:text-neutral-400">
+                                      {h.justification}
+                                    </TableCell> */}
+
+                            <TableCell className="px-2 py-2 align-top text-right">
+                              <div
+                                className="flex flex-col items-end gap-1"
+                                aria-label={`Score ${score} out of ${max}, ${pct} percent`}
                               >
-                                <span className="tabular-nums">{score}</span>
-                                <span className="text-xs font-normal text-neutral-600 dark:text-neutral-400">
-                                  / {max}
+                                <span
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-mono font-semibold ${badgeClass} border border-transparent shadow-sm`}
+                                  role="status"
+                                >
+                                  <span className="tabular-nums">{score}</span>
+                                  <span className="text-xs font-normal text-neutral-600 dark:text-neutral-400">
+                                    / {max}
+                                  </span>
                                 </span>
-                              </span>
-                              {/* compact percent as colored text (no badge) */}
-                              <span
-                                className={`ml-2 mr-3 text-xs font-semibold tabular-nums ${
-                                  pct >= 85
-                                    ? "text-green-600 dark:text-green-300"
-                                    : pct >= 65
-                                    ? "text-violet-600 dark:text-violet-300"
-                                    : pct >= 40
-                                    ? "text-amber-600 dark:text-amber-300"
-                                    : "text-red-600 dark:text-red-300"
-                                }`}
-                                title={`${pct}%`}
-                                aria-hidden={false}
-                                aria-label={`${pct} percent`}
-                              >
-                                {pct}%
-                              </span>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    }
-                  )}
-                </tbody>
-              </table>
+                                <span
+                                  className={`mr-2 text-[11px] font-semibold tabular-nums ${
+                                    pct >= 85
+                                      ? "text-green-600 dark:text-green-300"
+                                      : pct >= 65
+                                      ? "text-blue-700 dark:text-blue-300"
+                                      : pct >= 40
+                                      ? "text-amber-600 dark:text-amber-300"
+                                      : "text-red-600 dark:text-red-300"
+                                  }`}
+                                  title={`${pct}%`}
+                                  aria-hidden={false}
+                                  aria-label={`${pct} percent`}
+                                >
+                                  {pct}%
+                                </span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
 
             {/* Mobile: stacked cards */}

@@ -7,14 +7,17 @@ import React, {
 } from "react";
 import NextImage from "next/image";
 import { createClient } from "@/utils/supabase/client";
-import { FrameEvaluation } from "../page";
+import { EvalResponse, FrameEvaluation } from "../page";
 import {
   ArrowLeftRight,
   ChevronLeft,
   ChevronRight,
   Flame,
   Loader2,
+  Minus,
   Sparkles,
+  TrendingDown,
+  TrendingUp,
   X,
 } from "lucide-react";
 import {
@@ -67,7 +70,12 @@ export const DesignComparison: React.FC<Props> = ({
   const [threshold, setThreshold] = useState(40);
   const [swapSides, setSwapSides] = useState(false);
   const [versions, setVersions] = useState<
-    { id: string; version: number; created_at: string }[]
+    {
+      id: string;
+      version: number;
+      created_at: string;
+      ai_data?: EvalResponse;
+    }[]
   >([]);
   const [selectedCurrentVersionId, setSelectedCurrentVersionId] =
     useState(currentVersionId);
@@ -108,6 +116,34 @@ export const DesignComparison: React.FC<Props> = ({
   const currentVersionMeta = versions.find(
     (v) => v.id === selectedCurrentVersionId
   );
+
+  const previousVersionScore = useMemo(
+    () => computeScore(previousVersionMeta?.ai_data),
+    [previousVersionMeta]
+  );
+  const currentVersionScore = useMemo(
+    () => computeScore(currentVersionMeta?.ai_data),
+    [currentVersionMeta]
+  );
+
+  // Per-frame scores aligned by node_id when possible
+  const currentFrame = currentFrames[frameIndex];
+  const alignedPrevFrame =
+    previousFrames.find((p) => p.node_id === currentFrame?.node_id) ||
+    previousFrames[frameIndex];
+
+  const currentScore = useMemo(
+    () => computeScore(currentFrame?.ai_data),
+    [currentFrame]
+  );
+  const previousScore = useMemo(
+    () => computeScore(alignedPrevFrame?.ai_data),
+    [alignedPrevFrame]
+  );
+  const scoreDelta =
+    typeof currentScore === "number" && typeof previousScore === "number"
+      ? currentScore - previousScore
+      : undefined;
 
   const previousLabel = previousVersionMeta
     ? `v${previousVersionMeta.version}`
@@ -252,6 +288,102 @@ export const DesignComparison: React.FC<Props> = ({
     [threshold, heatmapColor, heatmapOpacity, HEATMAP_RGB]
   );
 
+  function computeScore(aiData: any): number | undefined {
+    if (!aiData) return undefined;
+
+    const possible = (aiData as any)?.ai ?? aiData;
+    const root = possible || {};
+    const debugCalc = root?.debug_calc;
+
+    // Heuristic average
+    const heurAvg =
+      typeof debugCalc?.heuristics_avg === "number"
+        ? debugCalc.heuristics_avg
+        : undefined;
+
+    // Category scores can be array or object
+    const catScoresObj =
+      (root as any)?.ai?.category_scores ??
+      (root as any)?.category_scores ??
+      undefined;
+
+    const catNumbers = Array.isArray(catScoresObj)
+      ? (catScoresObj as number[]).filter((n) => Number.isFinite(n))
+      : catScoresObj && typeof catScoresObj === "object"
+      ? Object.values(catScoresObj).filter(
+          (v: any): v is number => typeof v === "number" && Number.isFinite(v)
+        )
+      : [];
+
+    const catAvg =
+      catNumbers.length > 0
+        ? Math.round(
+            catNumbers.reduce((sum, n) => sum + n, 0) / catNumbers.length
+          )
+        : undefined;
+
+    // BiasWeighted Average
+    const biasWeighted =
+      typeof debugCalc?.bias_weighted_overall === "number"
+        ? debugCalc.bias_weighted_overall
+        : typeof (root as any)?.bias?.weighted_overall === "number"
+        ? (root as any).bias.weighted_overall
+        : undefined;
+
+    // Fallbacks (category + heuristic breakdown or overall_score)
+    const fallbackFromData = (() => {
+      const cats = root?.category_scores;
+      let catsAvg: number | undefined;
+      if (cats && typeof cats === "object") {
+        const vals = Object.values(cats).filter(
+          (v: any): v is number => typeof v === "number" && Number.isFinite(v)
+        );
+        if (vals.length)
+          catsAvg = Math.round(
+            vals.reduce((a: number, b: number) => a + b, 0) / vals.length
+          );
+      }
+      const hb: any[] = Array.isArray(root?.heuristic_breakdown)
+        ? root.heuristic_breakdown
+        : [];
+      let heuristicAvg: number | undefined;
+      if (hb.length) {
+        const pctSum = hb.reduce((acc, h) => {
+          const s = typeof h.score === "number" ? h.score : 0;
+          const m =
+            typeof h.max_points === "number" && h.max_points > 0
+              ? h.max_points
+              : 4;
+          return acc + (s / m) * 100;
+        }, 0);
+        heuristicAvg = Math.round(pctSum / hb.length);
+      }
+      if (typeof debugCalc?.final === "number") return debugCalc.final;
+      if (typeof root?.overall_score === "number") return root.overall_score;
+      if (typeof catsAvg === "number" && typeof heuristicAvg === "number")
+        return Math.round((catsAvg + heuristicAvg) / 2);
+      if (typeof catsAvg === "number") return catsAvg;
+      if (typeof heuristicAvg === "number") return heuristicAvg;
+      return undefined;
+    })();
+
+    const customTriAverage =
+      typeof heurAvg === "number" &&
+      typeof catAvg === "number" &&
+      typeof biasWeighted === "number"
+        ? Math.round((heurAvg + catAvg + biasWeighted) / 3)
+        : undefined;
+
+    const score =
+      typeof customTriAverage === "number"
+        ? customTriAverage
+        : typeof debugCalc?.final === "number"
+        ? debugCalc.final
+        : fallbackFromData;
+
+    return typeof score === "number" ? score : undefined;
+  }
+
   function HeatmapDot() {
     const [r, g, b] = HEATMAP_RGB[heatmapColor];
     return (
@@ -284,47 +416,82 @@ export const DesignComparison: React.FC<Props> = ({
     );
   }
 
-  function HeatmapLegend() {
-    if (!showHeatmap || !diffUrl) return null;
-    const [r, g, b] = HEATMAP_RGB[heatmapColor];
+  function ScoreBadge({
+    score,
+    tone,
+    title = "Overall score",
+  }: {
+    score: number;
+    tone: "current" | "previous";
+    title?: string;
+  }) {
+    const isCurrent = tone === "current";
+    const toneClasses = isCurrent
+      ? "from-indigo-500/15 to-violet-500/15 border-indigo-300/60 dark:border-indigo-900/50 ring-indigo-500/30"
+      : "from-orange-500/15 to-amber-500/15 border-orange-300/60 dark:border-orange-900/50 ring-orange-500/30";
+
+    const numberColor = isCurrent
+      ? "text-indigo-700 dark:text-indigo-200"
+      : "text-orange-700 dark:text-amber-200";
+
     return (
-      <div
-        className="inline-flex items-center gap-2 text-[11px]"
-        aria-label={`Color of changes: ${HEATMAP_LABELS[heatmapColor]}`}
-        title={`Color of changes: ${HEATMAP_LABELS[heatmapColor]}`}
+      <span
+        className={`inline-flex items-baseline gap-2 px-3 py-1.5 rounded-md border bg-gradient-to-r shadow-sm ring-1 ${toneClasses}`}
+        aria-label={title}
+        title={title}
       >
-        <span className="mt-1 text-[11px] text-gray-500 dark:text-gray-400 tracking-wide">
-          Heatmaps Color:
+        <span className="text-[10px] uppercase tracking-wide text-gray-600 dark:text-gray-300">
+          Score
         </span>
         <span
-          className="inline-block w-3 h-3 rounded-full border"
-          style={{
-            backgroundColor: `rgb(${r},${g},${b})`,
-            borderColor: `rgba(${r},${g},${b},0.5)`,
-          }}
-          aria-hidden
-        />
-      </div>
+          className={`tabular-nums text-base sm:text-lg font-bold ${numberColor}`}
+        >
+          {score}
+        </span>
+      </span>
     );
   }
 
   useEffect(() => {
     let active = true;
     (async () => {
-      setLoading(true);
-      const [cur, prev] = await Promise.all([
-        fetchFrames(currentVersionId),
-        fetchFrames(previousVersionId),
-      ]);
+      const { data, error } = await supabase
+        .from("design_versions")
+        .select("id, version, created_at, ai_data") // include ai_data
+        .eq("design_id", designId)
+        .order("version", { ascending: false });
+      if (error) {
+        console.warn(
+          "[DesignComparison] fetch versions failed:",
+          error.message
+        );
+        return;
+      }
       if (!active) return;
-      setCurrentFrames(cur);
-      setPreviousFrames(prev);
-      setLoading(false);
+      setVersions((data || []) as any);
     })();
     return () => {
       active = false;
     };
-  }, [fetchFrames, currentVersionId, previousVersionId]);
+  }, [designId, supabase]);
+
+  // useEffect(() => {
+  //   let active = true;
+  //   (async () => {
+  //     setLoading(true);
+  //     const [cur, prev] = await Promise.all([
+  //       fetchFrames(currentVersionId),
+  //       fetchFrames(previousVersionId),
+  //     ]);
+  //     if (!active) return;
+  //     setCurrentFrames(cur);
+  //     setPreviousFrames(prev);
+  //     setLoading(false);
+  //   })();
+  //   return () => {
+  //     active = false;
+  //   };
+  // }, [fetchFrames, currentVersionId, previousVersionId]);
 
   useEffect(() => {
     if (!showHeatmap) {
@@ -380,28 +547,28 @@ export const DesignComparison: React.FC<Props> = ({
     };
   }, []);
 
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      const { data, error } = await supabase
-        .from("design_versions")
-        .select("id, version, created_at")
-        .eq("design_id", designId)
-        .order("version", { ascending: false });
-      if (error) {
-        console.warn(
-          "[DesignComparison] fetch versions failed:",
-          error.message
-        );
-        return;
-      }
-      if (!active) return;
-      setVersions((data || []) as any);
-    })();
-    return () => {
-      active = false;
-    };
-  }, [designId, supabase]);
+  // useEffect(() => {
+  //   let active = true;
+  //   (async () => {
+  //     const { data, error } = await supabase
+  //       .from("design_versions")
+  //       .select("id, version, created_at")
+  //       .eq("design_id", designId)
+  //       .order("version", { ascending: false });
+  //     if (error) {
+  //       console.warn(
+  //         "[DesignComparison] fetch versions failed:",
+  //         error.message
+  //       );
+  //       return;
+  //     }
+  //     if (!active) return;
+  //     setVersions((data || []) as any);
+  //   })();
+  //   return () => {
+  //     active = false;
+  //   };
+  // }, [designId, supabase]);
 
   // Load frames for the selected versions
   useEffect(() => {
@@ -492,32 +659,32 @@ export const DesignComparison: React.FC<Props> = ({
       (p) => p.node_id === currentFrames[frameIndex]?.node_id
     );
 
-  useEffect(() => {
-    if (!showHeatmap) {
-      setDiffUrl(null);
-      console.log("[heatmap] Disabled");
-      return;
-    }
-    const cur = currentFrames[frameIndex];
-    const prev =
-      previousFrames.find((p) => p.node_id === cur?.node_id) ||
-      previousFrames[frameIndex];
+  // useEffect(() => {
+  //   if (!showHeatmap) {
+  //     setDiffUrl(null);
+  //     console.log("[heatmap] Disabled");
+  //     return;
+  //   }
+  //   const cur = currentFrames[frameIndex];
+  //   const prev =
+  //     previousFrames.find((p) => p.node_id === cur?.node_id) ||
+  //     previousFrames[frameIndex];
 
-    if (!cur || !prev) {
-      console.log("[heatmap] Missing frame(s)", {
-        curExists: !!cur,
-        prevExists: !!prev,
-      });
-      setDiffUrl(null);
-      return;
-    }
+  //   if (!cur || !prev) {
+  //     console.log("[heatmap] Missing frame(s)", {
+  //       curExists: !!cur,
+  //       prevExists: !!prev,
+  //     });
+  //     setDiffUrl(null);
+  //     return;
+  //   }
 
-    console.log("[heatmap] Building diff for frameIndex", frameIndex, {
-      curNode: cur.node_id,
-      prevNode: prev.node_id,
-    });
-    buildDiff(prev.thumbnail_url, cur.thumbnail_url);
-  }, [showHeatmap, frameIndex, currentFrames, previousFrames, buildDiff]);
+  //   console.log("[heatmap] Building diff for frameIndex", frameIndex, {
+  //     curNode: cur.node_id,
+  //     prevNode: prev.node_id,
+  //   });
+  //   buildDiff(prev.thumbnail_url, cur.thumbnail_url);
+  // }, [showHeatmap, frameIndex, currentFrames, previousFrames, buildDiff]);
 
   return (
     <div className="fixed inset-0 z-[1000] w-screen h-screen bg-white dark:bg-[#121212] flex flex-col overscroll-contain">
@@ -1197,7 +1364,6 @@ export const DesignComparison: React.FC<Props> = ({
                             >
                               {currentLabel}
                             </span>
-                        {showHeatmap && diffUrl && <HeatmapDot />}
                           </h3>
                           <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400 tracking-wide">
                             Active version frame
@@ -1207,7 +1373,36 @@ export const DesignComparison: React.FC<Props> = ({
                         {areSequential && (
                           <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
                             +1 iteration
+                            
                           </span>
+                        )}
+                        {typeof scoreDelta === "number" && (
+  <span
+    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md border ring-1 shadow-sm
+      ${
+        scoreDelta > 0
+          ? "bg-green-50 dark:bg-green-900/25 text-green-700 dark:text-green-200 border-green-300 dark:border-green-800 ring-green-200/60 dark:ring-green-700/40"
+          : scoreDelta < 0
+          ? "bg-red-50 dark:bg-red-900/25 text-red-700 dark:text-red-200 border-red-300 dark:border-red-800 ring-red-200/60 dark:ring-red-700/40"
+          : "bg-amber-50 dark:bg-amber-900/25 text-amber-700 dark:text-amber-200 border-amber-300 dark:border-amber-800 ring-amber-200/60 dark:ring-amber-700/40"
+      }`}
+    title={scoreDelta > 0 ? "Improved" : scoreDelta < 0 ? "Regressed" : "No change"}
+  >
+    {scoreDelta > 0 ? (
+      <TrendingUp className="h-5 w-5" />
+    ) : scoreDelta < 0 ? (
+      <TrendingDown className="h-5 w-5" />
+    ) : (
+      <Minus className="h-5 w-5" />
+    )}
+    <span className="tabular-nums text-sm font-semibold">
+      {scoreDelta > 0 ? "+" : scoreDelta < 0 ? "" : "±"}
+      {scoreDelta}
+    </span>
+  </span>
+)}
+                         {typeof currentScore === "number" && (
+                          <ScoreBadge score={currentScore} tone="current" />
                         )}
                       </div>
 
@@ -1226,6 +1421,9 @@ export const DesignComparison: React.FC<Props> = ({
                             ✓ Aligned
                           </span>
                         )}
+                        {/* {typeof currentScore === "number" && (
+                          <ScoreBadge score={currentScore} tone="current" />
+                        )} */}
                       </div>
                     </div>
                     {currentFrames[frameIndex] ? (
@@ -1350,18 +1548,15 @@ export const DesignComparison: React.FC<Props> = ({
                             Previous version frame
                           </p>
                         </div>
-
-                        {/* (Optional) comparison badge
-                        {currentVersionMeta && previousVersionMeta && (
-                          <div className="flex flex-col items-end">
-                            <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                              Comparing to
-                            </span>
-                            <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-gray-100 dark:bg-neutral-800">
-                              {currentLabel}
-                            </span>
-                          </div>
+                          {/* {areSequential && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
+                            +1 iteration
+                            
+                          </span>
                         )} */}
+                         {typeof previousScore === "number" && (
+                          <ScoreBadge score={previousScore} tone="previous" />
+                        )}
                       </div>
 
                       <div className="mt-4 flex items-center gap-2">
@@ -1400,6 +1595,7 @@ export const DesignComparison: React.FC<Props> = ({
               ) : (
                 <>
                   {/* Previous (left default) */}
+                      {/* Previous (right when swapped) */}
                   <div className="relative border rounded-md p-4 bg-white dark:bg-neutral-900 shadow-sm">
                     <div className="mb-6">
                       <div className="flex items-start justify-between gap-3">
@@ -1419,18 +1615,15 @@ export const DesignComparison: React.FC<Props> = ({
                             Previous version frame
                           </p>
                         </div>
-
-                        {/* (Optional) comparison badge */}
-                        {/* {currentVersionMeta && previousVersionMeta && (
-                          <div className="flex flex-col items-end">
-                            <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                              Comparing to
-                            </span>
-                            <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-gray-100 dark:bg-neutral-800">
-                              {currentLabel}
-                            </span>
-                          </div>
+                          {/* {areSequential && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
+                            +1 iteration
+                            
+                          </span>
                         )} */}
+                         {typeof previousScore === "number" && (
+                          <ScoreBadge score={previousScore} tone="previous" />
+                        )}
                       </div>
 
                       <div className="mt-4 flex items-center gap-2">
@@ -1462,12 +1655,12 @@ export const DesignComparison: React.FC<Props> = ({
                         />
                       </div>
                     ) : (
-                      <div className="text-lg text-gray-400">No frame</div>
+                      <div className="text-xs text-gray-400">No frame</div>
                     )}
                   </div>
 
                   {/* Current (right default) */}
-                  <div className="relative border rounded-md p-4 bg-white dark:bg-neutral-900 shadow-sm">
+                         <div className="relative border rounded-md p-4 bg-white dark:bg-neutral-900 shadow-sm">
                     <div className="mb-6">
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -1481,17 +1674,38 @@ export const DesignComparison: React.FC<Props> = ({
                             >
                               {currentLabel}
                             </span>
-                           {showHeatmap && diffUrl && <HeatmapDot />}
                           </h3>
                           <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400 tracking-wide">
                             Active version frame
                           </p>
                         </div>
-
-                        {areSequential && (
-                          <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
-                            +1 iteration
-                          </span>
+                        {typeof scoreDelta === "number" && (
+  <span
+    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md border ring-1 shadow-sm
+      ${
+        scoreDelta > 0
+          ? "bg-green-50 dark:bg-green-900/25 text-green-700 dark:text-green-200 border-green-300 dark:border-green-800 ring-green-200/60 dark:ring-green-700/40"
+          : scoreDelta < 0
+          ? "bg-red-50 dark:bg-red-900/25 text-red-700 dark:text-red-200 border-red-300 dark:border-red-800 ring-red-200/60 dark:ring-red-700/40"
+          : "bg-amber-50 dark:bg-amber-900/25 text-amber-700 dark:text-amber-200 border-amber-300 dark:border-amber-800 ring-amber-200/60 dark:ring-amber-700/40"
+      }`}
+    title={scoreDelta > 0 ? "Improved" : scoreDelta < 0 ? "Regressed" : "No change"}
+  >
+    {scoreDelta > 0 ? (
+      <TrendingUp className="h-5 w-5" />
+    ) : scoreDelta < 0 ? (
+      <TrendingDown className="h-5 w-5" />
+    ) : (
+      <Minus className="h-5 w-5" />
+    )}
+    <span className="tabular-nums text-sm font-semibold">
+      {scoreDelta > 0 ? "+" : scoreDelta < 0 ? "" : "±"}
+      {scoreDelta}
+    </span>
+  </span>
+)}
+                         {typeof currentScore === "number" && (
+                          <ScoreBadge score={currentScore} tone="current" />
                         )}
                       </div>
 
@@ -1510,15 +1724,19 @@ export const DesignComparison: React.FC<Props> = ({
                             ✓ Aligned
                           </span>
                         )}
+                        {/* {typeof currentScore === "number" && (
+                          <ScoreBadge score={currentScore} tone="current" />
+                        )} */}
                       </div>
                     </div>
                     {currentFrames[frameIndex] ? (
-                                            <div className="relative w-full flex items-center justify-center">
+                      <div className="relative w-full flex items-center justify-center">
                         {(() => {
                           const cur = currentFrames[frameIndex];
                           const alignedPrev =
-                            previousFrames.find((p) => p.node_id === cur?.node_id) ||
-                            previousFrames[frameIndex];
+                            previousFrames.find(
+                              (p) => p.node_id === cur?.node_id
+                            ) || previousFrames[frameIndex];
 
                           // Blink mode
                           if (blink && alignedPrev) {
@@ -1530,12 +1748,14 @@ export const DesignComparison: React.FC<Props> = ({
                                 <NextImage
                                   src={img}
                                   alt="Blink compare"
-                                 width={800}
+                                  width={800}
                                   height={800}
                                   className="object-contain w-auto max-h-[65vh] rounded"
                                   priority
                                 />
-                                {showHeatmap && diffUrl && <HeatmapOverlay src={diffUrl} />}
+                                {showHeatmap && diffUrl && (
+                                  <HeatmapOverlay src={diffUrl} />
+                                )}
                               </div>
                             );
                           }
@@ -1554,23 +1774,29 @@ export const DesignComparison: React.FC<Props> = ({
                                 />
                                 <div
                                   className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                                  style={{ clipPath: `inset(0 ${100 - revealPct}% 0 0)` }}
+                                  style={{
+                                    clipPath: `inset(0 ${
+                                      100 - revealPct
+                                    }% 0 0)`,
+                                  }}
                                 >
                                   <NextImage
                                     src={cur.thumbnail_url}
                                     alt="Current (revealed)"
-                                   width={800}
+                                    width={800}
                                     height={800}
                                     className="object-contain w-auto max-h-[65vh] rounded"
                                     priority
                                   />
                                 </div>
-                                {showHeatmap && diffUrl && <HeatmapOverlay src={diffUrl} />}
+                                {showHeatmap && diffUrl && (
+                                  <HeatmapOverlay src={diffUrl} />
+                                )}
                               </div>
                             );
                           }
 
-                         // Default
+                          // Default
                           return (
                             <div className="relative">
                               <NextImage
@@ -1580,8 +1806,21 @@ export const DesignComparison: React.FC<Props> = ({
                                 height={800}
                                 className="object-contain w-auto max-h-[65vh] rounded"
                                 priority
-                             />
-                              {showHeatmap && diffUrl && <HeatmapOverlay src={diffUrl} />}
+                              />
+
+                              {showHeatmap && (
+                                <div className="absolute top-2 right-2 z-20 text-[10px] px-2 py-1 rounded bg-black/60 text-white">
+                                  {diffCount === null
+                                    ? "Building…"
+                                    : diffCount === 0
+                                    ? "No differences"
+                                    : `${diffCount} diffs`}
+                                </div>
+                              )}
+
+                              {showHeatmap && diffUrl && (
+                                <HeatmapOverlay src={diffUrl} />
+                              )}
                             </div>
                           );
                         })()}
@@ -1589,6 +1828,7 @@ export const DesignComparison: React.FC<Props> = ({
                     ) : (
                       <div className="text-xs text-gray-400">No frame</div>
                     )}
+                    {/* {showHeatmap && diffUrl && <HeatmapOverlay src={diffUrl} />} */}
                   </div>
                 </>
               )}

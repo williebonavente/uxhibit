@@ -30,6 +30,7 @@ interface HeuristicLegendModalProps {
     severity?: string | number;
     score?: number;
     max_points?: number;
+    justification?: string;
   }[];
   versionLabel: number | string | null;
 }
@@ -219,12 +220,17 @@ const HeuristicLegendModal: React.FC<HeuristicLegendModalProps> = ({
                           Score: {score}/{max}
                         </span>
                       )}
+
                     </div>
                     <div className="font-semibold mb-1">
                       {h.title || "Untitled heuristic"}
                     </div>
                     <p className="text-xs leading-relaxed text-gray-600 dark:text-gray-300 mb-3">
                       {h.description || "No description provided."}
+                    </p>
+                      <p className="text-xs leading-relaxed text-gray-600 dark:text-gray-300 mb-3">
+                      {/* TODO: later add the justification here */}
+                      {/* {h.justification || "Justfied."} */}
                     </p>
                     {pct != null && (
                       <div className="space-y-1">
@@ -469,9 +475,6 @@ const RadarChart: React.FC<{ items: any[] }> = ({ items }) => {
 
   const polygon = points.map((p) => `${p.x},${p.y}`).join(" ");
 
-  const centerValue = percentMode
-    ? `${Math.round(avgRatio * 100)}%`
-    : `${(avgRatio * maxScale).toFixed(1)}`;
 
   const avgPercent = Math.round(avgRatio * 100); // 0–100
   const avgRaw = (avgRatio * maxScale).toFixed(1);
@@ -773,7 +776,7 @@ const RadarChart: React.FC<{ items: any[] }> = ({ items }) => {
                     <span className="font-semibold">{p.code}</span>
                   </div>
                   {/* Tooltip value line (replace existing score line): */}
-                  <div className="text-[11px] text-gray-600 dark:text-white-900">
+                  <div className="text-[11px] text-white-600 dark:text-white-900">
                     Score: {p.score}/{p.max}
                     {percentMode && showPercentValues
                       ? ` (${Math.round(p.ratio * 100)}%)`

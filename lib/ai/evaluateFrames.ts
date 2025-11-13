@@ -15,24 +15,24 @@ export async function evaluateFrames({
   figmaFileUrl,
   onProgress,
 }: {
-  frameIds: string[],
-  frameImages: Record<string, string>,
-  user: any,
-  designId: string,
-  fileKey: string,
-  versionId?: string,
-  snapshot?: any,
-  authError?: any,
-  supabase: any,
-  figmaFileUrl: string,
-  onProgress?: (current: number, total: number) => Promise<void>,
+  frameIds: string[];
+  frameImages: Record<string, string>;
+  user: any;
+  designId: string;
+  fileKey: string;
+  versionId?: string;
+  snapshot?: any;
+  authError?: any;
+  supabase: any;
+  figmaFileUrl: string;
+  onProgress?: (current: number, total: number) => Promise<void>;
 }) {
   const frameSupabaseUrls: Record<string, string> = {};
 
   function preprocessTextNodes(nodes: any[]) {
     if (!nodes || nodes.length === 0) return [];
 
-    return nodes.map(node => ({
+    return nodes.map((node) => ({
       text: node.text.length > 40 ? node.text.slice(0, 40) + "..." : node.text,
       fontSize: node.fontSize,
       fontWeight: node.fontWeight,
@@ -46,15 +46,16 @@ export async function evaluateFrames({
 
   function summarizeFrameForAI(frameId: string, nodes: any[]) {
     const count = nodes.length;
-    const fontSizes = nodes.map(n => n.fontSize);
-    const avgFontSize = fontSizes.reduce((a, b) => a + b, 0) / (fontSizes.length || 1);
+    const fontSizes = nodes.map((n) => n.fontSize);
+    const avgFontSize =
+      fontSizes.reduce((a, b) => a + b, 0) / (fontSizes.length || 1);
 
     return {
       frame_id: frameId,
       total_text_elements: count,
       avg_font_size: Math.round(avgFontSize),
-      unique_fonts: [...new Set(nodes.map(n => n.fontFamily))],
-      sample_texts: nodes.slice(0, 5).map(n => n.text),
+      unique_fonts: [...new Set(nodes.map((n) => n.fontFamily))],
+      sample_texts: nodes.slice(0, 5).map((n) => n.text),
     };
   }
 
@@ -63,7 +64,9 @@ export async function evaluateFrames({
       let supabaseUrl: string | null = null;
       try {
         // Add scale param for thumbnail
-        const thumbnailUrl = figmaUrl.includes('?') ? `${figmaUrl}&scale=0.3` : `${figmaUrl}?scale=0.3`;
+        const thumbnailUrl = figmaUrl.includes("?")
+          ? `${figmaUrl}&scale=0.3`
+          : `${figmaUrl}?scale=0.3`;
         const imgRes = await fetch(thumbnailUrl);
         if (!imgRes.ok) {
           frameSupabaseUrls[frameId] = figmaUrl;
@@ -72,14 +75,14 @@ export async function evaluateFrames({
         const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
         const filePath = `${user?.id}/${designId}/${frameId}.png`;
         const { error } = await supabase.storage
-          .from('figma-frames')
+          .from("figma-frames")
           .upload(filePath, imgBuffer, {
-            contentType: 'image/png',
+            contentType: "image/png",
             upsert: true,
           });
         if (!error) {
           const { data: signedData } = await supabase.storage
-            .from('figma-frames')
+            .from("figma-frames")
             .createSignedUrl(filePath, 60 * 60 * 24 * 365);
           supabaseUrl = signedData?.signedUrl || figmaUrl;
         } else {
@@ -92,14 +95,15 @@ export async function evaluateFrames({
     })
   );
 
-
   if (authError || !user) {
-    throw new Error('Unauthorized - user not found');
+    throw new Error("Unauthorized - user not found");
   }
   figmaFileUrl = figmaFileUrl;
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  const res = await fetch(`${baseUrl}/api/figma/parse?url=${encodeURIComponent(figmaFileUrl)}`);
+  const res = await fetch(
+    `${baseUrl}/api/figma/parse?url=${encodeURIComponent(figmaFileUrl)}`
+  );
   const figmaContext = await res.json();
   const heuristics = getHeuristicScores(figmaContext);
   const accessibilityResults = figmaContext.accessibilityResults;
@@ -110,20 +114,21 @@ export async function evaluateFrames({
   console.log(figmaContext);
   console.log("Detected Buttons COMING FROM FIGMA CONTEXT: ", detectedButtons);
 
-  const minimalAccessibilityResults = accessibilityResults.map(result => ({
+  const minimalAccessibilityResults = accessibilityResults.map((result) => ({
     frameId: result.frameId,
     frameName: result.frameName,
     layoutScore: result.layoutScore,
     averageContrastScore: result.averageContrastScore,
   }));
 
-  const minimalLayoutResults = Object.entries(layoutResults).map(([frameId, result]) => ({
-    frameId,
-    score: result.score,
-    summary: result.summary,
-    // issues: result.issues,
-  }));
-
+  const minimalLayoutResults = Object.entries(layoutResults).map(
+    ([frameId, result]) => ({
+      frameId,
+      score: result.score,
+      summary: result.summary,
+      // issues: result.issues,
+    })
+  );
 
   const frameResults: any[] = await Promise.all(
     frameIds.map(async (nodeId, index) => {
@@ -136,14 +141,32 @@ export async function evaluateFrames({
       let ai_error: string | undefined;
 
       console.log("RETURNING FIGMA CONTEXT: ");
-      console.log(figmaContext.accessibilityResults)
+      console.log(figmaContext.accessibilityResults);
       try {
         // TODO: FOR RE-EVALUATION
-                // Ensure snapshot is an object and contains iteration
+        // Ensure snapshot is an object and contains iteration
         const snapshotObj =
           typeof snapshot === "string"
-            ? (() => { try { return JSON.parse(snapshot); } catch { return undefined; } })()
-            : snapshot;
+            ? (() => {
+                try {
+                  return JSON.parse(snapshot);
+                } catch {
+                  return {};
+                }
+              })()
+            : snapshot || {};
+
+        // Provide sane defaults if UI didn’t set them
+        if (!("focus" in snapshotObj) && !("scoringFocus" in snapshotObj)) {
+          (snapshotObj as any).focus = "balance";
+        }
+        if (!("device" in snapshotObj)) {
+          (snapshotObj as any).device = "desktop";
+        }
+        if (!("strictness" in snapshotObj)) {
+          (snapshotObj as any).strictness = "balanced";
+        }
+
         console.log("Evaluator snapshot.iteration:", snapshotObj?.iteration);
 
         ai = await aiEvaluator(
@@ -159,7 +182,6 @@ export async function evaluateFrames({
           },
           snapshotObj
         );
- 
 
         if (!ai) ai_error = "mistral_skipped_or_empty";
         if (ai && Array.isArray(ai.issues)) {
@@ -169,30 +191,37 @@ export async function evaluateFrames({
           }));
         }
       } catch (e: unknown) {
-        ai_error = `mistral_error: ${e instanceof Error ? e.message : "unknown"}`;
+        ai_error = `mistral_error: ${
+          e instanceof Error ? e.message : "unknown"
+        }`;
       }
 
       if (ai && nodeId) {
         try {
-          await supabase.from("design_frame_evaluations").upsert({
-            design_id: designId,
-            file_key: fileKey,
-            node_id: nodeId,
-            version_id: versionId ?? null,
-            thumbnail_url: imageUrl,
-            ai_summary: ai.summary || null,
-            ai_data: ai,
-            snapshot: (() => {
-              if (!snapshot) return null;
-              if (typeof snapshot === "string") {
-                try { return JSON.parse(snapshot); } catch { return null; }
-              }
-              return snapshot;
-            })(),
-            created_at: new Date().toISOString(),
-            owner_id: user.id
-          },
-            { onConflict: ['design_id', 'node_id'] }
+          await supabase.from("design_frame_evaluations").upsert(
+            {
+              design_id: designId,
+              file_key: fileKey,
+              node_id: nodeId,
+              version_id: versionId ?? null,
+              thumbnail_url: imageUrl,
+              ai_summary: ai.summary || null,
+              ai_data: ai,
+              snapshot: (() => {
+                if (!snapshot) return null;
+                if (typeof snapshot === "string") {
+                  try {
+                    return JSON.parse(snapshot);
+                  } catch {
+                    return null;
+                  }
+                }
+                return snapshot;
+              })(),
+              created_at: new Date().toISOString(),
+              owner_id: user.id,
+            },
+            { onConflict: ["design_id", "node_id"] }
           );
         } catch (err) {
           console.log(err);
@@ -211,13 +240,16 @@ export async function evaluateFrames({
       };
     })
   );
-  const validResults = frameResults.filter(r => r.ai);
+  const validResults = frameResults.filter((r) => r.ai);
   const total_score = validResults.length
-    ? Math.round(validResults.reduce((sum, r) => sum + (r.ai?.overall_score ?? 0), 0) / validResults.length)
+    ? Math.round(
+        validResults.reduce((sum, r) => sum + (r.ai?.overall_score ?? 0), 0) /
+          validResults.length
+      )
     : 0;
 
   const mergedSummaries = validResults
-    .map(r => String(r.ai?.summary ?? ""))
+    .map((r) => String(r.ai?.summary ?? ""))
     .filter(Boolean)
     .join(". ");
 
@@ -225,49 +257,63 @@ export async function evaluateFrames({
     if (!text) return "";
     const sentences = text
       .split(/(?<=[.!?])\s+/)
-      .map(s => s.trim())
+      .map((s) => s.trim())
       .filter(Boolean);
 
     if (sentences.length === 0) return "";
     if (sentences.length <= count) {
       if (sentences.length < count) {
-        const clauses = sentences[0].split(",").map(c => c.trim()).filter(Boolean);
+        const clauses = sentences[0]
+          .split(",")
+          .map((c) => c.trim())
+          .filter(Boolean);
         if (clauses.length >= count) {
-          return clauses.slice(0, count).map(c => (c.endsWith(".") ? c : c + ".")).join(" ");
+          return clauses
+            .slice(0, count)
+            .map((c) => (c.endsWith(".") ? c : c + "."))
+            .join(" ");
         }
       }
       return sentences.join(" ");
     }
 
     // build word frequency map for scoring
-    const tokens = (text.toLowerCase().match(/\w+/g) || []);
+    const tokens = text.toLowerCase().match(/\w+/g) || [];
     const freq: Record<string, number> = {};
-    tokens.forEach(w => (freq[w] = (freq[w] || 0) + 1));
+    tokens.forEach((w) => (freq[w] = (freq[w] || 0) + 1));
 
-    const scored = sentences.map(s => {
-      const words = (s.toLowerCase().match(/\w+/g) || []);
-      const score = words.reduce((sum, w) => sum + (freq[w] || 0), 0) / Math.sqrt(Math.max(1, words.length));
+    const scored = sentences.map((s) => {
+      const words = s.toLowerCase().match(/\w+/g) || [];
+      const score =
+        words.reduce((sum, w) => sum + (freq[w] || 0), 0) /
+        Math.sqrt(Math.max(1, words.length));
       return { s, score };
     });
 
     // pick top N sentences
     scored.sort((a, b) => b.score - a.score);
-    const top = scored.slice(0, count).map(x => x.s);
+    const top = scored.slice(0, count).map((x) => x.s);
 
     // preserve original order
-    const ordered = sentences.filter(s => top.includes(s)).slice(0, count);
+    const ordered = sentences.filter((s) => top.includes(s)).slice(0, count);
     return ordered.join(" ");
   }
 
   // sentiment (lightweight) — Sentiment is already imported at top of file
   const sentimentAnalyzer = new Sentiment();
-  const sentimentResult = mergedSummaries ? sentimentAnalyzer.analyze(mergedSummaries) : { score: 0, comparative: 0 };
-  const sentimentLabel = sentimentResult.score > 0 ? "positive" : sentimentResult.score < 0 ? "negative" : "neutral";
+  const sentimentResult = mergedSummaries
+    ? sentimentAnalyzer.analyze(mergedSummaries)
+    : { score: 0, comparative: 0 };
+  const sentimentLabel =
+    sentimentResult.score > 0
+      ? "positive"
+      : sentimentResult.score < 0
+      ? "negative"
+      : "neutral";
 
   const threeSentenceSummary = makeThreeSentenceSummary(mergedSummaries, 3);
   const summary = threeSentenceSummary;
   const long_summary = mergedSummaries;
-
 
   const jobId = `${designId}-${versionId ?? "latest"}`;
   // console.log("[JobId]:", jobId);
@@ -282,6 +328,6 @@ export async function evaluateFrames({
       score: sentimentResult.score,
       comparative: sentimentResult.comparative,
       label: sentimentLabel,
-    }
+    },
   };
 }

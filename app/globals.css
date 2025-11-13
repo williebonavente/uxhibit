@@ -620,3 +620,9 @@ button[aria-disabled="true"] * {
 .animate-progressStripes {
   animation: progressStripes 0.9s linear infinite;
 }
+
+@keyframes badgePop {
+  0% { transform: scale(.85); opacity:.2 }
+  60% { transform: scale(1.08); opacity:.95 }
+  100% { transform: scale(1); opacity:1 }
+}

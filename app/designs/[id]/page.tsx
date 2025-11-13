@@ -38,7 +38,6 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { DesignComparison } from "./dialogs/DesignComparison";
-import { convertToParsedChatCompletionResponse } from "@mistralai/mistralai/extra/structChat";
 
 export interface FrameEvaluation {
   id: string;
@@ -146,12 +145,26 @@ type AiDebugCalc = {
   target: number;
   alpha: number;
   blended: number;
-  extra_pull_applied: boolean;
   final: number;
   iteration: number;
   total_iterations: number;
+  extra_pull_applied: boolean;
+  bias_weighted_overall: number;
+  
 };
 
+type AiBiasParams = {
+  params?: {
+    focus?: string;
+    device?: string;
+    generation?: string;
+    occupation?: string;
+    strictness?: string;
+  };
+  categoryWeights?: Record<string, number>;
+  weighted_overall?: number;
+  severityMultipliers?: Record<string, number>;
+}
 export type EvalResponse = {
   nodeId: string;
   imageUrl: string;
@@ -190,6 +203,7 @@ export type EvalResponse = {
     resources?: EvalResource[];
     heuristic_breakdown?: HeuristicBreakdownItem[];
     debug_calc?: AiDebugCalc;
+    bias?: AiBiasParams;
   } | null;
 };
 
@@ -378,124 +392,147 @@ export default function DesignDetailPage({
     previousVersionScores,
   ]);
 
-  const fetchEvaluations = React.useCallback(async () => {
-    const supabase = createClient();
-    console.log(
-      "[fetchEvaluations] Fetching latest version for design:",
-      design?.id
-    );
+  const fetchEvaluations = React.useCallback(
+    async (overrideVersionId?: string | null) => {
+      const supabase = createClient();
+      console.log(
+        "[fetchEvaluations] Fetching version for design:",
+        design?.id,
+        "overrideVersionId:",
+        overrideVersionId
+      );
 
-    const { data: versionData, error: versionError } = await supabase
-      .from("design_versions")
-      .select(
+      // If a version id is provided, fetch that specific version.
+      // Otherwise, fall back to the latest version for this design.
+      let versionData: any = null;
+      let versionError: any = null;
+
+      if (overrideVersionId) {
+        const { data, error } = await supabase
+          .from("design_versions")
+          .select(
+            `
+          id, design_id, version, file_key, node_id, thumbnail_url, created_by,
+          ai_summary, ai_data, snapshot, created_at, updated_at, total_score
         `
-      id, design_id, version, file_key, node_id, thumbnail_url, created_by,
-      ai_summary, ai_data, snapshot, created_at, updated_at, total_score
-    `
-      )
-      .eq("design_id", design?.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+          )
+          .eq("id", overrideVersionId)
+          .maybeSingle();
+        versionData = data;
+        versionError = error;
+      } else {
+        const { data, error } = await supabase
+          .from("design_versions")
+          .select(
+            `
+          id, design_id, version, file_key, node_id, thumbnail_url, created_by,
+          ai_summary, ai_data, snapshot, created_at, updated_at, total_score
+        `
+          )
+          .eq("design_id", design?.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        versionData = data;
+        versionError = error;
+      }
 
-    if (versionError) {
-      console.error(
-        "[fetchEvaluations] Failed to fetch version:",
-        versionError.message
-      );
-      return;
-    }
-    if (!versionData) {
-      console.warn(
-        "[fetchEvaluations] No version data found for design:",
-        design?.id
-      );
-      setFrameEvaluations([]);
-      return;
-    }
+      if (versionError) {
+        console.error(
+          "[fetchEvaluations] Failed to fetch version:",
+          versionError.message
+        );
+        return;
+      }
+      if (!versionData) {
+        console.warn(
+          "[fetchEvaluations] No version data found for design:",
+          design?.id
+        );
+        setFrameEvaluations([]);
+        return;
+      }
 
-    if (
-      !versionData.ai_summary ||
-      !versionData.ai_data ||
-      typeof versionData.total_score !== "number" ||
-      versionData.total_score === 0
-    ) {
-      console.warn(
-        "[fetchEvaluations] Skipping incomplete version:",
+      if (
+        !versionData.ai_summary ||
+        !versionData.ai_data ||
+        typeof versionData.total_score !== "number" ||
+        versionData.total_score === 0
+      ) {
+        console.warn(
+          "[fetchEvaluations] Skipping incomplete version:",
+          versionData.id
+        );
+      }
+
+      let aiData = versionData.ai_data;
+      if (typeof aiData === "string") {
+        try {
+          aiData = JSON.parse(aiData);
+        } catch (e) {
+          console.error(
+            "[fetchEvaluations] Failed to parse ai_data:",
+            e,
+            versionData.ai_data
+          );
+          aiData = {};
+        }
+      }
+
+      console.log(
+        "[fetchEvaluations] Fetching frames for version_id:",
         versionData.id
       );
-      // setFrameEvaluations([]);
-      // return;
-    }
 
-    let aiData = versionData.ai_data;
-    if (typeof aiData === "string") {
-      try {
-        aiData = JSON.parse(aiData);
-      } catch (e) {
+      const { data: frameData, error: frameError } = await supabase
+        .from("design_frame_evaluations")
+        .select(
+          `
+        id, design_id, version_id, file_key, node_id, thumbnail_url, owner_id,
+        ai_summary, ai_data, snapshot, created_at, updated_at
+      `
+        )
+        .eq("design_id", design?.id)
+        .eq("version_id", versionData.id)
+        .order("created_at", { ascending: true });
+
+      if (frameError) {
         console.error(
-          "[fetchEvaluations] Failed to parse ai_data:",
-          e,
-          versionData.ai_data
+          "[fetchEvaluations] Failed to fetch frame evaluations:",
+          frameError.message
         );
-        aiData = {};
+        setFrameEvaluations([]);
+        return;
       }
-    }
 
-    // Fetch real frames only (no synthetic overall frame)
-    console.log(
-      "[fetchEvaluations] Fetching frames for version_id:",
-      versionData.id
-    );
+      const frames = (frameData || []).map((frame: any, i: number) => ({
+        ...frame,
+        ai_data:
+          typeof frame.ai_data === "string"
+            ? safeParse(frame.ai_data)
+            : frame.ai_data,
+        originalIndex: i,
+      }));
 
-    const { data: frameData, error: frameError } = await supabase
-      .from("design_frame_evaluations")
-      .select(
-        `
-      id, design_id, version_id, file_key, node_id, thumbnail_url, owner_id,
-      ai_summary, ai_data, snapshot, created_at, updated_at
-    `
-      )
-      .eq("design_id", design?.id)
-      .eq("version_id", versionData.id)
-      .order("created_at", { ascending: true });
-
-    if (frameError) {
-      console.error(
-        "[fetchEvaluations] Failed to fetch frame evaluations:",
-        frameError.message
-      );
-      setFrameEvaluations([]);
-      return;
-    }
-
-    const frames = (frameData || []).map((frame: any, i: number) => ({
-      ...frame,
-      ai_data:
-        typeof frame.ai_data === "string"
-          ? safeParse(frame.ai_data)
-          : frame.ai_data,
-      originalIndex: i,
-    }));
-
-    // Only real frames
-    if (
-      lastVersionIdRef.current !== String(versionData.id) ||
-      JSON.stringify(frameEvaluations) !== JSON.stringify(frames)
-    ) {
-      setFrameEvaluations(frames);
-      lastVersionIdRef.current = String(versionData.id);
-      if (selectedFrameIndex >= frames.length) setSelectedFrameIndex(0);
-      console.log(
-        "[fetchEvaluations] Frame evaluations set (no overall):",
-        frames
-      );
-    } else {
-      console.log(
-        "[fetchEvaluations] Frames identical, skipping state update."
-      );
-    }
-  }, [design?.id, frameEvaluations, selectedFrameIndex]);
+      if (
+        lastVersionIdRef.current !== String(versionData.id) ||
+        JSON.stringify(frameEvaluations) !== JSON.stringify(frames)
+      ) {
+        setFrameEvaluations(frames);
+        lastVersionIdRef.current = String(versionData.id);
+        if (selectedFrameIndex >= frames.length) setSelectedFrameIndex(0);
+        console.log(
+          "[fetchEvaluations] Frame evaluations set (version-aware):",
+          frames
+        );
+      } else {
+        console.log(
+          "[fetchEvaluations] Frames identical, skipping state update."
+        );
+      }
+    },
+    [design?.id, frameEvaluations, selectedFrameIndex]
+  );
 
   const fetchWeaknesses = React.useCallback(
     async (designId?: string | null, versionId?: string | null) => {
@@ -1988,8 +2025,8 @@ export default function DesignDetailPage({
 
   useEffect(() => {
     if (!design?.id || loadingEval) return;
-    fetchEvaluations();
-  }, [design?.id, fetchEvaluations, loadingEval]);
+    fetchEvaluations(selectedVersion?.id ?? null);
+  }, [design?.id, fetchEvaluations, loadingEval, selectedVersion?.id]);
 
   useEffect(() => {
     if (!loadingEval || !design?.current_version_id) return;
@@ -2034,11 +2071,11 @@ export default function DesignDetailPage({
   }, [loadingEval]);
 
   useEffect(() => {
-    if (!design?.id) return;
-    fetchDesignVersions(design.id)
-      .then((versions) => setAllVersions(versions))
-      .catch((e) => console.error("Failed to fetch versions", e));
-  }, [design?.id]);
+  if (!design?.id) return;
+  fetchDesignVersions(design.id)
+    .then((versions) => setAllVersions(versions))
+    .catch((e) => console.error("Failed to fetch versions", e));
+}, [design?.id]);
 
   useEffect(() => {
     if (!versions || versions.length === 0) return;
@@ -2068,10 +2105,9 @@ export default function DesignDetailPage({
   }, [versions, selectedVersion]);
 
   useEffect(() => {
-    if (!design?.id) return;
-    // When the backend marks the job complete (loadingEval -> false), refresh data.
-    if (!loadingEval) {
-      fetchEvaluations();
+    if (!loadingEval && design?.id) {
+      // Keep currently selected version’s frames stable after backend updates
+      fetchEvaluations(selectedVersion?.id ?? null);
       fetchDesignVersions(design.id)
         .then((vs) =>
           setVersions(
@@ -2080,13 +2116,13 @@ export default function DesignDetailPage({
         )
         .catch((e: string) => console.error("Failed to fetch versions", e));
     }
-  }, [loadingEval, design?.id, fetchEvaluations]);
+  }, [loadingEval, design?.id, selectedVersion?.id, fetchEvaluations]);
 
   useEffect(() => {
     const handler = async () => {
       setSoftRefreshing(true);
       try {
-        await fetchEvaluations();
+        await fetchEvaluations(selectedVersion?.id ?? null);
         router.refresh();
       } finally {
         setSoftRefreshing(false);
@@ -2094,7 +2130,21 @@ export default function DesignDetailPage({
     };
     window.addEventListener("uxhibit:soft-refresh", handler);
     return () => window.removeEventListener("uxhibit:soft-refresh", handler);
-  }, [router, fetchEvaluations]);
+  }, [router, fetchEvaluations, selectedVersion?.id]);
+
+  useEffect(() => {
+  if (loadingEval || !design?.id) return;
+  (async () => {
+    await fetchEvaluations(selectedVersion?.id ?? null);
+    try {
+      const vs = await fetchDesignVersions(design.id);
+      setVersions(vs.map((v: any) => ({ ...v, total_score: v.total_score ?? 0 })));
+      setAllVersions(vs);
+    } catch (e) {
+      console.error("Failed to fetch versions", e);
+    }
+  })();
+}, [loadingEval, design?.id, selectedVersion?.id, fetchEvaluations]);
 
   useEffect(() => {
     if (!frameEvaluations.length) return;
@@ -2106,22 +2156,17 @@ export default function DesignDetailPage({
     }
   }, [frameEvaluations.length, selectedFrameIndex]);
 
-  const compareDiag = useMemo(() => {
-    const reasons: string[] = [];
-    const count = allVersions?.length ?? 0;
-    if (count < 2) reasons.push(`only ${count} version(s) available`);
-    if (!currentVersionScores?.id) reasons.push("missing currentVersionScores");
-    // if (!previousVersionScores?.id)
-    //   reasons.push("missing previousVersionScores");
-    return {
-      canCompare: reasons.length === 0,
-      why: reasons,
-    };
-  }, [
-    allVersions?.length,
-    currentVersionScores?.id,
-    // previousVersionScores?.id,
-  ]);
+  // Use the live versions array for comparison availability
+const compareDiag = useMemo(() => {
+  const reasons: string[] = [];
+  const count = versions?.length ?? 0; // was allVersions?.length
+  if (count < 2) reasons.push(`only ${count} version(s) available`);
+  if (!currentVersionScores?.id) reasons.push("missing currentVersionScores");
+  return {
+    canCompare: reasons.length === 0,
+    why: reasons,
+  };
+}, [versions?.length, currentVersionScores?.id]);
 
   useEffect(() => {
     console.groupCollapsed("[page] Compare availability");

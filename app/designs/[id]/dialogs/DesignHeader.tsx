@@ -63,6 +63,29 @@ interface DesignHeaderActionsProps {
   compareWhy?: string | null;
 }
 
+type BreakdownFrame = {
+  id: string;
+  name?: string;
+  ai?: {
+    overall_score?: number;
+    category_scores?: any;
+    heuristic_breakdown?: any[];
+    debug_calc?: any;
+    bias?: {
+      params?: {
+        focus?: string;
+        device?: string;
+        generation?: string;
+        occupation?: string;
+        strictness?: string;
+      };
+      categoryWeights?: Record<string, number>;
+      weighted_overall?: number;
+      severityMultipliers?: Record<string, number>;
+    };
+  };
+};
+
 const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
   handleShowVersions,
   handleOpenComments,
@@ -108,17 +131,7 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
   const [showComputationalBreakdown, setShowComputationalBreakdown] =
     useState(false);
   const [loadingBreakdown, setLoadingBreakdown] = useState(false);
-  const [breakdownFrames, setBreakdownFrames] = useState<
-    {
-      id: string;
-      name?: string;
-      ai?: {
-        overall_score?: number;
-        category_scores?: any;
-        heuristic_breakdown?: any[];
-      };
-    }[]
-  >([]);
+  const [breakdownFrames, setBreakdownFrames] = useState<BreakdownFrame>([]);
 
   const [showHeuristicLegend, setShowHeuristicLegend] = useState(false);
   const [heuristicLegend, setHeuristicLegend] = useState<any[]>([]);
@@ -373,6 +386,8 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
             category_scores: root?.category_scores,
             heuristic_breakdown: root?.heuristic_breakdown,
             debug_calc: root?.debug_calc,
+            bias: root?.bias,
+            
           },
         });
       } catch (e) {
