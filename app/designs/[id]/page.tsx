@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import { useEffect, useState, useRef, useCallback } from "react";
 import Image from "next/image";
 import { createClient } from "@/utils/supabase/client";
@@ -10,7 +10,6 @@ import {
   IconLayoutSidebarRightCollapse,
   IconLayoutSidebarRightExpand,
 } from "@tabler/icons-react";
-import { Spinner } from "@/components/ui/shadcn-io/spinner/index";
 import {
   fetchDesignVersions,
   deleteDesignVersion,
@@ -29,8 +28,18 @@ import {
   handleEvaluateWithParams,
 } from "@/lib/reEvaluate/evaluationHandlers";
 import { IWeakness } from "./dialogs/WeaknessesModal";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  Maximize2,
+  Minimize2,
+  Minus,
+  Sparkles,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { DesignComparison } from "./dialogs/DesignComparison";
 
-interface FrameEvaluation {
+export interface FrameEvaluation {
   id: string;
   snapshot: string;
   design_id?: string;
@@ -129,6 +138,33 @@ export type EvaluateInput = {
   versionId: string;
 };
 
+type AiDebugCalc = {
+  heuristics_avg: number;
+  categories_avg: number;
+  combined: number;
+  target: number;
+  alpha: number;
+  blended: number;
+  final: number;
+  iteration: number;
+  total_iterations: number;
+  extra_pull_applied: boolean;
+  bias_weighted_overall: number;
+  
+};
+
+type AiBiasParams = {
+  params?: {
+    focus?: string;
+    device?: string;
+    generation?: string;
+    occupation?: string;
+    strictness?: string;
+  };
+  categoryWeights?: Record<string, number>;
+  weighted_overall?: number;
+  severityMultipliers?: Record<string, number>;
+}
 export type EvalResponse = {
   nodeId: string;
   imageUrl: string;
@@ -166,7 +202,16 @@ export type EvalResponse = {
     category_score_justifications?: Record<string, string>;
     resources?: EvalResource[];
     heuristic_breakdown?: HeuristicBreakdownItem[];
+    debug_calc?: AiDebugCalc;
+    bias?: AiBiasParams;
   } | null;
+};
+
+export type ParsedVersionData = {
+  id: string;
+  version: number;
+  overall?: number;
+  categories: Record<string, number>;
 };
 
 type ProgressPayload = {
@@ -207,6 +252,8 @@ export default function DesignDetailPage({
 }) {
   const { id } = React.use(params);
   const lastVersionIdRef = useRef<string | null>(null);
+
+  const router = useRouter();
 
   const [showEval, setShowEval] = useState(true);
   const [showVersions, setShowVersions] = useState(false);
@@ -264,6 +311,13 @@ export default function DesignDetailPage({
   const [weaknesses, setWeaknesses] = React.useState<IWeakness[]>([]);
   const [loadingWeaknesses, setLoadingWeaknesses] = React.useState(false);
   const [allVersions, setAllVersions] = useState<Versions[]>([]);
+  const [previousVersionScores, setPreviousVersionScores] =
+    useState<ParsedVersionData | null>(null);
+  const [currentVersionScores, setCurrentVersionScores] =
+    useState<ParsedVersionData | null>(null);
+  const [softRefreshing, setSoftRefreshing] = useState(false);
+  const [vpCollapsed, setVpCollapsed] = useState(false);
+  const [compareMode, setCompareMode] = useState(false);
 
   function startResizing() {
     setIsResizing(true);
@@ -315,159 +369,170 @@ export default function DesignDetailPage({
     setIsPanning(false);
   }
 
-  const fetchEvaluations = React.useCallback(async () => {
-    const supabase = createClient();
-    console.log(
-      "[fetchEvaluations] Fetching latest version for design:",
-      design?.id
-    );
-
-    // 1. Fetch the latest version for this design
-    const { data: versionData, error: versionError } = await supabase
-      .from("design_versions")
-      .select(
-        `
-        id, design_id, version, file_key, node_id, thumbnail_url, created_by,
-        ai_summary, ai_data, snapshot, created_at, updated_at, total_score
-      `
-      )
-      .eq("design_id", design?.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (versionError) {
-      console.error(
-        "[fetchEvaluations] Failed to fetch overall evaluation:",
-        versionError.message
-      );
-      return;
+  function safeParse(raw: string) {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return {};
     }
-    if (!versionData) {
-      console.warn(
-        "[fetchEvaluations] No version data found for design:",
-        design?.id
-      );
-      setFrameEvaluations([]);
-      return;
-    }
+  }
 
-    // If the latest version hasn't changed since last fetch, skip updating state
-    if (
-      lastVersionIdRef.current &&
-      lastVersionIdRef.current === String(versionData.id)
-    ) {
+  const showVersionProgress = React.useMemo(() => {
+    if (loadingEval || designLoading || softRefreshing) return false;
+    if (!currentVersionScores || !previousVersionScores) return false;
+    // optional: avoid showing if somehow comparing same version
+    if (currentVersionScores.version === previousVersionScores.version)
+      return false;
+    return true;
+  }, [
+    loadingEval,
+    designLoading,
+    softRefreshing,
+    currentVersionScores,
+    previousVersionScores,
+  ]);
+
+  const fetchEvaluations = React.useCallback(
+    async (overrideVersionId?: string | null) => {
+      const supabase = createClient();
       console.log(
-        "[fetchEvaluations] Version unchanged, skipping update:",
+        "[fetchEvaluations] Fetching version for design:",
+        design?.id,
+        "overrideVersionId:",
+        overrideVersionId
+      );
+
+      // If a version id is provided, fetch that specific version.
+      // Otherwise, fall back to the latest version for this design.
+      let versionData: any = null;
+      let versionError: any = null;
+
+      if (overrideVersionId) {
+        const { data, error } = await supabase
+          .from("design_versions")
+          .select(
+            `
+          id, design_id, version, file_key, node_id, thumbnail_url, created_by,
+          ai_summary, ai_data, snapshot, created_at, updated_at, total_score
+        `
+          )
+          .eq("id", overrideVersionId)
+          .maybeSingle();
+        versionData = data;
+        versionError = error;
+      } else {
+        const { data, error } = await supabase
+          .from("design_versions")
+          .select(
+            `
+          id, design_id, version, file_key, node_id, thumbnail_url, created_by,
+          ai_summary, ai_data, snapshot, created_at, updated_at, total_score
+        `
+          )
+          .eq("design_id", design?.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        versionData = data;
+        versionError = error;
+      }
+
+      if (versionError) {
+        console.error(
+          "[fetchEvaluations] Failed to fetch version:",
+          versionError.message
+        );
+        return;
+      }
+      if (!versionData) {
+        console.warn(
+          "[fetchEvaluations] No version data found for design:",
+          design?.id
+        );
+        setFrameEvaluations([]);
+        return;
+      }
+
+      if (
+        !versionData.ai_summary ||
+        !versionData.ai_data ||
+        typeof versionData.total_score !== "number" ||
+        versionData.total_score === 0
+      ) {
+        console.warn(
+          "[fetchEvaluations] Skipping incomplete version:",
+          versionData.id
+        );
+      }
+
+      let aiData = versionData.ai_data;
+      if (typeof aiData === "string") {
+        try {
+          aiData = JSON.parse(aiData);
+        } catch (e) {
+          console.error(
+            "[fetchEvaluations] Failed to parse ai_data:",
+            e,
+            versionData.ai_data
+          );
+          aiData = {};
+        }
+      }
+
+      console.log(
+        "[fetchEvaluations] Fetching frames for version_id:",
         versionData.id
       );
-      return;
-    }
-    // HOTFIX: Filter out incomplete/placeholder versions
-    if (
-      !versionData.ai_summary ||
-      !versionData.ai_data ||
-      typeof versionData.total_score !== "number" ||
-      versionData.total_score === 0
-    ) {
-      console.warn(
-        "[fetchEvaluations] Skipping incomplete/placeholder version:",
-        versionData
-      );
-      setFrameEvaluations([]);
-      return;
-    }
 
-    console.log("[fetchEvaluations] Latest version data:", versionData);
-
-    // 2. Parse AI data for the overall frame
-    let aiData = versionData.ai_data;
-    if (typeof aiData === "string") {
-      try {
-        aiData = JSON.parse(aiData);
-      } catch (e) {
-        console.error(
-          "[fetchEvaluations] Failed to parse ai_data:",
-          e,
-          versionData.ai_data
-        );
-        aiData = {};
-      }
-    }
-
-    const overall: FrameEvaluation = {
-      id: "overallFrame",
-      design_id: versionData.design_id,
-      version_id: versionData.id,
-      file_key: versionData.file_key,
-      node_id: versionData.node_id,
-      thumbnail_url: versionData.thumbnail_url,
-      owner_id: versionData.created_by,
-      ai_summary: versionData.ai_summary,
-      ai_data: aiData,
-      snapshot: versionData.snapshot,
-      created_at: versionData.created_at,
-      updated_at: versionData.updated_at,
-      total_score: versionData.total_score,
-    };
-
-    // 3. Fetch all frames for this version
-    console.log(
-      "[fetchEvaluations] Fetching frames for version_id:",
-      versionData.id
-    );
-
-    const { data: frameData, error: frameError } = await supabase
-      .from("design_frame_evaluations")
-      .select(
-        `
+      const { data: frameData, error: frameError } = await supabase
+        .from("design_frame_evaluations")
+        .select(
+          `
         id, design_id, version_id, file_key, node_id, thumbnail_url, owner_id,
         ai_summary, ai_data, snapshot, created_at, updated_at
       `
-      )
-      .eq("design_id", design?.id)
-      .eq("version_id", versionData.id)
-      .order("created_at", { ascending: true });
+        )
+        .eq("design_id", design?.id)
+        .eq("version_id", versionData.id)
+        .order("created_at", { ascending: true });
 
-    if (frameError) {
-      console.error(
-        "[fetchEvaluations] Failed to fetch frame evaluations:",
-        frameError.message
-      );
-      setFrameEvaluations([overall]);
-      return;
-    }
+      if (frameError) {
+        console.error(
+          "[fetchEvaluations] Failed to fetch frame evaluations:",
+          frameError.message
+        );
+        setFrameEvaluations([]);
+        return;
+      }
 
-    console.log("[fetchEvaluations] Frame data for version:", frameData);
+      const frames = (frameData || []).map((frame: any, i: number) => ({
+        ...frame,
+        ai_data:
+          typeof frame.ai_data === "string"
+            ? safeParse(frame.ai_data)
+            : frame.ai_data,
+        originalIndex: i,
+      }));
 
-    const frames = (frameData || []).map((frame: any) => ({
-      ...frame,
-      ai_data:
-        typeof frame.ai_data === "string"
-          ? JSON.parse(frame.ai_data)
-          : frame.ai_data,
-    }));
-
-    // 4. Combine overall and frames
-    const combined = [overall, ...frames];
-    // only set state if different (avoids rerenders that retrigger fetches)
-    if (
-      lastVersionIdRef.current !== String(versionData.id) ||
-      JSON.stringify(frameEvaluations) !== JSON.stringify(combined)
-    ) {
-      setFrameEvaluations(combined);
-      lastVersionIdRef.current = String(versionData.id);
-      console.log(
-        "[fetchEvaluations] Combined frame evaluations set:",
-        combined
-      );
-    } else {
-      console.log(
-        "[fetchEvaluations] Combined evaluations identical, not updating state."
-      );
-    }
-    console.log("[fetchEvaluations] Combined frame evaluations set:", combined);
-  }, [design?.id, frameEvaluations]);
+      if (
+        lastVersionIdRef.current !== String(versionData.id) ||
+        JSON.stringify(frameEvaluations) !== JSON.stringify(frames)
+      ) {
+        setFrameEvaluations(frames);
+        lastVersionIdRef.current = String(versionData.id);
+        if (selectedFrameIndex >= frames.length) setSelectedFrameIndex(0);
+        console.log(
+          "[fetchEvaluations] Frame evaluations set (version-aware):",
+          frames
+        );
+      } else {
+        console.log(
+          "[fetchEvaluations] Frames identical, skipping state update."
+        );
+      }
+    },
+    [design?.id, frameEvaluations, selectedFrameIndex]
+  );
 
   const fetchWeaknesses = React.useCallback(
     async (designId?: string | null, versionId?: string | null) => {
@@ -666,28 +731,85 @@ export default function DesignDetailPage({
 
   const sortedFrameEvaluations = React.useMemo(() => {
     if (sortOrder === "default") return frameEvaluations;
-    const [overall, ...frames] = frameEvaluations;
-    const sorted = [...frames].sort((a, b) => {
-      const aScore = a.ai_data.overall_score ?? 0;
-      const bScore = b.ai_data.overall_score ?? 0;
+
+    const getFrameScore = (f: FrameEvaluation) => {
+      const ai: any = f.ai_data ?? {};
+      const root = ai.ai ?? ai;
+      const dbg = root?.debug_calc;
+
+      // 1) Prefer mean you show in the ring
+      if (typeof dbg?.combined === "number") return dbg.combined;
+      if (typeof dbg?.final === "number") return dbg.final;
+
+      // 2) Fallback: explicit overall_score
+      if (typeof root?.overall_score === "number") return root.overall_score;
+      if (typeof f.total_score === "number") return f.total_score;
+
+      // 3) Fallback: compute from categories/heuristics if present
+      let catsAvg: number | undefined;
+      const cats = root?.category_scores;
+      if (cats && typeof cats === "object") {
+        const vals = Object.values(cats).filter(
+          (v): v is number => typeof v === "number" && Number.isFinite(v)
+        );
+        if (vals.length)
+          catsAvg = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+      }
+
+      let heurAvg: number | undefined;
+      const hb: any[] = Array.isArray(root?.heuristic_breakdown)
+        ? root.heuristic_breakdown
+        : [];
+      if (hb.length) {
+        const pctSum = hb.reduce((acc, h) => {
+          const s = typeof h.score === "number" ? h.score : 0;
+          const m =
+            typeof h.max_points === "number" && h.max_points > 0
+              ? h.max_points
+              : 4;
+          return acc + (s / m) * 100;
+        }, 0);
+        heurAvg = Math.round(pctSum / hb.length);
+      }
+
+      if (typeof catsAvg === "number" && typeof heurAvg === "number")
+        return Math.round((catsAvg + heurAvg) / 2);
+      if (typeof catsAvg === "number") return catsAvg;
+      if (typeof heurAvg === "number") return heurAvg;
+
+      // 4) Last resort
+      return 0;
+    };
+
+    return [...frameEvaluations].sort((a, b) => {
+      const aScore = getFrameScore(a);
+      const bScore = getFrameScore(b);
       return sortOrder === "asc" ? aScore - bScore : bScore - aScore;
     });
-    return [overall, ...sorted];
   }, [frameEvaluations, sortOrder]);
 
   const filteredFrameEvaluations = React.useMemo(() => {
     if (!searchQuery.trim()) return sortedFrameEvaluations;
     return sortedFrameEvaluations.filter(
       (frame) =>
-        frame.ai_summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        frame.ai_data.summary
-          ?.toLowerCase()
+        (frame.ai_summary || "")
+          .toLowerCase()
           .includes(searchQuery.toLowerCase()) ||
-        frame.node_id?.toLowerCase().includes(searchQuery.toLowerCase())
+        (frame.ai_data?.summary || "")
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase()) ||
+        (frame.node_id || "").toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [sortedFrameEvaluations, searchQuery]);
 
   const currentFrame = sortedFrameEvaluations[selectedFrameIndex];
+  const derivedEval = React.useMemo(
+    () =>
+      currentFrame
+        ? mapFrameToEvalResponse(currentFrame, selectedFrameIndex)
+        : null,
+    [currentFrame, selectedFrameIndex]
+  );
 
   function handleOpenEvalParams() {
     const frameIds = design?.frames?.map((f) => String(f.id)) ?? [];
@@ -806,6 +928,7 @@ export default function DesignDetailPage({
       setLoadingVersions(false);
     }
   };
+
   const handleEvaluate = React.useCallback(async () => {
     if (!design?.id || !design?.fileKey) {
       console.error("Missing required design data:", {
@@ -1048,29 +1171,36 @@ export default function DesignDetailPage({
     frame: FrameEvaluation,
     frameIdx = 0
   ): EvalResponse {
-    const aiData = frame.ai_data ?? {};
+    const aiData: any = frame.ai_data ?? {};
+    // normalize: many rows store everything under ai_data.ai
+    const root: any = aiData.ai ?? aiData;
+
+    const issues = Array.isArray(root.issues) ? root.issues : [];
+    const mappedIssues = issues.map((issue: any, issueIdx: number) => ({
+      ...issue,
+      id: `frame${frameIdx}-issue${issueIdx}`,
+      // normalize field name
+      suggestions: issue.suggestion ?? issue.suggestions,
+    }));
+
     return {
       nodeId: frame.node_id,
       imageUrl: frame.thumbnail_url,
-      summary: frame.ai_summary || aiData.summary || "",
-      heuristics: null,
+      summary: frame.ai_summary || root.summary || "",
+      heuristics: root.heuristics ?? root.heuristic_breakdown ?? null,
       ai_status: "ok",
-      overall_score: aiData.overall_score ?? null,
-      strengths: aiData.strengths ?? [],
-      weaknesses: aiData.weaknesses ?? [],
-      issues: (aiData.issues ?? []).map((issue, issueIdx) => ({
-        ...issue,
-        id: `frame${frameIdx}-issue${issueIdx}`,
-        suggestions: issue.suggestion,
-      })),
-      category_scores: aiData.category_scores ?? null,
+      overall_score: root.overall_score ?? null,
+      strengths: Array.isArray(root.strengths) ? root.strengths : [],
+      weaknesses: Array.isArray(root.weaknesses) ? root.weaknesses : [],
+      issues: mappedIssues,
+      category_scores: root.category_scores ?? null,
       ai: {
-        ...aiData,
-        issues: (aiData.issues ?? []).map((issue, issueIdx) => ({
-          ...issue,
-          id: `frame${frameIdx}-issue${issueIdx}`,
-          suggestions: issue.suggestion,
-        })),
+        ...root,
+        issues: mappedIssues,
+        category_scores: root.category_scores ?? undefined,
+        heuristic_breakdown:
+          root.heuristic_breakdown ?? root.heuristics ?? undefined,
+        debug_calc: root.debug_calc ?? undefined,
       },
     };
   }
@@ -1242,6 +1372,190 @@ export default function DesignDetailPage({
       }));
   }, []);
 
+    function computeFrameScoreFromAi(root: any): number {
+    if (!root || typeof root !== "object") return 0;
+    const dbg = root?.debug_calc;
+
+    // Heuristic average
+    let heurAvg: number | undefined =
+      typeof dbg?.heuristics_avg === "number" ? dbg.heuristics_avg : undefined;
+    if (heurAvg === undefined) {
+      const hb: any[] = Array.isArray(root?.heuristic_breakdown)
+        ? root.heuristic_breakdown
+        : [];
+      if (hb.length) {
+        const pctSum = hb.reduce((acc, h) => {
+          const s = typeof h?.score === "number" ? h.score : 0;
+          const m =
+            typeof h?.max_points === "number" && h.max_points > 0
+              ? h.max_points
+              : 4;
+          return acc + (s / m) * 100;
+        }, 0);
+        heurAvg = Math.round(pctSum / hb.length);
+      }
+    }
+
+    // Category avg
+    const cs =
+      root?.category_scores && typeof root.category_scores === "object"
+        ? root.category_scores
+        : undefined;
+    const catVals = cs
+      ? Object.values(cs).filter(
+          (v: any): v is number => typeof v === "number" && Number.isFinite(v)
+        )
+      : [];
+    const catAvg = catVals.length
+      ? Math.round(catVals.reduce((a: number, b: number) => a + b, 0) / catVals.length)
+      : undefined;
+
+    // Bias weighted
+    const biasWeighted =
+      typeof dbg?.bias_weighted_overall === "number"
+        ? dbg.bias_weighted_overall
+        : typeof root?.bias?.weighted_overall === "number"
+        ? root.bias.weighted_overall
+        : undefined;
+
+    const tri =
+      typeof heurAvg === "number" &&
+      typeof catAvg === "number" &&
+      typeof biasWeighted === "number"
+        ? Math.round((heurAvg + catAvg + biasWeighted) / 3)
+        : undefined;
+
+    if (typeof tri === "number") return tri;
+    if (typeof dbg?.final === "number") return dbg.final;
+    if (typeof root?.overall_score === "number") return root.overall_score;
+    if (typeof catAvg === "number" && typeof heurAvg === "number")
+      return Math.round((catAvg + heurAvg) / 2);
+    if (typeof catAvg === "number") return catAvg;
+    if (typeof heurAvg === "number") return heurAvg;
+    return 0;
+  }
+
+  function parseVersionScores(v: any): ParsedVersionData | null {
+    if (!v) return null;
+
+    // 1) Prefer persisted total_score if valid (>0) to avoid recompute noise
+    const persisted =
+      typeof v.total_score === "number" && v.total_score > 0
+        ? Math.round(v.total_score)
+        : undefined;
+
+    let raw = v.ai_data;
+    if (typeof raw === "string") {
+      try {
+        raw = JSON.parse(raw);
+      } catch {
+        return {
+          id: v.id,
+            version: v.version,
+            overall: persisted,
+            categories: {},
+        };
+      }
+    }
+
+    const toEntries = (x: any): any[] => {
+      if (!x) return [];
+      if (Array.isArray(x)) return x;
+      if (typeof x === "object") {
+        // numeric index object
+        const keys = Object.keys(x);
+        if (keys.length && keys.every((k) => /^\d+$/.test(k))) {
+          return keys.sort((a, b) => Number(a) - Number(b)).map((k) => x[k]);
+        }
+        if (Array.isArray(x.frames)) return x.frames;
+        return [x];
+      }
+      return [];
+    };
+
+    const entries = toEntries(raw).map((e) =>
+      e && typeof e === "object" && "ai" in e ? e.ai : e
+    );
+
+    // Aggregate per-frame robust score
+    const frameScores: number[] = [];
+    const perCategory: Record<string, { sum: number; n: number }> = {};
+
+    entries.forEach((root) => {
+      if (!root || typeof root !== "object") return;
+      const score = computeFrameScoreFromAi(root);
+      if (score > 0) frameScores.push(score);
+
+      const cats = root?.category_scores;
+      if (cats && typeof cats === "object") {
+        Object.entries(cats).forEach(([k, val]) => {
+          if (typeof val === "number" && Number.isFinite(val)) {
+            if (!perCategory[k]) perCategory[k] = { sum: 0, n: 0 };
+            perCategory[k].sum += val;
+            perCategory[k].n += 1;
+          }
+        });
+      }
+    });
+
+    // Fallback: if entries empty, inspect single root
+    if (!entries.length && raw && typeof raw === "object") {
+      const root: any = raw.ai ?? raw;
+      const loneScore = computeFrameScoreFromAi(root);
+      if (loneScore > 0) frameScores.push(loneScore);
+      const cats = root?.category_scores;
+      if (cats && typeof cats === "object") {
+        Object.entries(cats).forEach(([k, val]) => {
+          if (typeof val === "number" && Number.isFinite(val)) {
+            perCategory[k] = { sum: val, n: 1 };
+          }
+        });
+      }
+    }
+
+    const avg = (arr: number[]) =>
+      arr.length
+        ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length)
+        : undefined;
+
+    const recomputed = avg(frameScores);
+
+    // Final overall: persisted > recomputed > undefined
+    const overall = persisted ?? recomputed ?? undefined;
+
+    const categories: Record<string, number> = {};
+    Object.entries(perCategory).forEach(([k, { sum, n }]) => {
+      categories[k] = Math.round(sum / Math.max(1, n));
+    });
+
+    return {
+      id: v.id,
+      version: v.version,
+      overall,
+      categories,
+    };
+  }
+
+  function diffArrow(newVal?: number, oldVal?: number) {
+    if (typeof newVal !== "number" || typeof oldVal !== "number") {
+      return <Minus className="h-3.5 w-3.5 text-gray-400" />;
+    }
+    const d = newVal - oldVal;
+    if (d === 0) return <Minus className="h-3.5 w-3.5 text-gray-400" />;
+    if (d > 0) return <ArrowUpRight className="h-3.5 w-3.5 text-emerald-500" />;
+    return <ArrowDownRight className="h-3.5 w-3.5 text-rose-500" />;
+  }
+
+  function scoreTone(n?: number) {
+    if (n == null)
+      return "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300";
+    if (n >= 85)
+      return "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300";
+    if (n >= 70) return "bg-blue-500/15 text-blue-600 dark:text-blue-300";
+    if (n >= 50) return "bg-amber-500/15 text-amber-600 dark:text-amber-300";
+    return "bg-rose-500/15 text-rose-600 dark:text-rose-300";
+  }
+
   useEffect(() => {
     const supabase = createClient();
     async function fetchUserProfile() {
@@ -1399,12 +1713,11 @@ export default function DesignDetailPage({
   }, [id]);
 
   useEffect(() => {
-    if (!design?.id) {
-      console.log("[fetchEvaluations] No design id, skipping.");
-      return;
-    }
-    fetchEvaluations();
-  }, [design?.id, fetchEvaluations]);
+    if (!design?.id || !selectedVersion?.id) return;
+    fetchWeaknesses(design.id, selectedVersion.id).catch((e) =>
+      console.warn("fetchWeaknesses failed:", e)
+    );
+  }, [design?.id, selectedVersion?.id, fetchWeaknesses]);
 
   useEffect(() => {
     if (!design?.id || !selectedVersion?.id) return;
@@ -1616,7 +1929,7 @@ export default function DesignDetailPage({
     }
   }, [searchQuery, sortedFrameEvaluations]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (isResizing) {
       document.body.style.userSelect = "col-resize";
     } else {
@@ -1763,8 +2076,8 @@ export default function DesignDetailPage({
 
   useEffect(() => {
     if (!design?.id || loadingEval) return;
-    fetchEvaluations();
-  }, [design?.id, fetchEvaluations, loadingEval]);
+    fetchEvaluations(selectedVersion?.id ?? null);
+  }, [design?.id, fetchEvaluations, loadingEval, selectedVersion?.id]);
 
   useEffect(() => {
     if (!loadingEval || !design?.current_version_id) return;
@@ -1809,11 +2122,125 @@ export default function DesignDetailPage({
   }, [loadingEval]);
 
   useEffect(() => {
-    if (!design?.id) return;
-    fetchDesignVersions(design.id)
-      .then((versions) => setAllVersions(versions))
-      .catch((e) => console.error("Failed to fetch versions", e));
-  }, [design?.id]);
+  if (!design?.id) return;
+  fetchDesignVersions(design.id)
+    .then((versions) => setAllVersions(versions))
+    .catch((e) => console.error("Failed to fetch versions", e));
+}, [design?.id]);
+
+  useEffect(() => {
+    if (!versions || versions.length === 0) return;
+    // versions assumed DESC (latest first). If not, sort defensively:
+    const sorted = [...versions].sort(
+      (a, b) => (b.version ?? 0) - (a.version ?? 0)
+    );
+
+    // Determine “current” = selectedVersion (if set) else latest
+    const current = selectedVersion
+      ? sorted.find((v) => v.id === selectedVersion.id) || sorted[0]
+      : sorted[0];
+    const currentIdx = sorted.findIndex((v) => v.id === current.id);
+
+    // “Previous” = the next older version (index +1). If none, null.
+    const previous =
+      currentIdx >= 0 && currentIdx + 1 < sorted.length
+        ? sorted[currentIdx + 1]
+        : null;
+
+    // Parse
+    const parsedCurrent = parseVersionScores(current);
+    const parsedPrevious = previous ? parseVersionScores(previous) : null;
+
+    setCurrentVersionScores(parsedCurrent);
+    setPreviousVersionScores(parsedPrevious);
+  }, [versions, selectedVersion]);
+
+  useEffect(() => {
+    if (!loadingEval && design?.id) {
+      // Keep currently selected version’s frames stable after backend updates
+      fetchEvaluations(selectedVersion?.id ?? null);
+      fetchDesignVersions(design.id)
+        .then((vs) =>
+          setVersions(
+            vs.map((v: any) => ({ ...v, total_score: v.total_score ?? 0 }))
+          )
+        )
+        .catch((e: string) => console.error("Failed to fetch versions", e));
+    }
+  }, [loadingEval, design?.id, selectedVersion?.id, fetchEvaluations]);
+
+  useEffect(() => {
+    const handler = async () => {
+      setSoftRefreshing(true);
+      try {
+        await fetchEvaluations(selectedVersion?.id ?? null);
+        router.refresh();
+      } finally {
+        setSoftRefreshing(false);
+      }
+    };
+    window.addEventListener("uxhibit:soft-refresh", handler);
+    return () => window.removeEventListener("uxhibit:soft-refresh", handler);
+  }, [router, fetchEvaluations, selectedVersion?.id]);
+
+  useEffect(() => {
+  if (loadingEval || !design?.id) return;
+  (async () => {
+    await fetchEvaluations(selectedVersion?.id ?? null);
+    try {
+      const vs = await fetchDesignVersions(design.id);
+      setVersions(vs.map((v: any) => ({ ...v, total_score: v.total_score ?? 0 })));
+      setAllVersions(vs);
+    } catch (e) {
+      console.error("Failed to fetch versions", e);
+    }
+  })();
+}, [loadingEval, design?.id, selectedVersion?.id, fetchEvaluations]);
+
+  useEffect(() => {
+    if (!frameEvaluations.length) return;
+    if (
+      selectedFrameIndex < 0 ||
+      selectedFrameIndex >= frameEvaluations.length
+    ) {
+      setSelectedFrameIndex(0);
+    }
+  }, [frameEvaluations.length, selectedFrameIndex]);
+
+  // Use the live versions array for comparison availability
+const compareDiag = useMemo(() => {
+  const reasons: string[] = [];
+  const count = versions?.length ?? 0; // was allVersions?.length
+  if (count < 2) reasons.push(`only ${count} version(s) available`);
+  if (!currentVersionScores?.id) reasons.push("missing currentVersionScores");
+  return {
+    canCompare: reasons.length === 0,
+    why: reasons,
+  };
+}, [versions?.length, currentVersionScores?.id]);
+
+  useEffect(() => {
+    console.groupCollapsed("[page] Compare availability");
+    console.log(
+      "versions:",
+      (allVersions || []).map((v) => ({ id: v.id, version: v.version }))
+    );
+    console.log("currentVersionScores:", currentVersionScores);
+    console.log("previousVersionScores:", previousVersionScores);
+    console.log(
+      "canCompare:",
+      compareDiag.canCompare,
+      "reasons:",
+      compareDiag.why
+    );
+    console.groupEnd();
+  }, [
+    allVersions,
+    currentVersionScores,
+    previousVersionScores,
+    compareDiag.canCompare,
+    compareDiag.why,
+  ]);
 
   if (designLoading)
     return (
@@ -1840,10 +2267,12 @@ export default function DesignDetailPage({
   const isOwner =
     currentUserId && design?.id && currentUserId === design?.owner_id;
 
+  const loadingScreenActive = loadingEval || designLoading;
+
   return (
     <div>
       {/* Re-evaluate loading bar */}
-      {loadingEval && (
+      {/* {loadingEval && (
         <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-50 bg-white dark:bg-[#232323] shadow-lg rounded-lg px-6 py-4 border border-orange-300 flex flex-col items-center">
           <Spinner className="w-6 h-6 mb-2" />
           <span className="font-semibold text-orange-600">
@@ -1851,6 +2280,14 @@ export default function DesignDetailPage({
           </span>
           <span className="text-sm text-gray-600 mt-1"></span>
         </div>
+      )} */}
+      {compareMode && currentVersionScores && previousVersionScores && (
+        <DesignComparison
+          designId={design.id}
+          currentVersionId={currentVersionScores.id}
+          previousVersionId={previousVersionScores.id}
+          onClose={() => setCompareMode(false)}
+        />
       )}
       <div className="mb-2">
         <div className="flex gap-2 items-center justify-between w-full">
@@ -1887,6 +2324,10 @@ export default function DesignDetailPage({
               weaknesses={weaknesses}
               loadingWeaknesses={loadingWeaknesses}
               allVersions={allVersions}
+              onToggleCompare={() => setCompareMode((v) => !v)}
+              compareActive={compareMode}
+              canCompare={compareDiag.canCompare}
+              compareWhy={compareDiag.why.join("; ") || null}
             />
           )}
         </div>
@@ -1896,63 +2337,188 @@ export default function DesignDetailPage({
         {/* <DesignChats designId={design.id} currentUserId={currentUserId} /> */}
       </div>
       <div className="flex h-screen">
+        {/* LEFT PANE OR IMAGE CONTAINER  */}
         <div className="flex-2 h-full border rounded-md bg-accent overflow-y-auto flex items-center justify-center relative">
-          {designLoading && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 dark:bg-[#232323]/80 z-20 rounded-md animate-fade-in-up">
-              <Spinner className="w-12 h-12 text-[#ED5E20] animate-spin mb-4" />
-              <span className="text-lg font-semibold text-[#ED5E20] animate-pulse">
-                Loading your design...
-              </span>
-              <span className="text-sm text-gray-400 mt-2">
-                Please wait while we fetch your frame.
-              </span>
-            </div>
-          )}
           <ZoomControls
             zoom={zoom}
             setZoom={setZoom}
             setPan={setPan}
             pan={pan}
           />
+
+          {/* Full overlay that covers the entire container */}
+          {loadingScreenActive && (
+            <div
+              className="absolute inset-0 z-30 pointer-events-auto select-none overflow-hidden"
+              role="status"
+              aria-live="polite"
+            >
+              {/* Local keyframes (scoped) */}
+              <style>{`
+              @keyframes vignettePulse {
+              0%,100% { opacity: .6; }
+              50% { opacity: .85; }
+              }
+              @keyframes shineSweep {
+              from { transform: translateX(-60%); }
+              to { transform: translateX(40%); }
+              }
+              @keyframes progressStripes {from { background-position: 0 0; }
+              to { background-position: 32px 0; }
+              }@media (prefers-reduced-motion: reduce) {
+              .anim-ok { animation: none !important; transition: none !important; }
+              }
+              `}</style>
+
+              {/* Dim + blur backdrop */}
+              <div className="absolute inset-0 bg-white/70 dark:bg-[#0f0f0f]/70 backdrop-blur-sm" />
+              {/* Soft vignette (animation dialed for readability) */}
+              <div
+                className="absolute inset-0 [mask-image:radial-gradient(ellipse_at_center,black_45%,transparent_100%)] anim-ok"
+                style={{ animation: "vignettePulse 3.5s ease-in-out infinite" }}
+              />
+              {/* Subtle diagonal sweep (softer in light mode for contrast) */}
+              <div
+                aria-hidden
+                className="absolute inset-0 z-0 anim-ok"
+                style={{
+                  background:
+                    "linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.5) 50%, transparent 70%)",
+                  animation: "shineSweep 2.2s linear infinite",
+                }}
+              />
+
+              {/* Center content: frosted card for readability */}
+              <div className="absolute inset-0 z-10 flex items-center justify-center p-6">
+                <div className="relative w-[min(92vw,560px)] rounded-2xl border border-neutral-200/80 dark:border-neutral-700/60 bg-white/90 dark:bg-neutral-900/80 backdrop-blur-md shadow-xl ring-1 ring-black/5 dark:ring-white/5 p-6">
+                  {/* Title/status line */}
+                  <div className="text-center">
+                    <div className="mx-auto inline-flex items-center justify-center gap-2">
+                      <span
+                        className="inline-block h-3 w-3 rounded-full bg-[#ED5E20] shadow-[0_0_0_3px_rgba(237,94,32,0.15)] anim-ok"
+                        style={{
+                          animation: "vignettePulse 2s ease-in-out infinite",
+                        }}
+                      />
+                      <span className="text-lg md:text-xl font-semibold text-neutral-800 dark:text-neutral-100 drop-shadow-[0_1px_0_rgba(0,0,0,.25)]">
+                        {(() => {
+                          if (!loadingEval) return "Summoning your frame ✨";
+                          const tiers: Record<string, string[]> = {
+                            t0: [
+                              "Spinning up the vibe engine…",
+                              "Booting heuristic hamster wheel…",
+                              "Pixel cauldron preheating 🔥",
+                              "Assembling UX atoms…",
+                            ],
+                            t25: [
+                              "Blending clarity + chaos 🎨",
+                              "Marinating accessibility sauce…",
+                              "Teaching the AI manners 🤖",
+                              "Refactoring your pixels' aura…",
+                            ],
+                            t50: [
+                              "Mid-cook: tasting the layout stew 👅",
+                              "Optimizing tap targets fr",
+                              "Charting cognitive load maps 🗺️",
+                              "Color contrast glow-up in progress…",
+                            ],
+                            t75: [
+                              "Polishing heuristic halos ✨",
+                              "Compressing insights into nuggets…",
+                              "Almost vibed to perfection 😌",
+                              "Wrapping semantic gifts 🎁",
+                            ],
+                            t100: [
+                              "Finalizing score drop 🔥",
+                              "Stamping UX passport ✅",
+                              "Sealing insight scrolls 📜",
+                              "Deploying vibe report…",
+                            ],
+                          };
+                          const pick = (arr: string[]) =>
+                            arr[Math.floor(Math.random() * arr.length)];
+                          if (backendProgress < 25) return pick(tiers.t0);
+                          if (backendProgress < 50) return pick(tiers.t25);
+                          if (backendProgress < 75) return pick(tiers.t50);
+                          if (backendProgress < 100) return pick(tiers.t75);
+                          return pick(tiers.t100);
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Center of the image here */}
-          <Image
-            src={
-              selectedFrameIndex === 0
-                ? thumbUrl
-                  ? thumbUrl
-                  : design.fileKey
+          <div className="w-full h-full flex items-center justify-center">
+            {loadingScreenActive ? (
+              <div
+                className="relative w-[600px] h-[400px] rounded-xl overflow-hidden border shadow bg-gradient-to-br from-neutral-100 via-neutral-200 to-neutral-100 dark:from-neutral-800 dark:via-neutral-700 dark:to-neutral-800"
+                style={{
+                  transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${
+                    pan.y / zoom
+                  }px)`,
+                  transformOrigin: "center center",
+                  cursor:
+                    zoom > 1 ? (isPanning ? "grabbing" : "grab") : "default",
+                }}
+                onMouseDown={handlePanStart}
+              />
+            ) : (
+              (() => {
+                const showFigmaThumb = design?.fileKey
                   ? `/api/figma/thumbnail?fileKey=${design.fileKey}${
                       design.nodeId
                         ? `&nodeId=${encodeURIComponent(design.nodeId)}`
                         : ""
                     }`
-                  : "/images/design-thumbnail.png"
-                : frameEvaluations[selectedFrameIndex]?.thumbnail_url
-                ? frameEvaluations[selectedFrameIndex].thumbnail_url
-                : "/images/design-thumbnail.png"
-            }
-            alt={
-              selectedFrameIndex === 0
-                ? "Overall"
-                : frameEvaluations[selectedFrameIndex]?.node_id
-                ? `Frame ${selectedFrameIndex}`
-                : design.project_name || "Design"
-            }
-            width={600}
-            height={400}
-            className="w-full h-full object-contain"
-            style={{
-              opacity: designLoading ? 0.5 : 1,
-              transition: isPanning ? "none" : "opacity 0.3s, transform 0.2s",
-              transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${
-                pan.y / zoom
-              }px)`,
-              transformOrigin: "center center",
-              cursor: zoom > 1 ? (isPanning ? "grabbing" : "grab") : "default",
-            }}
-            onMouseDown={handlePanStart}
-          />
+                  : null;
+                const imageSrc =
+                  currentFrame?.thumbnail_url ||
+                  thumbUrl ||
+                  showFigmaThumb ||
+                  "/images/design-thumbnail.png";
+                const frameLabelIndex =
+                  typeof (currentFrame as any)?.originalIndex === "number"
+                    ? (currentFrame as any).originalIndex + 1
+                    : selectedFrameIndex + 1;
+                const imageAlt = currentFrame?.node_id
+                  ? `Frame ${frameLabelIndex}`
+                  : design?.project_name || "Design";
+                return (
+                  <Image
+                    src={imageSrc}
+                    alt={imageAlt}
+                    width={600}
+                    height={400}
+                    className="w-full h-full object-contain"
+                    style={{
+                      opacity: 1,
+                      transition: isPanning
+                        ? "none"
+                        : "opacity 0.3s, transform 0.2s",
+                      transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${
+                        pan.y / zoom
+                      }px)`,
+                      transformOrigin: "center center",
+                      cursor:
+                        zoom > 1
+                          ? isPanning
+                            ? "grabbing"
+                            : "grab"
+                          : "default",
+                    }}
+                    onMouseDown={handlePanStart}
+                    priority
+                  />
+                );
+              })()
+            )}
+          </div>
         </div>
+
         {/* {!isOwner && <VisitorEngagement designId={design.id} />} */}
         <div>
           <button
@@ -1975,6 +2541,7 @@ export default function DesignDetailPage({
           tabIndex={0}
           role="separator"
         />
+
         {/* RIGHT PANEL (Evaluation Sidebar) */}
         {showEval && sidebarWidth > 20 && (
           <div style={{ width: sidebarWidth }}>
@@ -2013,6 +2580,319 @@ export default function DesignDetailPage({
               </div>
               {sidebarTab === "ai" && (
                 <>
+                  {showVersionProgress && (
+                    <div
+                      className="mb-5 relative group rounded-2xl border border-orange-300/50 dark:border-orange-400/30
+                      bg-gradient-to-br from-white via-orange-50/40 to-white dark:from-[#191919] dark:via-[#242424] dark:to-[#1d1d1d]
+                      shadow-[0_4px_18px_-4px_rgba(0,0,0,.18)] backdrop-blur-sm overflow-hidden"
+                    >
+                      {/* Decorative accents */}
+                      <div className="pointer-events-none absolute -top-10 -left-10 w-40 h-40 rounded-full bg-orange-400/15 blur-2xl" />
+                      <div className="pointer-events-none absolute -bottom-10 -right-10 w-48 h-48 rounded-full bg-amber-300/10 blur-2xl" />
+                      <div
+                        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"
+                        style={{
+                          background:
+                            "radial-gradient(circle at 30% 20%, rgba(255,255,255,0.35), transparent 60%)",
+                        }}
+                      />
+
+                      <div className="relative z-10 p-4">
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-tr from-orange-500 to-amber-400 text-white shadow">
+                              <Sparkles className="h-4 w-4" />
+                            </div>
+                            <h4 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100 tracking-wide">
+                              Version Progress
+                            </h4>
+                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-400/20 dark:text-orange-300 font-medium">
+                              v{previousVersionScores?.version} → v
+                              {currentVersionScores?.version}
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setVpCollapsed((c) => !c)}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium
+                            bg-white/80 dark:bg-neutral-800/70 border border-orange-300/40 dark:border-orange-400/30
+                            hover:bg-orange-50 dark:hover:bg-neutral-700 transition cursor-pointer"
+                            aria-expanded={!vpCollapsed}
+                            aria-label={
+                              vpCollapsed
+                                ? "Expand version progress"
+                                : "Collapse version progress"
+                            }
+                          >
+                            {vpCollapsed ? (
+                              <Maximize2 className="h-3.5 w-3.5" />
+                            ) : (
+                              <Minimize2 className="h-3.5 w-3.5" />
+                            )}
+                            {vpCollapsed ? "Expand" : "Collapse"}
+                          </button>
+                        </div>
+
+                        {/* Collapsible content */}
+                        <div
+                          className={`transition-all duration-500 ease-in-out ${
+                            vpCollapsed
+                              ? "max-h-0 opacity-0 pointer-events-none"
+                              : "max-h-[560px] opacity-100"
+                          }`}
+                        >
+                          {/* Overall comparison */}
+                          <div className="grid grid-cols-3 gap-3 items-end mb-5 mt-3">
+                            <div className="space-y-1">
+                              <p className="text-[10px] uppercase tracking-wide font-medium text-neutral-500 dark:text-neutral-400">
+                                Previous
+                              </p>
+                              <div
+                                className={`inline-flex px-2 py-1 rounded-md text-xs font-semibold ${scoreTone(
+                                  previousVersionScores?.overall
+                                )}`}
+                              >
+                                {previousVersionScores?.overall ?? "—"}
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-center">
+                              <div className="flex items-center space-x-1"></div>
+                              {(() => {
+                                const oldVal = previousVersionScores?.overall;
+                                const newVal = currentVersionScores?.overall;
+                                if (
+                                  typeof oldVal !== "number" ||
+                                  typeof newVal !== "number"
+                                ) {
+                                  return (
+                                    <p className="text-[10px] mt-1 text-neutral-500 dark:text-neutral-400 font-medium">
+                                      —
+                                    </p>
+                                  );
+                                }
+                                const delta = newVal - oldVal;
+                                const positive = delta > 0;
+                                const neutral = delta === 0;
+
+                                const badgeTone = positive
+                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 ring-emerald-400/30"
+                                  : neutral
+                                  ? "bg-neutral-500/10 text-neutral-600 dark:text-neutral-300 ring-neutral-400/30"
+                                  : "bg-rose-500/10 text-rose-600 dark:text-rose-300 ring-rose-400/30";
+
+                                const glowTone = positive
+                                  ? "bg-emerald-400/25"
+                                  : neutral
+                                  ? "bg-neutral-400/25"
+                                  : "bg-rose-400/25";
+
+                                return (
+                                  <div className="relative grid place-items-center select-none">
+                                    {/* Delta pill */}
+                                    <div
+                                      className={[
+                                        "relative inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold ring-1 shadow-sm",
+                                        "transition-transform duration-300",
+                                        "animate-[vpPopIn_.6s_ease-out_1]",
+                                        badgeTone,
+                                      ].join(" ")}
+                                      title={`Overall change: ${
+                                        delta > 0 ? "+" : ""
+                                      }${delta}`}
+                                    >
+                                      <span
+                                        className={[
+                                          "absolute inset-0 -z-10 rounded-[14px] blur-md opacity-70",
+                                          "animate-[vpPulseGlow_2.2s_ease-in-out_infinite]",
+                                          glowTone,
+                                        ].join(" ")}
+                                        aria-hidden
+                                      />
+                                      {positive ? (
+                                        <ArrowUpRight className="h-3.5 w-3.5 animate-[vpArrow_.9s_ease-in-out_infinite]" />
+                                      ) : neutral ? (
+                                        <Minus className="h-3.5 w-3.5" />
+                                      ) : (
+                                        <ArrowDownRight className="h-3.5 w-3.5 animate-[vpArrow_.9s_ease-in-out_infinite]" />
+                                      )}
+                                      <span className="text-sm tabular-nums">
+                                        {delta > 0 ? `+${delta}` : `${delta}`}
+                                      </span>
+                                      <span className="hidden sm:inline text-[10px] opacity-70">
+                                        overall
+                                      </span>
+                                    </div>
+                                    {/* Scoped keyframes (safe to duplicate) */}
+                                    <style>
+                                      {`
+                                      @keyframes vpPulseGlow {
+                                        0%, 100% { transform: scale(1); opacity: .55; }
+                                        50% { transform: scale(1.02); opacity: .95; }
+                                      }
+                                      @keyframes vpPopIn {
+                                        0% { transform: translateY(4px) scale(.98); opacity: 0; }
+                                        100% { transform: translateY(0) scale(1); opacity: 1; }
+                                      }
+                                      @keyframes vpArrow {
+                                        0%, 100% { transform: translateY(0); }
+                                        50% { transform: translateY(-1px); }
+                                      }
+                                    `}
+                                    </style>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                            <div className="space-y-1 text-right">
+                              <p className="text-[10px] uppercase tracking-wide font-medium text-neutral-500 dark:text-neutral-400">
+                                Current
+                              </p>
+                              <div
+                                className={`inline-flex px-2 py-1 rounded-md text-xs font-semibold ${scoreTone(
+                                  currentVersionScores?.overall
+                                )}`}
+                              >
+                                {currentVersionScores?.overall ?? "—"}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Categories diff list */}
+                          <div className="space-y-2">
+                            <p className="text-[11px] font-medium tracking-wide text-neutral-600 dark:text-neutral-300">
+                              Category Changes
+                            </p>
+                            <div
+                              className="rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-700
+                              divide-y divide-neutral-200 dark:divide-neutral-800 bg-white/70 dark:bg-neutral-900/50"
+                            >
+                              {Array.from(
+                                new Set([
+                                  ...Object.keys(
+                                    previousVersionScores.categories
+                                  ),
+                                  ...Object.keys(
+                                    currentVersionScores.categories
+                                  ),
+                                ])
+                              )
+                                .sort()
+                                .map((cat) => {
+                                  const oldVal =
+                                    previousVersionScores?.categories[cat];
+                                  const newVal =
+                                    currentVersionScores?.categories[cat];
+                                  const delta =
+                                    typeof newVal === "number" &&
+                                    typeof oldVal === "number"
+                                      ? newVal - oldVal
+                                      : null;
+                                  return (
+                                    <div
+                                      key={cat}
+                                      className="grid grid-cols-6 gap-2 items-center px-2 py-1.5 text-xs
+                                      bg-white/60 dark:bg-neutral-900/40 hover:bg-orange-50/40 dark:hover:bg-neutral-800/60 transition"
+                                    >
+                                      <span className="col-span-2 capitalize text-neutral-700 dark:text-neutral-300 truncate">
+                                        {cat}
+                                      </span>
+                                      <span className="text-neutral-600 dark:text-neutral-300 text-right">
+                                        {typeof oldVal === "number"
+                                          ? oldVal
+                                          : "—"}
+                                      </span>
+                                      <span className="flex items-center justify-center">
+                                        {diffArrow(newVal, oldVal)}
+                                      </span>
+                                      <span
+                                        className={`text-right font-semibold ${
+                                          newVal > (oldVal ?? -Infinity)
+                                            ? "text-emerald-600 dark:text-emerald-400"
+                                            : newVal < (oldVal ?? Infinity)
+                                            ? "text-rose-500"
+                                            : "text-neutral-500 dark:text-neutral-400"
+                                        }`}
+                                      >
+                                        {typeof newVal === "number"
+                                          ? newVal
+                                          : "—"}
+                                      </span>
+                                      <span
+                                        className={`text-[10px] text-right ${
+                                          delta == null
+                                            ? "text-neutral-400"
+                                            : delta > 0
+                                            ? "text-emerald-500"
+                                            : delta < 0
+                                            ? "text-rose-500"
+                                            : "text-neutral-500 dark:text-neutral-400"
+                                        }`}
+                                      >
+                                        {delta == null || isNaN(delta) ? (
+                                          "—"
+                                        ) : delta === 0 ? (
+                                          <span
+                                            className="inline-flex items-center justify-end gap-1 px-1.5 py-0.5
+                                            text-neutral-600 dark:text-neutral-300"
+                                            title="No change"
+                                            aria-label="No change"
+                                          >
+                                            <Minus className="h-3 w-3 opacity-70" />
+                                          </span>
+                                        ) : (
+                                          (delta > 0 ? "+" : "") + delta
+                                        )}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          </div>
+
+                          {/* Footer */}
+                          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-[10px] text-neutral-600 dark:text-neutral-400">
+                            {/* Delta legend chips */}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 ring-1 ring-emerald-400/20">
+                                <ArrowUpRight className="h-3 w-3" />
+                                Improved
+                              </span>
+                              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-300 ring-1 ring-rose-400/20">
+                                <ArrowDownRight className="h-3 w-3" />
+                                Regressed
+                              </span>
+                              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-neutral-500/10 text-neutral-600 dark:text-neutral-300 ring-1 ring-neutral-400/20">
+                                <Minus className="h-3 w-3" />
+                                No change
+                              </span>
+
+                              {/* Delta emphasis badge */}
+                              {/* <span className="ml-1 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gradient-to-r from-orange-100 to-amber-100 dark:from-orange-400/10 dark:to-amber-400/10 text-orange-700 dark:text-orange-300 ring-1 ring-orange-400/20">
+                                Δ change highlighted above
+                              </span> */}
+                            </div>
+
+                            {/* Live tracking indicator */}
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="relative flex items-end gap-[3px] h-3"
+                                aria-hidden
+                              >
+                                <span className="w-[3px] rounded-sm bg-[#ED5E20]/85 animate-[bar1_1100ms_ease-in-out_infinite]" />
+                                <span className="w-[3px] rounded-sm bg-[#ED5E20]/70 animate-[bar2_950ms_ease-in-out_infinite]" />
+                                <span className="w-[3px] rounded-sm bg-[#ED5E20]/85 animate-[bar3_800ms_ease-in-out_infinite]" />
+                                <span className="w-[3px] rounded-sm bg-[#ED5E20]/60 animate-[bar2_900ms_ease-in-out_infinite]" />
+                                <span className="w-[3px] rounded-sm bg-[#ED5E20]/85 animate-[bar1_1050ms_ease-in-out_infinite]" />
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <FrameNavigator
                     selectedFrameIndex={selectedFrameIndex}
                     setSelectedFrameIndex={setSelectedFrameIndex}
@@ -2029,9 +2909,9 @@ export default function DesignDetailPage({
                     )}
 
                     {/* Results */}
-                    {evalResult && !loadingEval && (
+                    {derivedEval && !loadingEval && (
                       <EvaluationResult
-                        evalResult={evalResult}
+                        evalResult={derivedEval}
                         loadingEval={loadingEval}
                         currentFrame={currentFrame}
                         frameEvaluations={frameEvaluations}
@@ -2192,6 +3072,7 @@ export default function DesignDetailPage({
           setEvalResult={setEvalResult}
           setShowEval={setShowEval}
           setFrameEvaluations={setFrameEvaluations}
+          setSelectedFrameIndex={setSelectedFrameIndex}
         />
       )}
     </div>

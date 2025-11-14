@@ -9,7 +9,14 @@ import {
   IconSend,
   IconAlertTriangle,
 } from "@tabler/icons-react";
-import { BarChart2, Menu, MessageSquare } from "lucide-react";
+import {
+  AlignEndHorizontal,
+  BarChart2,
+  Columns,
+  Cpu,
+  Menu,
+  MessageSquare,
+} from "lucide-react";
 import CommentModal from "./CommentModal";
 import { Comment } from "@/components/comments-user";
 import { Design, Versions } from "../page";
@@ -17,7 +24,9 @@ import PublishConfirmModal from "./PublishConfirmModal";
 import ImprovementGraphs from "./ImprovementGraphs";
 import WeaknessesModal, { IWeakness } from "./WeaknessesModal";
 import { flushSync } from "react-dom";
-// import { useRouter } from "next/router";
+import ComputationalBreakdown from "./ComputationalBreakdownModal";
+import HeuristicLegendModal from "./HeuristicLegendModal";
+import { getHeuristicLegendFromVersion } from "@/database/actions/versions/heuristicLegend";
 
 interface DesignHeaderActionsProps {
   handleShowVersions: () => void;
@@ -48,7 +57,34 @@ interface DesignHeaderActionsProps {
   loadingWeaknesses?: boolean;
   displayVersionToShow?: string | null;
   allVersions: Versions[];
+  onToggleCompare?: () => void;
+  compareActive?: boolean;
+  canCompare?: boolean;
+  compareWhy?: string | null;
 }
+
+type BreakdownFrame = {
+  id: string;
+  name?: string;
+  ai?: {
+    overall_score?: number;
+    category_scores?: any;
+    heuristic_breakdown?: any[];
+    debug_calc?: any;
+    bias?: {
+      params?: {
+        focus?: string;
+        device?: string;
+        generation?: string;
+        occupation?: string;
+        strictness?: string;
+      };
+      categoryWeights?: Record<string, number>;
+      weighted_overall?: number;
+      severityMultipliers?: Record<string, number>;
+    };
+  };
+};
 
 const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
   handleShowVersions,
@@ -75,6 +111,10 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
   weaknesses,
   loadingWeaknesses,
   allVersions,
+  onToggleCompare,
+  compareActive,
+  canCompare,
+  compareWhy
 }) => {
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [showGraphs, setShowGraphs] = useState(false);
@@ -88,6 +128,14 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
   //   const [weaknesses, setWeaknesses] = useState<any[]>([]);
   //   const [loadingWeaknesses, setLoadingWeaknesses] = useState(false);
   const [showWeaknesses, setShowWeaknesses] = useState(false);
+  const [showComputationalBreakdown, setShowComputationalBreakdown] =
+    useState(false);
+  const [loadingBreakdown, setLoadingBreakdown] = useState(false);
+  const [breakdownFrames, setBreakdownFrames] = useState<BreakdownFrame>([]);
+
+  const [showHeuristicLegend, setShowHeuristicLegend] = useState(false);
+  const [heuristicLegend, setHeuristicLegend] = useState<any[]>([]);
+  const [loadingLegend, setLoadingLegend] = useState(false);
 
   // const router = useRouter();
 
@@ -115,28 +163,41 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
   }
 
   // Fetch evaluations (total_score from design_versions)
-
-  const fetchEvaluations = React.useCallback(async () => {
+    const fetchEvaluations = React.useCallback(async () => {
     if (!design?.id) return;
     setLoadingEvaluations(true);
 
     const supabase = createClient();
+    console.groupCollapsed("[DesignHeader] fetchEvaluations");
+    console.log("designId:", design.id);
     const { data, error } = await supabase
       .from("design_versions")
-      .select("thumbnail_url, total_score, created_at")
+      .select("id, version, thumbnail_url, total_score, created_at")
       .eq("design_id", design.id)
       .order("created_at", { ascending: true });
 
     if (error) {
-      console.error("fetching design_version failed", error.message);
+      console.error("design_versions query failed:", error.message);
       setEvaluations([]);
     } else {
+      console.log("rows fetched:", (data ?? []).length);
+      try {
+        console.table(
+          (data ?? []).map((r: any) => ({
+            id: r.id,
+            version: r.version,
+            total_score: Number(r.total_score) ?? null,
+            created_at: r.created_at,
+          }))
+        );
+      } catch {}
       const mapped = (data ?? []).map((r: any) => ({
         timestamp: r.created_at ?? new Date().toISOString(),
         score: Number(r.total_score) ?? 0,
       }));
       setEvaluations(mapped);
     }
+    console.groupEnd();
     setLoadingEvaluations(false);
   }, [design?.id]);
 
@@ -162,6 +223,202 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
       return null;
     }
   };
+
+  // Get the latest design_versions.id (UUID) for a design
+  const fetchLatestVersionId = async (did?: string | null) => {
+    if (!did) return null;
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("design_versions")
+        .select("id")
+        .eq("design_id", did)
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) {
+        console.warn("fetchLatestVersionId failed", error.message);
+        return null;
+      }
+      return data?.id ?? null;
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  };
+
+  function normalizeEntries(raw: any) {
+    if (raw === null) return [];
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === "object") {
+      const keys = Object.keys(raw);
+      if (keys.length && keys.every((k) => /^\d+$/.test(k)))
+        return Object.values(raw);
+      return [raw];
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [parsed];
+    } catch {
+      return [];
+    }
+  }
+
+  const fetchFramesForBreakdown = async (
+    designId?: string | null,
+    versionId?: string | null
+  ) => {
+    const did = designId ?? design?.id ?? null;
+    if (!did) return [];
+    const supabase = createClient();
+
+    console.groupCollapsed("[fetchFramesForBreakdown] start");
+    console.log(
+      "designId:",
+      did,
+      "requested versionId:",
+      versionId,
+      "selectedVersionId:",
+      selectedVersion?.id
+    );
+
+    let vid: string | null =
+      versionId ?? selectedVersion?.id ?? design?.current_version_id ?? null;
+
+    // Ensure we have a UUID. If missing, fetch latest UUID.
+    if (!vid) {
+      vid = await fetchLatestVersionId(did);
+      console.log("resolved latest versionId (uuid):", vid);
+    }
+    // If vid looks like a plain number (e.g., "1"), convert it to the UUID id.
+    if (vid && /^\d+$/.test(vid)) {
+      console.warn(
+        "[fetchFramesForBreakdown] numeric version detected, resolving to UUID:",
+        vid
+      );
+      const { data: vrow, error: verr } = await supabase
+        .from("design_versions")
+        .select("id")
+        .eq("design_id", did)
+        .eq("version", Number(vid))
+        .maybeSingle();
+      if (verr) {
+        console.error(
+          "[fetchFramesForBreakdown] failed to resolve version UUID:",
+          verr.message
+        );
+        console.groupEnd();
+        return [];
+      }
+      vid = vrow?.id ?? null;
+      console.log("[fetchFramesForBreakdown] resolved version UUID:", vid);
+    }
+
+    if (!vid) {
+      console.error("[fetchFramesForBreakdown] no version id resolved");
+      console.groupEnd();
+      return [];
+    }
+
+    const { data: frames, error } = await supabase
+      .from("design_frame_evaluations")
+      .select("id, ai_data, thumbnail_url, version_id, node_id")
+      .eq("design_id", did)
+      .eq("version_id", vid)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error(
+        "[fetchFramesForBreakdown] frames query error:",
+        error.message
+      );
+      console.groupEnd();
+      return [];
+    }
+
+    console.log("frames rows:", (frames ?? []).length);
+    try {
+      console.table(
+        (frames ?? []).map((f: any) => ({
+          id: f.id,
+          node_id: f.node_id,
+          has_ai_data: !!f.ai_data,
+          version_id: f.version_id,
+        }))
+      );
+    } catch {}
+
+    const out: any[] = [];
+    for (const f of frames || []) {
+      if (!f?.ai_data) {
+        console.warn(
+          "[fetchFramesForBreakdown] missing ai_data for frame:",
+          f?.id || f?.node_id
+        );
+        out.push({ id: f.node_id || f.id, ai: {} });
+        continue;
+      }
+      try {
+        console.log(
+          "[fetchFramesForBreakdown] parsing ai_data for frame:",
+          f.id
+        );
+        const entries = normalizeEntries(
+          typeof f.ai_data === "string" ? JSON.parse(f.ai_data) : f.ai_data
+        );
+        const entry = entries[0] ?? {};
+        const root = entry?.ai ?? entry;
+
+        // Optional: quick peek at heuristic codes
+        const hb = Array.isArray(root?.heuristic_breakdown)
+          ? root.heuristic_breakdown.map((h: any) => h?.code).filter(Boolean)
+          : [];
+        console.log(
+          "[fetchFramesForBreakdown] heuristic codes:",
+          f.node_id || f.id,
+          hb
+        );
+
+        out.push({
+          id: f.node_id || f.id,
+          ai: {
+            overall_score: root?.overall_score,
+            category_scores: root?.category_scores,
+            heuristic_breakdown: root?.heuristic_breakdown,
+            debug_calc: root?.debug_calc,
+            bias: root?.bias,
+            
+          },
+        });
+      } catch (e) {
+        console.error(
+          "[fetchFramesForBreakdown] parse ai_data failed:",
+          f.id,
+          e
+        );
+        out.push({ id: f.node_id || f.id, ai: {} });
+      }
+    }
+
+    console.log("[fetchFramesForBreakdown] parsed frames:", out.length);
+    if (out.length) {
+      console.log("[fetchFramesForBreakdown] sample entry:", out[0]);
+    }
+    console.groupEnd();
+    return out;
+  };
+
+  const totalIters = Math.max(
+    3,
+    Math.min(
+      5,
+      Number((selectedVersion as any)?.snapshot?.totalIterations) || 3
+    )
+  );
+  const iterClamped = Math.max(
+    1,
+    Math.min(totalIters, Number(selectedVersion?.version) || 1)
+  );
 
   // Fetch weaknesses from latest version  frame evaluation
   //   const loadWeaknesses = React.useCallback(
@@ -354,19 +611,6 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
   //     [design?.id, design?.current_version_id]
   //   );
 
-  useEffect(() => {
-    fetchEvaluations();
-  }, [fetchEvaluations]);
-
-  // React.useEffect(() => {
-  //   console.error(
-  //     "DesignHeader - selectedVersion:",
-  //     selectedVersion?.id ?? null,
-  //     "showWeaknesses:",
-  //     showWeaknesses
-  //   );
-  // }, [selectedVersion?.id, showWeaknesses]);
-
   const extraTickvalues = useMemo(() => {
     return Array.from(
       new Set(
@@ -375,7 +619,35 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
     ).sort((a, b) => a - b);
   }, [evaluations]);
 
-  console.warn("This is fetchingWeaknesses: ",fetchWeaknesses);
+  useEffect(() => {
+    fetchEvaluations();
+  }, [fetchEvaluations]);
+
+    useEffect(() => {
+    console.groupCollapsed("[DesignHeader] Props snapshot");
+    console.log("design.id:", design?.id);
+    console.log("selectedVersion:", {
+      id: selectedVersion?.id,
+      version: selectedVersion?.version,
+      total_score: selectedVersion?.total_score,
+    });
+    console.log("allVersions count:", allVersions?.length);
+    try {
+      console.table(
+        (allVersions || []).map((v) => ({
+          id: v.id,
+          version: v.version,
+          total_score: v.total_score,
+          created_at: v.created_at,
+        }))
+      );
+    } catch {}
+    console.log("compareActive:", compareActive, "canCompare:", canCompare);
+    console.groupEnd();
+  }, [design?.id, selectedVersion?.id, selectedVersion?.version, allVersions?.length, compareActive, 
+    canCompare, allVersions, selectedVersion?.total_score]);
+
+  console.warn("This is fetchingWeaknesses: ", fetchWeaknesses);
   return (
     <div className="flex gap-2 items-center justify-between">
       {/* Wrapper */}
@@ -731,11 +1003,172 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Add Computational Breakdown button */}
+        <div className="relative group">
+          <button
+            className="p-2 rounded cursor-pointer transition hover:text-[#ED5E20]"
+            aria-label="Show Computational Breakdown"
+            onClick={async () => {
+              setShowSortOptions(false);
+              setShowSearch(false);
+              setShowComments(false);
+              setShowPublishModal(false);
+              setShowWeaknesses(false);
+              setShowGraphs(false);
+
+              // load frames then open
+              try {
+                setLoadingBreakdown(true);
+                const frames = await fetchFramesForBreakdown(
+                  design.id,
+                  selectedVersion?.id ?? null
+                );
+                console.log(
+                  "[ComputationalBreakdown] frames fetch: ",
+                  frames.length
+                );
+                setBreakdownFrames(frames);
+              } catch (e) {
+                console.error("[ComputationalBreakdown] fetch failed: ", e);
+              } finally {
+                setLoadingBreakdown(false);
+                setShowComputationalBreakdown(true);
+              }
+            }}
+          >
+            <Cpu size={18} />
+          </button>
+
+          {/* Tooltip */}
+          <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
+            <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
+              Computational Breakdown
+            </div>
+          </div>
+        </div>
+
+        {/* Heuristic Legend */}
+        <div className="relative group">
+          <button
+            className="p-2 rounded cursor-pointer transition hover:text-[#ED5E20]"
+            aria-label="Show Heuristic Legend"
+            onClick={async () => {
+              setShowSortOptions(false);
+              setShowSearch(false);
+              setShowComments(false);
+              setShowPublishModal(false);
+              setShowWeaknesses(false);
+              setShowGraphs(false);
+              setShowComputationalBreakdown(false);
+              try {
+                setLoadingLegend(true);
+
+                // Resolve a usable version UUID:
+                let vid: string | null =
+                  selectedVersion?.id ??
+                  (design?.current_version_id as string | null) ??
+                  null;
+
+                // If a plain number sneaks in, resolve it to UUID
+                if (vid && /^\d+$/.test(String(vid))) {
+                  const supabase = createClient();
+                  const { data } = await supabase
+                    .from("design_versions")
+                    .select("id")
+                    .eq("design_id", design.id)
+                    .eq("version", Number(vid))
+                    .maybeSingle();
+                  vid = data?.id ?? null;
+                }
+
+                // Fallback to latest version UUID
+                if (!vid) {
+                  vid = await fetchLatestVersionId(design.id);
+                }
+
+                const legend = vid
+                  ? await getHeuristicLegendFromVersion(vid)
+                  : [];
+
+                // In the place you set legend
+                console.log(
+                  "[Legend raw ai_data]",
+                  typeof selectedVersion?.ai_data,
+                  selectedVersion?.ai_data
+                );
+                console.log("[Legend extracted]", legend);
+                setHeuristicLegend(legend);
+              } catch (e) {
+                console.error("[Heuristic Legend] fetch failed: ", e);
+              } finally {
+                setLoadingLegend(false);
+                setShowHeuristicLegend(true);
+              }
+            }}
+          >
+            <AlignEndHorizontal size={18} />
+          </button>
+          <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
+            <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
+              Heuristic Breakdown
+            </div>
+          </div>
+        </div>
+
+        {/* Compare Versions */}
+        <div className="relative group">
+          <button
+            className={`p-2 rounded cursor-pointer transition
+              ${
+                compareActive
+                  ? "ring-2 ring-[#ED5E20] bg-gradient-to-r from-[#ED5E20]/20 to-orange-400/20 shadow"
+                  : ""
+              }
+              hover:text-[#ED5E20]
+              ${!canCompare ? "opacity-40 pointer-events-none" : ""}`}
+            aria-label="Toggle version comparison"
+            disabled={!canCompare}
+            onMouseEnter={() => {
+              console.groupCollapsed("[DesignHeader] Compare availability (hover)");
+              console.log("canCompare:", canCompare, "reason:", compareWhy || "(none)");
+              console.log("allVersions count:", allVersions?.length);
+              console.log("selectedVersion:", { id: selectedVersion?.id, version: selectedVersion?.version });
+              console.log("design.current_version_id:", design?.current_version_id);
+              console.groupEnd();
+            }}
+            onFocus={() => {
+              // Keyboard users
+              console.groupCollapsed("[DesignHeader] Compare availability (focus)");
+              console.log("canCompare:", canCompare, "reason:", compareWhy || "(none)");
+              console.groupEnd();
+            }}
+            onClick={() => {
+              // Will only fire if canCompare is true
+              setShowSortOptions(false);
+              setShowSearch(false);
+              setShowComments(false);
+              setShowPublishModal(false);
+              onToggleCompare?.();
+            }}
+          >
+            <Columns size={18} className="text-inherit" />
+          </button>
+        
+          {/* Tooltip */}
+          <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200">
+            <div className="px-3 py-1 rounded bg-gray-800/90 text-white text-xs shadow-lg whitespace-nowrap">
+              {canCompare
+                ? (compareActive ? "Exit Comparison" : "Compare Versions")
+                : (compareWhy || "Need at least 2 versions")}
+            </div>
+          </div>
+        </div>
+
         {/* Render detached modal centered when open */}
         {showGraphs && (
           <ImprovementGraphs
-            evaluations={evaluations} // make sure `data` is in scope or replace with your evaluations array
-            metricName="Scores"
+            evaluations={evaluations}
             onClose={() => setShowGraphs(false)}
             extraTickValues={extraTickvalues}
           />
@@ -761,6 +1194,29 @@ const DesignHeaderActions: React.FC<DesignHeaderActionsProps> = ({
             fetchWeaknesses={fetchWeaknesses}
             designId={design.id}
             allVersions={allVersions}
+          />
+        )}
+
+        {/* ADDING here the computational breakdown for good measure */}
+        {showComputationalBreakdown && (
+          <ComputationalBreakdown
+            open={showComputationalBreakdown}
+            onClose={() => setShowComputationalBreakdown(false)}
+            frames={breakdownFrames}
+            initialFrameId={breakdownFrames[0]?.id}
+            loading={loadingBreakdown}
+            iteration={iterClamped}
+            totalIterations={totalIters}
+          />
+        )}
+
+        {showHeuristicLegend && (
+          <HeuristicLegendModal
+            open={showHeuristicLegend}
+            onClose={() => setShowHeuristicLegend(false)}
+            loading={loadingLegend}
+            items={heuristicLegend}
+            versionLabel={selectedVersion?.version ?? null}
           />
         )}
       </div>

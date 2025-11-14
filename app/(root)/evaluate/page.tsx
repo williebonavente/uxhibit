@@ -8,7 +8,13 @@ import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { FrameCarousel } from "@/components/carousel/frame-carousel";
 import { IconLink } from "@tabler/icons-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { EvalResponse } from "@/app/designs/[id]/page";
 import { AlertCircle } from "lucide-react";
@@ -23,6 +29,18 @@ type ParsedMeta = {
 };
 
 export default function Evaluate() {
+  const pollControllerRef = useRef<AbortController | null>(null);
+  const isPollingRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    return () => {
+      try {
+        pollControllerRef.current?.abort();
+      } catch (e) {}
+      pollControllerRef.current = null;
+      isPollingRef.current = false;
+    };
+  }, []);
 
   const pollControllerRef = useRef<AbortController | null>(null);
   const isPollingRef = useRef<boolean>(false);
@@ -55,6 +73,7 @@ export default function Evaluate() {
 
   const [savedDesignId, setSavedDesignId] = useState<string | null>(null);
   const [expectedFrameCount, setExpectedFrameCount] = useState<number>(0);
+  const [loadingEval, setLoadingEval] = useState(false);
 
   const canNextFrom1 = !!age && !!occupation;
   const canParse = !!link && !parsing;
@@ -70,11 +89,14 @@ export default function Evaluate() {
     }
     setParsing(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/figma/parse`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: link }),
-      });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_APP_URL}/api/figma/parse`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: link }),
+        }
+      );
       const data = await res.json();
 
       if (!res.ok) {
@@ -149,17 +171,21 @@ export default function Evaluate() {
         snapshot: { age, occupation },
       });
 
-      // Try to reuse existing design by file_key to avoid creating duplicate versions
       let precheckedExisting: any = null;
       try {
-        const checkRes = await fetch(`/api/designs?file_key=${encodeURIComponent(parsed.fileKey)}`);
+        const checkRes = await fetch(
+          `/api/designs?file_key=${encodeURIComponent(parsed.fileKey)}`
+        );
         if (checkRes.status === 405) {
-          toast.error("Pre-check endpoint not implemented (405) - skipping precheck");
-          console.warn("[handleSubmit] Pre-check endpoint not implemented (405) - skipping precheck");
+          toast.error(
+            "Pre-check endpoint not implemented (405) - skipping precheck"
+          );
+          console.warn(
+            "[handleSubmit] Pre-check endpoint not implemented (405) - skipping precheck"
+          );
           setStep(3);
           return;
-        }
-        else if (checkRes.status >= 500) {
+        } else if (checkRes.status >= 500) {
           // Server error — surface message and return to review
           const body = await checkRes.text().catch(() => "");
           const msg = body ? body : checkRes.statusText || "Server error";
@@ -167,43 +193,62 @@ export default function Evaluate() {
           setStep(3);
           setSubmitting(false);
           return;
-        }
-        else if (!checkRes.ok) {
+        } else if (!checkRes.ok) {
           const body = await checkRes.text().catch(() => "(no body)");
-          console.warn("[handleSubmit] Pre-check failed", checkRes.status, body);
+          console.warn(
+            "[handleSubmit] Pre-check failed",
+            checkRes.status,
+            body
+          );
         } else {
           precheckedExisting = await checkRes.json().catch(() => null);
           if (precheckedExisting?.design?.id) {
-            console.log("[handleSubmit] Found existing design by file_key", precheckedExisting.design.id);
+            console.log(
+              "[handleSubmit] Found existing design by file_key",
+              precheckedExisting.design.id
+            );
           }
         }
       } catch (e) {
-        console.warn("[handleSubmit] pre-save check failed (network), continuing to save", e);
+        console.warn(
+          "[handleSubmit] pre-save check failed (network), continuing to save",
+          e
+        );
       }
 
-      const saveRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/designs`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: parsed.name,
-          figma_link: link,
-          file_key: parsed.fileKey,
-          node_id: parsed.nodeId,
-          thumbnail_url: parsed.thumbnail,
-          age,
-          occupation,
-          snapshot: { age, occupation },
-        }),
-      });
+      const saveRes = await fetch(
+        `${process.env.NEXT_PUBLIC_APP_URL}/api/designs`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title: parsed.name,
+            figma_link: link,
+            file_key: parsed.fileKey,
+            node_id: parsed.nodeId,
+            thumbnail_url: parsed.thumbnail,
+            age,
+            occupation,
+            snapshot: { age, occupation },
+          }),
+        }
+      );
       console.log("[handleSubmit] Save response status", saveRes.status);
 
       const saved = await saveRes.json().catch(() => ({}));
       const designId =
-        saved?.design?.id ?? saved?.id ?? saved?.design_id ?? saved?.data?.design?.id ?? null;
+        saved?.design?.id ??
+        saved?.id ??
+        saved?.design_id ??
+        saved?.data?.design?.id ??
+        null;
       if (!saveRes.ok || !designId) {
-        console.log("[handleSubmit] Save failed or missing design id", { status: saveRes.status, saved });
+        console.log("[handleSubmit] Save failed or missing design id", {
+          status: saveRes.status,
+          saved,
+        });
         toast.error(saved?.error || "Save failed (no design id).");
         return;
       }
@@ -216,41 +261,66 @@ export default function Evaluate() {
             const newest = Array.isArray(vdata?.versions) && vdata.versions[0];
             if (newest?.id) {
               resolvedVersionId = newest.id;
-              console.log("[handleSubmit] Resolved version_id from versions endpoint", resolvedVersionId);
+              console.log(
+                "[handleSubmit] Resolved version_id from versions endpoint",
+                resolvedVersionId
+              );
             } else {
-              console.warn("[handleSubmit] No versions returned when resolving version_id", vdata);
+              console.warn(
+                "[handleSubmit] No versions returned when resolving version_id",
+                vdata
+              );
             }
           } else {
-            console.warn("[handleSubmit] Failed to fetch versions for design", designId, vres.status);
+            console.warn(
+              "[handleSubmit] Failed to fetch versions for design",
+              designId,
+              vres.status
+            );
           }
         } catch (e) {
-          console.warn("[handleSubmit] Error resolving version_id, proceeding without it", e);
+          console.warn(
+            "[handleSubmit] Error resolving version_id, proceeding without it",
+            e
+          );
         }
       }
       if (resolvedVersionId) {
         saved.version_id = resolvedVersionId;
       } else {
-        console.warn("[handleSubmit] No version_id available — polling may miss worker updates");
+        console.warn(
+          "[handleSubmit] No version_id available — polling may miss worker updates"
+        );
       }
-
 
       // Prefer existing design from pre-check if present
       if (precheckedExisting?.design?.id && !saved?.design?.id && !saved?.id) {
         saved.design = saved.design ?? {};
         saved.design.id = precheckedExisting.design.id;
-        if (precheckedExisting.design.version_id) saved.version_id = precheckedExisting.design.version_id;
-        console.log("[handleSubmit] Using prechecked existing design data", saved);
+        if (precheckedExisting.design.version_id)
+          saved.version_id = precheckedExisting.design.version_id;
+        console.log(
+          "[handleSubmit] Using prechecked existing design data",
+          saved
+        );
       }
 
       // Normalize returned design id (handle different backend shapes)
 
-
       setSavedDesignId(designId);
-      console.log("[handleSubmit] Normalized design Id", designId, "version_id:", saved?.version_id);
+      console.log(
+        "[handleSubmit] Normalized design Id",
+        designId,
+        "version_id:",
+        saved?.version_id
+      );
 
       // Polling with AbortController, version param, robust guards
       // abort any previous poll, create a new controller for this session
-      try { pollControllerRef.current?.abort(); } catch (e) { }
+      setLoadingEval(true);
+      try {
+        pollControllerRef.current?.abort();
+      } catch (e) {}
       pollControllerRef.current = new AbortController();
       const controller = pollControllerRef.current;
       let pollCount = 0;
@@ -258,12 +328,18 @@ export default function Evaluate() {
       const maxPolls = 60;
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
       const expectedIds = Object.keys(parsed.frameImages || {});
-      const versionParam = saved?.version_id ? `&version=${saved.version_id}` : "";
+      const versionParam = saved?.version_id
+        ? `&version=${saved.version_id}`
+        : "";
 
       try {
         while (pollCount < maxPolls) {
           pollCount++;
-          console.log(`[handleSubmit] Polling evaluation (attempt ${pollCount}) for design ID: ${designId} version:${saved?.version_id ?? "n/a"}`);
+          console.log(
+            `[handleSubmit] Polling evaluation (attempt ${pollCount}) for design ID: ${designId} version:${
+              saved?.version_id ?? "n/a"
+            }`
+          );
 
           let res: Response | null = null;
           let data: any = null;
@@ -285,16 +361,24 @@ export default function Evaluate() {
           try {
             data = await res.json();
           } catch (err) {
-            console.error("[handleSubmit] Failed to parse evaluation JSON:", err);
+            console.error(
+              "[handleSubmit] Failed to parse evaluation JSON:",
+              err
+            );
             await new Promise((r) => setTimeout(r, 2000));
             continue;
           }
 
-          console.log(`[handleSubmit] Evaluation response status: ${res.status}`, {
-            statusField: data?.status,
-            returnedIds: (data?.results || []).map((r: any) => r.nodeId ?? r.node_id),
-            expectedIds,
-          });
+          console.log(
+            `[handleSubmit] Evaluation response status: ${res.status}`,
+            {
+              statusField: data?.status,
+              returnedIds: (data?.results || []).map(
+                (r: any) => r.nodeId ?? r.node_id
+              ),
+              expectedIds,
+            }
+          );
 
           if (!res.ok && res.status >= 400 && res.status < 500) {
             console.error("[handleSubmit] Permanent polling error:", data);
@@ -304,13 +388,17 @@ export default function Evaluate() {
 
           // Backend signalled stop
           if (data?.status === "not_found" || data?.status === "error") {
-            console.log("[handleSubmit] Backend signaled stop:", data?.status, data?.message);
+            console.log(
+              "[handleSubmit] Backend signaled stop:",
+              data?.status,
+              data?.message
+            );
             break;
           }
 
           // Collect frames matching current parsed node ids
-          frames = (Array.isArray(data.results) ? data.results : []).filter((f: any) =>
-            expectedIds.includes(f.nodeId ?? f.node_id)
+          frames = (Array.isArray(data.results) ? data.results : []).filter(
+            (f: any) => expectedIds.includes(f.nodeId ?? f.node_id)
           );
           setEvaluatedFrames(frames);
 
@@ -319,8 +407,14 @@ export default function Evaluate() {
 
           // Success: all expected frames present
           if (frames.length === expectedIds.length) {
+            setLoadingEval(false);
+            try {
+              window.dispatchEvent(new Event("uxhibit:soft-refresh"));
+            } catch {}
             toast.success("Design and AI evaluation completed for all frames");
-            try { controller.abort(); } catch (e) { }
+            try {
+              controller.abort();
+            } catch (e) {}
             pollControllerRef.current = null;
             isPollingRef.current = false;
             router.push(`/designs/${designId}`);
@@ -328,16 +422,29 @@ export default function Evaluate() {
           }
 
           // If results exist but none match after several attempts -> abort to avoid infinite polling
-          const returnedIds = (Array.isArray(data.results) ? data.results.map((r: any) => r.nodeId ?? r.node_id) : []);
+          const returnedIds = Array.isArray(data.results)
+            ? data.results.map((r: any) => r.nodeId ?? r.node_id)
+            : [];
           if (returnedIds.length > 0 && pollCount > 10 && frames.length === 0) {
-            console.warn("[handleSubmit] Returned results do not match expected node ids; aborting polling.", { expectedIds, returnedIds });
-            toast.warning("Evaluation returned unexpected frame ids. Check version/node mapping.");
+            console.warn(
+              "[handleSubmit] Returned results do not match expected node ids; aborting polling.",
+              { expectedIds, returnedIds }
+            );
+            toast.warning(
+              "Evaluation returned unexpected frame ids. Check version/node mapping."
+            );
             break;
           }
 
           // If backend explicitly marks done -> stop
           if (data?.status === "done") {
-            console.log("[handleSubmit] Backend marked done but not all frames present");
+            setLoadingEval(false);
+            try {
+              window.dispatchEvent(new Event("uxhibit:soft-refresh"));
+            } catch {}
+            console.log(
+              "[handleSubmit] Backend marked done but not all frames present"
+            );
             break;
           }
 
@@ -346,13 +453,25 @@ export default function Evaluate() {
         }
       } finally {
         // ensure controller cleaned up
-        try { controller.abort(); } catch (e) { }
+        try {
+          controller.abort();
+        } catch (e) {}
         isPollingRef.current = false;
+      }
+
+      if (loadingEval) {
+        setLoadingEval(false);
+        try {
+          window.dispatchEvent(new Event("uxhibit:soft-refresh"));
+        } catch {}
       }
 
       // End of polling: route consistently using normalized id
       if (frames.length < expectedIds.length) {
-        console.log("[handleSubmit] Polling finished without completing all frames", { framesEvaluated: frames.length, expected: expectedIds.length });
+        console.log(
+          "[handleSubmit] Polling finished without completing all frames",
+          { framesEvaluated: frames.length, expected: expectedIds.length }
+        );
         toast.warning("Design saved, but AI evaluation did not complete.");
         router.push(`/designs/${designId}`);
       }
@@ -364,6 +483,15 @@ export default function Evaluate() {
       console.log("[handleSubmit] Finished");
     }
   }
+
+  useEffect(() => {
+    const handler = () => {
+      // trigger a local visual cue or re-fetch lightweight data here.
+      console.log("[Evaluate] Soft refresh event received");
+    };
+    window.addEventListener("uxhibit:soft-refresh", handler);
+    return () => window.removeEventListener("uxhibit:soft-refresh", handler);
+  }, []);
 
   function resetAll() {
     setStep(1);
@@ -380,7 +508,10 @@ export default function Evaluate() {
       className="min-h-screen flex items-center justify-center"
       style={cardCursor}
     >
-      <div className="relative pt-2 md:pt-4 pb-6 md:pb-8 flex flex-col gap-8" style={cardCursor}>
+      <div
+        className="relative pt-2 md:pt-4 pb-6 md:pb-8 flex flex-col gap-8"
+        style={cardCursor}
+      >
         {/* Step Indicator */}
 
         <div className="flex items-center justify-center gap-5 text-xs font-medium tracking-wide p-2 rounded-full mt-0">
@@ -389,21 +520,23 @@ export default function Evaluate() {
               {/* Step Circle */}
               <span
                 className={`relative h-9 w-9 rounded-full flex items-center justify-center text-[12px] font-semibold transition-all
-            ${step === n
-                    ? "bg-[#ED5E20] text-white drop-shadow-[0_0_8px_#ED5E20] animate-pulse"
-                    : step > n
-                      ? "bg-[#ED5E20] text-white"
-                      : "bg-neutral-200 dark:bg-neutral-800 text-neutral-500"
-                  }`}
+            ${
+              step === n
+                ? "bg-[#ED5E20] text-white drop-shadow-[0_0_8px_#ED5E20] animate-pulse"
+                : step > n
+                ? "bg-[#ED5E20] text-white"
+                : "bg-neutral-200 dark:bg-neutral-800 text-neutral-500"
+            }`}
               >
                 {n}
               </span>
               {/* Step Label */}
               <span
-                className={`hidden sm:inline text-sm ${step >= n
-                  ? "text-neutral-900 dark:text-neutral-100"
-                  : "text-neutral-500 dark:text-neutral-600"
-                  }`}
+                className={`hidden sm:inline text-sm ${
+                  step >= n
+                    ? "text-neutral-900 dark:text-neutral-100"
+                    : "text-neutral-500 dark:text-neutral-600"
+                }`}
               >
                 {n === 1 && "Parameters"}
                 {n === 2 && "Upload"}
@@ -414,10 +547,9 @@ export default function Evaluate() {
               {i < 3 && (
                 <div
                   className={`h-0.5 w-14 rounded-full transition-colors duration-300
-              ${step > n
-                      ? "bg-[#ED5E20]"
-                      : "bg-neutral-300 dark:bg-neutral-700"
-                    }`}
+              ${
+                step > n ? "bg-[#ED5E20]" : "bg-neutral-300 dark:bg-neutral-700"
+              }`}
                 />
               )}
             </div>
@@ -438,13 +570,15 @@ export default function Evaluate() {
 
             <fieldset className="grid grid-cols-1 gap-6">
               {/* Generation */}
-              <label className="group relative flex flex-col rounded-xl
+              <label
+                className="group relative flex flex-col rounded-xl
                                 bg-accent dark:bg-neutral-800/60
                                 text-white
                                 p-5
                                 transition-colors
                                 focus-within:ring-1 focus-within:ring-[#ED5E20]/70 focus-within:border-[#ED5E20 border"
-                style={cardCursor}>
+                style={cardCursor}
+              >
                 <span className="text-[15px] font-semibold text-[#ED5E20] mb-2">
                   Generation
                 </span>
@@ -474,18 +608,24 @@ export default function Evaluate() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Gen Z">Gen Z (1997-2012)</SelectItem>
-                      <SelectItem value="Millennial">Millennial (1981-1996)</SelectItem>
-                      <SelectItem value="Gen Alpha">Gen Alpha (2013-Present)</SelectItem>
+                      <SelectItem value="Millennial">
+                        Millennial (1981-1996)
+                      </SelectItem>
+                      <SelectItem value="Gen Alpha">
+                        Gen Alpha (2013-Present)
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </label>
 
               {/* Occupation */}
-              <label className="group relative flex flex-col rounded-xl
+              <label
+                className="group relative flex flex-col rounded-xl
                                 bg-accent dark:bg-neutral-800/60 text-white
                                 p-5 transition-colors focus-within:ring-1 focus-within:ring-[#ED5E20]/70 focus-within:border-[#ED5E20 border"
-                style={cardCursor}>
+                style={cardCursor}
+              >
                 <span className="text-[15px] font-semibold text-[#ED5E20] mb-2">
                   Occupation
                 </span>
@@ -554,10 +694,11 @@ export default function Evaluate() {
                 disabled={!canNextFrom1}
                 onClick={() => canNextFrom1 && setStep(2)}
                 className={`px-6 py-2 rounded-lg text-sm font-semibold text-white cursor-pointer
-                    ${canNextFrom1
-                    ? "bg-[#ED5E20] hover:bg-orange-600"
-                    : "bg-gray-400 cursor-not-allowed"
-                  }`}
+                    ${
+                      canNextFrom1
+                        ? "bg-[#ED5E20] hover:bg-orange-600"
+                        : "bg-gray-400 cursor-not-allowed"
+                    }`}
               >
                 Next
               </button>
@@ -573,7 +714,8 @@ export default function Evaluate() {
                 Paste Figma Design Link
               </p>
               <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                Make sure the link is only from figma.com domain and is public or shared with you.
+                Make sure the link is only from figma.com domain and is public
+                or shared with you.
               </p>
             </div>
 
@@ -590,11 +732,17 @@ export default function Evaluate() {
                 />
               </div>
               {parsed && (
-                <div className="px-6 py-6"> {/* Increased margin-top and padding */}
+                <div className="px-6 py-6">
+                  {" "}
+                  {/* Increased margin-top and padding */}
                   {/* Info Section: Name and FileKey */}
                   <div className="mb-6 p-5 rounded-lg bg-accent dark:bg-neutral-800/60 border">
-                    <div className="font-bold text-2xl md:text-xl mb-1">{parsed.name}</div>
-                    <div className="opacity-70 break-all text-sm md:text-base">{parsed.fileKey}</div>
+                    <div className="font-bold text-2xl md:text-xl mb-1">
+                      {parsed.name}
+                    </div>
+                    <div className="opacity-70 break-all text-sm md:text-base">
+                      {parsed.fileKey}
+                    </div>
                   </div>
                   {/* Thumbnail Section */}
                   {parsed.thumbnail && (
@@ -647,9 +795,10 @@ export default function Evaluate() {
                   onClick={handleParse}
                   disabled={!canParse}
                   className={`px-6 py-2 rounded-lg text-sm font-semibold flex items-center justify-center min-w-[120px]
-                    ${parsing
-                      ? "text-white bg-gray-400 cursor-not-allowed"
-                      : parsed
+                    ${
+                      parsing
+                        ? "text-white bg-gray-400 cursor-not-allowed"
+                        : parsed
                         ? "border-2 border-[#ED5E20] text-[#ED5E20] bg-transparent hover:bg-[#ED5E20]/10"
                         : "text-white bg-[#ED5E20] hover:bg-orange-600"
                     } transition-colors cursor-pointer`}
@@ -663,7 +812,11 @@ export default function Evaluate() {
                         <span className="w-1.5 h-1.5 mx-0.5 bg-white rounded-full animate-bounce"></span>
                       </span>
                     </span>
-                  ) : parsed ? "Re-Parse" : "Parse"}
+                  ) : parsed ? (
+                    "Re-Parse"
+                  ) : (
+                    "Parse"
+                  )}
                 </button>
                 {parsed && !parsing && (
                   <button
@@ -687,14 +840,18 @@ export default function Evaluate() {
                 Review Information and Evaluate
               </p>
               <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                Carefully check the provided details and ensure all information is correct before proceeding.
+                Carefully check the provided details and ensure all information
+                is correct before proceeding.
               </p>
             </div>
 
             <div className="grid gap-4">
               <div className="rounded-lg p-4 bg-accent dark:bg-neutral-800/60 border">
-                <h3 className="text-[18px] font-semibold mb-3 p-3 text-center text-neutral-900 dark:text-neutral-100">{parsed.name}</h3>
-                {parsed.frameImages && Object.keys(parsed.frameImages).length > 0 ? (
+                <h3 className="text-[18px] font-semibold mb-3 p-3 text-center text-neutral-900 dark:text-neutral-100">
+                  {parsed.name}
+                </h3>
+                {parsed.frameImages &&
+                Object.keys(parsed.frameImages).length > 0 ? (
                   <FrameCarousel frameImages={parsed.frameImages} />
                 ) : parsed.thumbnail ? (
                   <div className="thumbnail-wrapper mb-3">
@@ -707,21 +864,25 @@ export default function Evaluate() {
                     />
                   </div>
                 ) : (
-                  <div className={cn(
-                    "flex items-center gap-2 text-sm italic",
-                    "text-muted-foreground"
-                  )}>
+                  <div
+                    className={cn(
+                      "flex items-center gap-2 text-sm italic",
+                      "text-muted-foreground"
+                    )}
+                  >
                     <AlertCircle className="h-4 w-4" />
-                    <span>Preview not available — let your imagination fill the gap.</span>
+                    <span>
+                      Preview not available — let your imagination fill the gap.
+                    </span>
                   </div>
-
-
                 )}
               </div>
             </div>
 
             <div className="rounded-lg p-4 bg-accent dark:bg-neutral-800/60 border">
-              <h3 className="text-[18px] font-semibold mb-3 p-3 text-center text-neutral-900 dark:text-neutral-100">Parameters</h3>
+              <h3 className="text-[18px] font-semibold mb-3 p-3 text-center text-neutral-900 dark:text-neutral-100">
+                Parameters
+              </h3>
               <div className="flex justify-between gap-2 text-center">
                 {/* Generation Card */}
                 <div className="flex w-1/2 h-[50px] bg-[#ED5E20]/5 p-2 rounded-lg justify-center items-center gap-3">
@@ -759,7 +920,14 @@ export default function Evaluate() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       >
-                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                        <rect
+                          x="2"
+                          y="7"
+                          width="20"
+                          height="14"
+                          rx="2"
+                          ry="2"
+                        />
                         <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
                       </svg>
                     )}
@@ -898,7 +1066,11 @@ export default function Evaluate() {
                   🎉 All frames successfully evaluated!
                 </div>
                 <div className="text-center text-base text-gray-700 dark:text-gray-300 mt-2">
-                  Design <span className="font-mono text-[#ED5E20]">{savedDesignId}</span> has been saved and evaluated.
+                  Design{" "}
+                  <span className="font-mono text-[#ED5E20]">
+                    {savedDesignId}
+                  </span>{" "}
+                  has been saved and evaluated.
                 </div>
               </div>
             )}
