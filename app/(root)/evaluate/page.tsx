@@ -34,19 +34,6 @@ export default function Evaluate() {
 
   useEffect(() => {
     return () => {
-      try {
-        pollControllerRef.current?.abort();
-      } catch (e) {}
-      pollControllerRef.current = null;
-      isPollingRef.current = false;
-    };
-  }, []);
-
-  const pollControllerRef = useRef<AbortController | null>(null);
-  const isPollingRef = useRef<boolean>(false);
-
-  useEffect(() => {
-    return () => {
       try { pollControllerRef.current?.abort(); } catch (e) { }
       pollControllerRef.current = null;
       isPollingRef.current = false;
