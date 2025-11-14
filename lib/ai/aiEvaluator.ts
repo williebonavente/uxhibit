@@ -772,44 +772,6 @@ export async function aiEvaluator(
       .replace(/\s*```$/i, "")
       .trim();
 
-  try {
-    const completion = await client.chat.complete({
-      model: "ft:ministral-8b-latest:521112c6:20251101:fbb300c8",
-      temperature: 0,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: prompt,
-            },
-            // {
-            //     type: "image_url", imageUrl: { url: imageUrl }
-            // }
-          ],
-        },
-      ],
-    });
-    const msg = completion?.choices?.[0]?.message;
-    console.log(msg);
-    const contentStr: string | undefined =
-      typeof msg?.content === "string"
-        ? msg.content
-        : Array.isArray(msg?.content)
-        ? (
-            msg.content.find((p) => p.type === "text" && "text" in p) as
-              | { type: "text"; text: string }
-              | undefined
-          )?.text
-        : undefined;
-    if (!contentStr) return null;
-
-    const cleaned = contentStr
-      .replace(/^\s*```(?:json)?\s*/i, "")
-      .replace(/\s*```$/i, "")
-      .trim();
-
     try {
       const parsed = JSON.parse(cleaned) as AiEvaluator;
 
