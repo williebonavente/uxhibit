@@ -1,8 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 // import Image from "next/image";
 import { Spinner } from "@/components/ui/shadcn-io/spinner/index";
 import { toast } from "sonner";
-import { createClient } from "@/utils/supabase/client";
 import { Eye } from "lucide-react";
 import {
   fetchFramesForVersion,
@@ -127,43 +126,126 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
     }
   }
 
-  function computeCombinedAverage(aiData: any): number | null {
-  if (!aiData) return null;
-  let raw = aiData;
-  if (typeof raw === "string") {
-    try { raw = JSON.parse(raw); } catch { return null; }
-  }
-  const collect = (x: any): any[] => {
-    if (!x) return [];
-    if (Array.isArray(x)) return x;
-    if (typeof x === "object") {
-      const keys = Object.keys(x);
-      if (keys.length && keys.every(k => /^\d+$/.test(k))) {
-        return keys.sort((a,b)=>Number(a)-Number(b)).map(k => x[k]);
-      }
-      // single ai wrapper
-      if ("ai" in x) return [x];
-      return [x];
-    }
-    return [];
-  };
-  const entries = collect(raw).map(e => (e && e.ai ? e.ai : e));
-  const nums: number[] = [];
-  for (const e of entries) {
-    const dc = e?.debug_calc;
-    if (dc && typeof dc.combined === "number") nums.push(dc.combined);
-    else if (typeof e?.overall_score === "number") nums.push(e.overall_score);
-  }
-  if (!nums.length) return null;
-  return Math.round(nums.reduce((a,b)=>a+b,0)/nums.length);
-}
+  const computeFrameScoreFromAi = useCallback((ai: any): number => {
+    if (!ai || typeof ai !== "object") return 0;
+    const dc = ai?.debug_calc;
 
-const augmentedPaged = useMemo(() => {
-  return pagedVersions.map(v => {
-    const combinedAvg = computeCombinedAverage(v.ai_data);
-    return { ...v, combinedAvg };
-  });
-}, [pagedVersions]);
+    // Heuristic average
+    let heurAvg: number | undefined =
+      typeof dc?.heuristics_avg === "number" ? dc.heuristics_avg : undefined;
+
+    if (heurAvg === undefined) {
+      const hb: any[] = Array.isArray(ai?.heuristic_breakdown)
+        ? ai.heuristic_breakdown
+        : [];
+
+      if (hb.length) {
+        const pctSum = hb.reduce((acc, h) => {
+          const s = typeof h?.score === "number" ? h.score : 0;
+          const m =
+            typeof h?.max_points === "number" && h.max_points > 0
+              ? h.max_points
+              : 4;
+          return acc + (s / m) * 100;
+        }, 0);
+        heurAvg = Math.round(pctSum / hb.length);
+      }
+    }
+
+    // Category average
+    const cs =
+      ai?.category_scores && typeof ai.category_scores === "object"
+        ? ai.category_scores
+        : undefined;
+
+    const catVals = cs
+      ? Object.values(cs).filter(
+          (v: any): v is number => typeof v === "number" && Number.isFinite(v)
+        )
+      : [];
+
+    const catAvg = catVals.length
+      ? Math.round(catVals.reduce((a, b) => a + b, 0) / catVals.length)
+      : undefined;
+
+    // Bias weighted
+    const biasWeighted =
+      typeof dc?.bias_weighted_overall === "number"
+        ? dc.bias_weighted_overall
+        : typeof ai?.bias?.weighted_overall === "number"
+        ? ai.bias.weighted_overall
+        : undefined;
+
+    const tri =
+      typeof heurAvg === "number" &&
+      typeof catAvg === "number" &&
+      typeof biasWeighted === "number"
+        ? Math.round((heurAvg + catAvg + biasWeighted) / 3)
+        : undefined;
+
+    if (typeof tri === "number") return tri;
+    if (typeof dc?.final === "number") return dc.final;
+    if (typeof ai?.overall_score === "number") return ai.overall_score;
+    if (typeof catAvg === "number" && typeof heurAvg === "number")
+      return Math.round((catAvg + heurAvg) / 2);
+    if (typeof catAvg === "number") return catAvg;
+    if (typeof heurAvg === "number") return heurAvg;
+    return 0;
+  }, []);
+
+  const computeVersionScore = useCallback(
+    (v: any): number | null => {
+      if (
+        typeof v?.total_score === "number" &&
+        Number.isFinite(v.total_score)
+      ) {
+        return Math.round(v.total_score);
+      }
+
+      let raw = v?.ai_data;
+      if (!raw) return null;
+      if (typeof raw === "string") {
+        try {
+          raw = JSON.parse(raw);
+        } catch {
+          return null;
+        }
+      }
+
+      const collect = (x: any): any[] => {
+        if (!x) return [];
+        if (Array.isArray(x)) return x;
+        if (typeof x === "object") {
+          const keys = Object.keys(x);
+          if (keys.length && keys.every((k) => /^\d+$/.test(k))) {
+            return keys.sort((a, b) => Number(a) - Number(b)).map((k) => x[k]);
+          }
+          if ("ai" in x) return [x];
+          return [x];
+        }
+        return [];
+      };
+
+      const entries = collect(raw).map((e) => (e?.ai ? e.ai : e));
+      const scores = entries
+        .map((ai) => computeFrameScoreFromAi(ai))
+        .filter((n) => typeof n === "number" && Number.isFinite(n));
+
+      if (!scores.length) return null;
+      return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+    },
+    [computeFrameScoreFromAi]
+  ); // include deps of helpers you use
+
+  const augmentedPaged = useMemo(() => {
+    return pagedVersions.map((v) => {
+      const displayScore = computeVersionScore(v);
+      console.log({ 
+        ...v
+      });
+      return { ...v, displayScore};
+    });
+  }, [pagedVersions, computeVersionScore]);
 
   //  Persist showHidden across pagination / modal reopen
   useEffect(() => {
@@ -181,8 +263,6 @@ const augmentedPaged = useMemo(() => {
   }, [showHidden, versions, page, pageSize, setPage]);
 
   if (!open) return null;
-
-  
 
   return (
     <div className="fixed inset-0 flex items-center justify-center pl-20 pr-20 z-50">
@@ -241,7 +321,6 @@ const augmentedPaged = useMemo(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  
                   {augmentedPaged.map((v) => {
                     const isCurrent =
                       String(v.id).trim() ===
@@ -391,19 +470,34 @@ const augmentedPaged = useMemo(() => {
                           )}
                         </td>
 
-                        {/*SCORE*/}
-                             <td className="p-2 border text-gray-700 dark:text-gray-200 text-center">
-          {v.combinedAvg != null
-            ? v.combinedAvg
-            : v.total_score != null
-            ? Math.round(v.total_score)
-            : "-"}
-        </td>
+     {/*SCORE*/}
+                        <td className="p-2 border text-gray-700 dark:text-gray-200 text-center">
+                          {v.displayScore != null
+                            ? v.displayScore
+                            : v.total_score != null
+                            ? Math.round(v.total_score)
+                            : "-"}
+                        </td> 
 
                         {/*AI SUMMARY*/}
-                        <td className="p-2 border text-gray-700 dark:text-gray-200">
-                          {v.ai_summary || "-"}
-                        </td>
+                                               <td className="p-2 border text-gray-700 dark:text-gray-200">
+                          {(() => {
+                            const s: any = v.ai_summary;
+                            if (!s) return "-";
+                            if (typeof s === "string") {
+                              try {
+                                const parsed: any = JSON.parse(s);
+                                return parsed?.narrative ?? parsed?.long ?? parsed?.short ?? s;
+                              } catch {
+                                return s; // plain string
+                              }
+                            }
+                            if (typeof s === "object") {
+                              return s?.narrative ?? s?.long ?? s?.short ?? "-";
+                            }
+                            return "-";
+                          })()}
+                        </td> 
 
                         {/*PARAMETERS*/}
                         {/* <td className="p-5 border align-middle text-gray-700 dark:text-gray-200">
@@ -546,8 +640,7 @@ const augmentedPaged = useMemo(() => {
                               }}
                               className="text-orange-600 hover:text-white hover:bg-orange-500 rounded-full p-1 transition-all duration-200"
                               title="Hide version"
-                            >
-                            </button>
+                            ></button>
                           )}
                           {!isCurrent && !isHidden && (
                             <button

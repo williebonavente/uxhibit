@@ -230,22 +230,8 @@ export async function aiEvaluator(
   const scoringMode: "raw" | "progressive" =
     (snapshot as any)?.scoringMode === "raw" ? "raw" : "progressive";
 
-  function normalizeForIteration(parsed: AiEvaluator): AiEvaluator {
-    // In raw mode, do not reshape category_scores toward targets.
-    if (scoringMode === "raw") {
-      const next: AiEvaluator = {
-        ...parsed,
-        category_scores: { ...(parsed.category_scores ?? {}) },
-      };
-      if (iteration >= totalIterations) {
-        next.weaknesses = [];
-        next.weakness_suggestions = [];
-        next.issues = [];
-      }
-      return next;
-    }
-
-    const tgtRaw = targetRawForIteration(iteration, totalIterations);
+      function normalizeForIteration(parsed: AiEvaluator): AiEvaluator {
+    // Categories list used in both branches
     const categories = [
       "accessibility",
       "typography",
@@ -254,6 +240,62 @@ export async function aiEvaluator(
       "hierarchy",
       "usability",
     ] as const;
+
+    // Optional previous categories to stabilize progression
+    const prevCats =
+      (snapshot as any)?.previousCategoryScores ||
+      (snapshot as any)?.prevCategoryScores ||
+      null;
+    const enforceMonotonic = !!(snapshot as any)?.enforceMonotonic; // if true, never allow drops
+
+    // Helper clamp
+    const clamp = (n: number, lo: number, hi: number) =>
+      Math.max(lo, Math.min(hi, n));
+
+    // In raw mode, apply soft guardrails so categories don't collapse
+    if (scoringMode === "raw") {
+      const tgtRaw = targetRawForIteration(iteration, totalIterations);
+      const band = 30; // keep within ±30 of the iteration target
+      const minBand = tgtRaw - band;
+      const maxBand = tgtRaw + band;
+
+      const next: AiEvaluator = {
+        ...parsed,
+        category_scores: { ...(parsed.category_scores ?? {}) },
+      };
+
+      for (const c of categories) {
+        const current = Number((next.category_scores as any)?.[c]);
+        if (Number.isFinite(current)) {
+          let val = current;
+
+          // Guardrail around target
+          val = clamp(Math.round(val), 0, 100);
+          if (val < minBand) val = Math.max(minBand + 15, val); // lift extreme lows
+          if (val > maxBand) val = Math.min(maxBand - 15, val); // cap extreme highs
+
+          // Stabilize vs previous iteration
+          const prev = Number(prevCats?.[c]);
+          if (Number.isFinite(prev) && iteration > 1) {
+            const maxDrop = enforceMonotonic ? 0 : 10; // allow at most -10 (or 0 if monotonic)
+            val = Math.max(val, prev - maxDrop);
+          }
+
+          (next.category_scores as any)[c] = clamp(val, 0, 100);
+        }
+      }
+
+      // If final iteration, drop weaknesses/issues
+      if (iteration >= totalIterations) {
+        next.weaknesses = [];
+        next.weakness_suggestions = [];
+        next.issues = [];
+      }
+      return next;
+    }
+
+    // Progressive mode (existing logic + stabilization)
+    const tgtRaw = targetRawForIteration(iteration, totalIterations);
 
     const t =
       totalIterations > 1
@@ -290,7 +332,15 @@ export async function aiEvaluator(
 
       let cat = tgtRaw + n + hAdj;
       if (iteration >= totalIterations) cat = Math.max(minFinal, cat);
-      const catRounded = clamp(Math.round(cat), 0, 100);
+      let catRounded = clamp(Math.round(cat), 0, 100);
+
+      // Stabilize vs previous iteration
+      const prev = Number(prevCats?.[c]);
+      if (Number.isFinite(prev) && iteration > 1) {
+        const maxDrop = enforceMonotonic ? 0 : 10;
+        catRounded = Math.max(catRounded, prev - maxDrop);
+      }
+
       (next.category_scores as any)[c] = catRounded;
     }
 
@@ -301,6 +351,7 @@ export async function aiEvaluator(
     }
     return next;
   }
+  
   function computeOverallFromCategories(cat: Record<string, number>): number {
     const vals = Object.values(cat).filter((v) => Number.isFinite(v));
     if (!vals.length) return 0;

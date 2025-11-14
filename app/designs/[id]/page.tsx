@@ -1372,8 +1372,77 @@ export default function DesignDetailPage({
       }));
   }, []);
 
+    function computeFrameScoreFromAi(root: any): number {
+    if (!root || typeof root !== "object") return 0;
+    const dbg = root?.debug_calc;
+
+    // Heuristic average
+    let heurAvg: number | undefined =
+      typeof dbg?.heuristics_avg === "number" ? dbg.heuristics_avg : undefined;
+    if (heurAvg === undefined) {
+      const hb: any[] = Array.isArray(root?.heuristic_breakdown)
+        ? root.heuristic_breakdown
+        : [];
+      if (hb.length) {
+        const pctSum = hb.reduce((acc, h) => {
+          const s = typeof h?.score === "number" ? h.score : 0;
+          const m =
+            typeof h?.max_points === "number" && h.max_points > 0
+              ? h.max_points
+              : 4;
+          return acc + (s / m) * 100;
+        }, 0);
+        heurAvg = Math.round(pctSum / hb.length);
+      }
+    }
+
+    // Category avg
+    const cs =
+      root?.category_scores && typeof root.category_scores === "object"
+        ? root.category_scores
+        : undefined;
+    const catVals = cs
+      ? Object.values(cs).filter(
+          (v: any): v is number => typeof v === "number" && Number.isFinite(v)
+        )
+      : [];
+    const catAvg = catVals.length
+      ? Math.round(catVals.reduce((a: number, b: number) => a + b, 0) / catVals.length)
+      : undefined;
+
+    // Bias weighted
+    const biasWeighted =
+      typeof dbg?.bias_weighted_overall === "number"
+        ? dbg.bias_weighted_overall
+        : typeof root?.bias?.weighted_overall === "number"
+        ? root.bias.weighted_overall
+        : undefined;
+
+    const tri =
+      typeof heurAvg === "number" &&
+      typeof catAvg === "number" &&
+      typeof biasWeighted === "number"
+        ? Math.round((heurAvg + catAvg + biasWeighted) / 3)
+        : undefined;
+
+    if (typeof tri === "number") return tri;
+    if (typeof dbg?.final === "number") return dbg.final;
+    if (typeof root?.overall_score === "number") return root.overall_score;
+    if (typeof catAvg === "number" && typeof heurAvg === "number")
+      return Math.round((catAvg + heurAvg) / 2);
+    if (typeof catAvg === "number") return catAvg;
+    if (typeof heurAvg === "number") return heurAvg;
+    return 0;
+  }
+
   function parseVersionScores(v: any): ParsedVersionData | null {
     if (!v) return null;
+
+    // 1) Prefer persisted total_score if valid (>0) to avoid recompute noise
+    const persisted =
+      typeof v.total_score === "number" && v.total_score > 0
+        ? Math.round(v.total_score)
+        : undefined;
 
     let raw = v.ai_data;
     if (typeof raw === "string") {
@@ -1382,12 +1451,9 @@ export default function DesignDetailPage({
       } catch {
         return {
           id: v.id,
-          version: v.version,
-          overall:
-            typeof v.total_score === "number"
-              ? Math.round(v.total_score)
-              : undefined,
-          categories: {},
+            version: v.version,
+            overall: persisted,
+            categories: {},
         };
       }
     }
@@ -1396,45 +1462,31 @@ export default function DesignDetailPage({
       if (!x) return [];
       if (Array.isArray(x)) return x;
       if (typeof x === "object") {
+        // numeric index object
         const keys = Object.keys(x);
         if (keys.length && keys.every((k) => /^\d+$/.test(k))) {
-          return keys
-            .sort((a, b) => Number(a) - Number(b))
-            .map((k) => (x as any)[k]);
+          return keys.sort((a, b) => Number(a) - Number(b)).map((k) => x[k]);
         }
-        if (Array.isArray((x as any).frames)) return (x as any).frames;
+        if (Array.isArray(x.frames)) return x.frames;
         return [x];
       }
       return [];
     };
 
     const entries = toEntries(raw).map((e) =>
-      e && typeof e === "object" && "ai" in e ? (e as any).ai : e
+      e && typeof e === "object" && "ai" in e ? e.ai : e
     );
 
-    const combinedVals: number[] = [];
-    const finalVals: number[] = [];
-    const overallVals: number[] = [];
-    const heuristicsAvgVals: number[] = [];
-    const categoriesAvgVals: number[] = [];
-
+    // Aggregate per-frame robust score
+    const frameScores: number[] = [];
     const perCategory: Record<string, { sum: number; n: number }> = {};
 
     entries.forEach((root) => {
       if (!root || typeof root !== "object") return;
-      const dbg = (root as any).debug_calc;
+      const score = computeFrameScoreFromAi(root);
+      if (score > 0) frameScores.push(score);
 
-      if (dbg && typeof dbg.combined === "number")
-        combinedVals.push(dbg.combined);
-      if (dbg && typeof dbg.final === "number") finalVals.push(dbg.final);
-      if (dbg && typeof dbg.heuristics_avg === "number")
-        heuristicsAvgVals.push(dbg.heuristics_avg);
-      if (dbg && typeof dbg.categories_avg === "number")
-        categoriesAvgVals.push(dbg.categories_avg);
-      if (typeof (root as any).overall_score === "number")
-        overallVals.push((root as any).overall_score);
-
-      const cats = (root as any).category_scores;
+      const cats = root?.category_scores;
       if (cats && typeof cats === "object") {
         Object.entries(cats).forEach(([k, val]) => {
           if (typeof val === "number" && Number.isFinite(val)) {
@@ -1446,20 +1498,17 @@ export default function DesignDetailPage({
       }
     });
 
-    // If no frame entries, try single root shape
+    // Fallback: if entries empty, inspect single root
     if (!entries.length && raw && typeof raw === "object") {
-      const root: any = (raw as any).ai ?? raw;
-      const dbg = root?.debug_calc;
-      if (dbg?.combined) combinedVals.push(dbg.combined);
-      if (dbg?.final) finalVals.push(dbg.final);
-      if (dbg?.heuristics_avg) heuristicsAvgVals.push(dbg.heuristics_avg);
-      if (dbg?.categories_avg) categoriesAvgVals.push(dbg.categories_avg);
-      if (typeof root?.overall_score === "number")
-        overallVals.push(root.overall_score);
+      const root: any = raw.ai ?? raw;
+      const loneScore = computeFrameScoreFromAi(root);
+      if (loneScore > 0) frameScores.push(loneScore);
       const cats = root?.category_scores;
       if (cats && typeof cats === "object") {
         Object.entries(cats).forEach(([k, val]) => {
-          if (typeof val === "number") perCategory[k] = { sum: val, n: 1 };
+          if (typeof val === "number" && Number.isFinite(val)) {
+            perCategory[k] = { sum: val, n: 1 };
+          }
         });
       }
     }
@@ -1469,19 +1518,14 @@ export default function DesignDetailPage({
         ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length)
         : undefined;
 
-    // Preferred overall: mean combined across frames
-    const overall =
-      avg(combinedVals) ??
-      avg(finalVals) ??
-      avg(overallVals) ??
-      (typeof v.total_score === "number"
-        ? Math.round(v.total_score)
-        : undefined);
+    const recomputed = avg(frameScores);
 
-    // Build per-category averages
+    // Final overall: persisted > recomputed > undefined
+    const overall = persisted ?? recomputed ?? undefined;
+
     const categories: Record<string, number> = {};
     Object.entries(perCategory).forEach(([k, { sum, n }]) => {
-      categories[k] = Math.round(sum / Math.max(n, 1));
+      categories[k] = Math.round(sum / Math.max(1, n));
     });
 
     return {
