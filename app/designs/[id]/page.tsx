@@ -1720,6 +1720,13 @@ export default function DesignDetailPage({
   }, [design?.id, selectedVersion?.id, fetchWeaknesses]);
 
   useEffect(() => {
+    if (!design?.id || !selectedVersion?.id) return;
+    fetchWeaknesses(design.id, selectedVersion.id).catch((e) =>
+      console.warn("fetchWeaknesses failed:", e)
+    );
+  }, [design?.id, selectedVersion?.id, fetchWeaknesses]);
+
+  useEffect(() => {
     if (frameEvaluations[selectedFrameIndex]) {
       setEvalResult(
         mapFrameToEvalResponse(

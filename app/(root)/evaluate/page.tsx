@@ -42,6 +42,17 @@ export default function Evaluate() {
     };
   }, []);
 
+  const pollControllerRef = useRef<AbortController | null>(null);
+  const isPollingRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    return () => {
+      try { pollControllerRef.current?.abort(); } catch (e) { }
+      pollControllerRef.current = null;
+      isPollingRef.current = false;
+    }
+  }, []);
+
   const cardCursor: React.CSSProperties = {
     cursor:
       "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='22' stroke='%23ffffff' fill='none' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 3l7 17 2-7 7-2-16-8Z'/></svg>\") 3 3, pointer",
