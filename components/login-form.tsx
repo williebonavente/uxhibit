@@ -44,7 +44,7 @@ export default function LoginForm() {
   // const [figmaLoading, setFigmaLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
-  const siteKey = process.env.RECAPTCHA_SITE_KEY || "";
+  const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "";
 
   const router = useRouter();
   const form = useForm<z.infer<typeof formSchema>>({

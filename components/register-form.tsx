@@ -5,7 +5,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import "react-datepicker/dist/react-datepicker.css";
@@ -37,17 +37,26 @@ import { CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import BackgroundVideo from "./background_video/backgroundVideo";
+import ReCAPTCHA from "react-google-recaptcha";
 
 export default function RegistrationForm() {
   const router = useRouter();
 
   const [termsAccepted, setTermsAccepted] = useState(false);
+    const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "";
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const captchaRef = useRef<ReCAPTCHA | null>(null);
 
   const handleCheckboxChange = (checked: boolean) => {
     setTermsAccepted(checked);
     localStorage.setItem("termsAccepted", String(checked));
   };
+
+    useEffect(() => {
+    if (!siteKey) console.warn("Missing NEXT_PUBLIC_RECAPTCHA_SITE_KEY");
+  }, [siteKey]);
 
   const form = useForm<z.infer<typeof registerFormSchema>>({
     defaultValues: {
@@ -74,8 +83,36 @@ export default function RegistrationForm() {
       : process.env.NEXT_PUBLIC_SITE_URL || "";
 
   async function onSubmit(values: z.infer<typeof registerFormSchema>) {
+    if (isSubmitting) return; // prevent double click
     if (!termsAccepted) {
       toast.error("You must accept the Terms and Conditions.");
+      return;
+    }
+
+    if (!captchaToken) {
+      toast.error("Complete CAPTCHA");
+      return;
+    }
+
+        let verifyJson: { success: boolean } = { success: false };
+    try {
+      const verifyResp = await fetch("/api/captcha/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: captchaToken }),
+      });
+      verifyJson = await verifyResp.json();
+    } catch {
+      toast.error("CAPTCHA verification network error.");
+      captchaRef.current?.reset();
+      setCaptchaToken(null);
+      return;
+    }
+
+        if (!verifyJson.success) {
+      toast.error("CAPTCHA failed.");
+      captchaRef.current?.reset();
+      setCaptchaToken(null);
       return;
     }
 
@@ -154,6 +191,8 @@ export default function RegistrationForm() {
       toast.error("Failed to submit the form. Please try again.");
     } finally {
       setTimeout(() => setIsSubmitting(false), 400);
+            captchaRef.current?.reset();
+      setCaptchaToken(null);
     }
   }
 
@@ -527,6 +566,20 @@ export default function RegistrationForm() {
               )}
             />
 
+                        <div className="mt-2 w-full flex justify-center cursor-pointer">
+              {siteKey ? (
+                <ReCAPTCHA
+                  ref={captchaRef}
+                  sitekey={siteKey}
+                  theme="dark"
+                  onChange={(t) => setCaptchaToken(t)}
+                  onExpired={() => setCaptchaToken(null)}
+                />
+              ) : (
+                <p className="text-xs text-red-400">CAPTCHA misconfigured.</p>
+              )}
+            </div>
+
             {/* Terms and Conditions Checkbox */}
             <div className="flex items-center space-x-2 mb-5">
               <Checkbox
@@ -558,7 +611,7 @@ export default function RegistrationForm() {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isSubmitting || !isValid || !termsAccepted}
+              disabled={isSubmitting || !isValid || !termsAccepted || !captchaToken}
               aria-disabled={isSubmitting || !isValid || !termsAccepted}
               // inline cursor fallback (guaranteed)
               style={{
