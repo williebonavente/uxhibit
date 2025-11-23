@@ -26,7 +26,7 @@ import { avatarStyles } from "@/constants/randomAvatars";
 import { createClient } from "@/utils/supabase/client";
 import { Loader2 } from "lucide-react";
 import BackgroundVideo from "./background_video/backgroundVideo";
-
+import ReCAPTCHA from "react-google-recaptcha";
 
 const formSchema = loginFormSchema;
 
@@ -42,7 +42,9 @@ export default function LoginForm() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   // const [figmaLoading, setFigmaLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
+  const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "";
 
   const router = useRouter();
   const form = useForm<z.infer<typeof formSchema>>({
@@ -88,7 +90,19 @@ export default function LoginForm() {
       toast.error("Figma authentication failed.")
     }
   }, [])
+
+  useEffect(() => {
+    if (!siteKey) {
+      console.warn("Missing NEXT_PUBLIC_RECAPTCHA_SITE_KEY");
+    }
+  }, [siteKey]);
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    
+    if (!captchaToken) {
+      toast.error("Complete CAPTCHA");
+      return;
+    }
     setLoginLoading(true);
 
     try {
@@ -96,6 +110,7 @@ export default function LoginForm() {
       const formData = new FormData();
       formData.append("email", values.email);
       formData.append("password", values.password);
+      formData.append("captchaToken", captchaToken);
 
       const result = await login(formData);
       if (result?.error) {
@@ -252,10 +267,26 @@ export default function LoginForm() {
                 )}
               />
 
+                      {/* CAPTCHA */}
+              <div className="mt-4 flex justify-center">
+                {siteKey ? (
+                  <ReCAPTCHA
+                    sitekey={siteKey}
+                    theme="dark"
+                    onChange={(token) => setCaptchaToken(token)}
+                    onExpired={() => setCaptchaToken(null)}
+                  />
+                ) : (
+                  <p className="text-xs text-red-400">
+                    CAPTCHA misconfigured (no site key).
+                  </p>
+                )}
+              </div>
+
               {/* Login Button */}
               <Button
                 type="submit"
-                disabled={loginLoading || redirecting}
+                disabled={loginLoading || redirecting || !captchaToken}
                 className={`group relative inline-flex items-center justify-center
                   w-full h-11 sm:h-12 mt-5
                   rounded-xl text-base tracking-wide
