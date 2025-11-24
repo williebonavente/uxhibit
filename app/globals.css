@@ -626,3 +626,18 @@ button[aria-disabled="true"] * {
   60% { transform: scale(1.08); opacity:.95 }
   100% { transform: scale(1); opacity:1 }
 }
+
+/* Hide native date input icon (Chrome / Safari / Edge) */
+.no-native-date::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  display: none;
+}
+.no-native-date::-webkit-clear-button,
+.no-native-date::-webkit-inner-spin-button {
+  display: none;
+}
+.no-native-date {
+  color-scheme: light dark; /* preserve dark mode */
+}
+
+
