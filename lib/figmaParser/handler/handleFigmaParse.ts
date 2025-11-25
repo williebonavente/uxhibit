@@ -23,14 +23,39 @@ import { getFigmaFile, getFigmaImagesChunked } from "@/utils/figma/figmaApi";
  * @param url - The Figma file or node URL to parse.
  */
 
+async function retryFigmaCall<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  baseDelay = 1000
+): Promise<T> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      const is429 = error?.message?.includes('429');
+      const isLastAttempt = attempt === maxRetries;
+      
+      if (!is429 || isLastAttempt) {
+        throw error;
+      }
+      
+      // Exponential backoff: 1s, 2s, 4s
+      const delay = baseDelay * Math.pow(2, attempt);
+      console.log(`Rate limited. Retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw new Error('Max retries exceeded');
+}
+
 export async function handleFigmaParse(url: string) {
   if (!FIGMA_TOKEN) return NextResponse.json({ error: "Missing FIGMA_ACCESS_TOKEN" }, { status: 500 });
 
   const parsed = parseFigmaUrl(url);
   if (!parsed) return NextResponse.json({ error: "Invalid Figma URL" }, { status: 400 });
 
-  // File metadata (cached / retry inside getFigmaFile)
-  const fileJson = await getFigmaFile(parsed.fileKey, FIGMA_TOKEN);
+    // File metadata (cached / retry inside getFigmaFile)
+  const fileJson = await retryFigmaCall(() => getFigmaFile(parsed.fileKey, FIGMA_TOKEN));
   const pages: FigmaNode[] = fileJson?.document?.children ?? [];
 
   // Select target pages
@@ -72,7 +97,9 @@ export async function handleFigmaParse(url: string) {
     ...allFrameIds
   ]));
 
-  const imagesMap = await getFigmaImagesChunked(parsed.fileKey, imageIds, FIGMA_TOKEN, 0.75);
+    const imagesMap = await retryFigmaCall(() => 
+    getFigmaImagesChunked(parsed.fileKey, imageIds, FIGMA_TOKEN, 0.75)
+  );
   const nodeImageUrl = parsed.nodeId ? imagesMap[parsed.nodeId] || null : null;
   const frameImageUrl = extractedFrameId ? imagesMap[extractedFrameId] || null : null;
 
@@ -88,7 +115,9 @@ export async function handleFigmaParse(url: string) {
   let accessibilityResults: any = null;
 
   if (allFrameIds.length > 0) {
-    const nodeData = await fetchFigmaNodeData(parsed.fileKey, allFrameIds);
+        const nodeData = await retryFigmaCall(() => 
+      fetchFigmaNodeData(parsed.fileKey, allFrameIds)
+    );
     frameMetadata = nodeData?.nodes || {};
 
     accessibilityResults = evaluateFrameAccessibility({
