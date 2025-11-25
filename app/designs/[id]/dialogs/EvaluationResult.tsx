@@ -742,7 +742,7 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
 
                         return (
                           <TableRow
-                            key={`heuristic-${h.code ?? idx}`}
+                            key={`heuristic-${h.code ?? "no-code"}-${idx}`}
                             className="align-top"
                           >
                             <TableCell className="px-2 py-2 align-top whitespace-nowrap">
@@ -825,7 +825,7 @@ const EvaluationResult: React.FC<EvaluationResultProps> = ({
 
                 return (
                   <div
-                    key={`heuristic-mobile-${h.code ?? idx}`}
+                    key={`heuristic-mobile-${h.code ?? "no-code"}-${idx}`}
                     className="bg-white/90 dark:bg-[#232323]/90 rounded-lg p-4 shadow-sm"
                   >
                     <div className="flex items-start justify-between gap-3">

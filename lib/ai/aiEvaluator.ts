@@ -306,7 +306,7 @@ ${iteration < totalIterations ? "Include weaknesses & suggestions." : "Final ite
 
   try {
       const completion = await client.chat.complete({
-    model: "ft:ministral-8b-latest:521112c6:20251101:fbb300c8",
+    model: "pixtral-12b",
     temperature: 0.25,
     topP: 0.9,
     messages: [

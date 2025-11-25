@@ -807,9 +807,9 @@ const ComputationalBreakdown: React.FC<ComputationalBreakdownProps> = ({
                               </TableHeader>
 
                               <TableBody>
-                                {heuristicPercents.map((h) => (
+                                {heuristicPercents.map((h, idx) => (
                                   <TableRow
-                                    key={h.code}
+                                    key={`${h.code}-${idx}`}
                                     className="hover:bg-gray-50 dark:hover:bg-gray-800/70 transition-colors"
                                   >
                                     <TableCell className="font-mono text-sm text-gray-800 dark:text-gray-200">
