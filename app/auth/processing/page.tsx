@@ -10,7 +10,7 @@ export default function ProcessingPage() {
   useEffect(() => {
     const supabase = createClient();
     const startTime = Date.now();
-    const minDelay = 1200;
+    const minDelay = 200;
 
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();

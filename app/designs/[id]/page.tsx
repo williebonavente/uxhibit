@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { DesignComparison } from "./dialogs/DesignComparison";
+import Link from "next/link";
 
 export interface FrameEvaluation {
   id: string;
@@ -318,6 +319,7 @@ export default function DesignDetailPage({
   const [softRefreshing, setSoftRefreshing] = useState(false);
   const [vpCollapsed, setVpCollapsed] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   function startResizing() {
     setIsResizing(true);
@@ -2153,7 +2155,7 @@ export default function DesignDetailPage({
 
     setCurrentVersionScores(parsedCurrent);
     setPreviousVersionScores(parsedPrevious);
-  }, [versions, selectedVersion]);
+  }, [versions, selectedVersion, parseVersionScores]);
 
   useEffect(() => {
     if (!loadingEval && design?.id) {
@@ -2241,6 +2243,10 @@ const compareDiag = useMemo(() => {
     compareDiag.canCompare,
     compareDiag.why,
   ]);
+
+    useEffect(() => {
+    setImageError(false);
+  }, [currentFrame?.thumbnail_url, thumbUrl, design?.fileKey, design?.nodeId]);
 
   if (designLoading)
     return (
@@ -2452,71 +2458,105 @@ const compareDiag = useMemo(() => {
           )}
 
           {/* Center of the image here */}
-          <div className="w-full h-full flex items-center justify-center">
-            {loadingScreenActive ? (
-              <div
-                className="relative w-[600px] h-[400px] rounded-xl overflow-hidden border shadow bg-gradient-to-br from-neutral-100 via-neutral-200 to-neutral-100 dark:from-neutral-800 dark:via-neutral-700 dark:to-neutral-800"
-                style={{
-                  transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${
-                    pan.y / zoom
-                  }px)`,
-                  transformOrigin: "center center",
-                  cursor:
-                    zoom > 1 ? (isPanning ? "grabbing" : "grab") : "default",
-                }}
-                onMouseDown={handlePanStart}
-              />
-            ) : (
-              (() => {
-                const showFigmaThumb = design?.fileKey
-                  ? `/api/figma/thumbnail?fileKey=${design.fileKey}${
-                      design.nodeId
-                        ? `&nodeId=${encodeURIComponent(design.nodeId)}`
-                        : ""
-                    }`
-                  : null;
-                const imageSrc =
-                  currentFrame?.thumbnail_url ||
-                  thumbUrl ||
-                  showFigmaThumb ||
-                  "/images/design-thumbnail.png";
-                const frameLabelIndex =
-                  typeof (currentFrame as any)?.originalIndex === "number"
-                    ? (currentFrame as any).originalIndex + 1
-                    : selectedFrameIndex + 1;
-                const imageAlt = currentFrame?.node_id
-                  ? `Frame ${frameLabelIndex}`
-                  : design?.project_name || "Design";
-                return (
-                  <Image
-                    src={imageSrc}
-                    alt={imageAlt}
-                    width={600}
-                    height={400}
-                    className="w-full h-full object-contain"
-                    style={{
-                      opacity: 1,
-                      transition: isPanning
-                        ? "none"
-                        : "opacity 0.3s, transform 0.2s",
-                      transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${
-                        pan.y / zoom
-                      }px)`,
-                      transformOrigin: "center center",
-                      cursor:
-                        zoom > 1
-                          ? isPanning
-                            ? "grabbing"
-                            : "grab"
-                          : "default",
-                    }}
-                    onMouseDown={handlePanStart}
-                    priority
-                  />
-                );
-              })()
-            )}
+<div className="w-full h-full flex items-center justify-center">
+  {loadingScreenActive ? (
+    <div
+      className="relative w-[600px] h-[400px] rounded-xl overflow-hidden border shadow bg-gradient-to-br from-neutral-100 via-neutral-200 to-neutral-100 dark:from-neutral-800 dark:via-neutral-700 dark:to-neutral-800"
+      style={{
+        transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+        transformOrigin: "center center",
+        cursor: zoom > 1 ? (isPanning ? "grabbing" : "grab") : "default",
+      }}
+      onMouseDown={handlePanStart}
+    />
+  ) : (
+    (() => {
+      const showFigmaThumb = design?.fileKey
+        ? `/api/figma/thumbnail?fileKey=${design.fileKey}${
+            design.nodeId ? `&nodeId=${encodeURIComponent(design.nodeId)}` : ""
+          }`
+        : null;
+      const imageSrc =
+        currentFrame?.thumbnail_url ||
+        thumbUrl ||
+        showFigmaThumb ||
+        "/images/design-thumbnail.png";
+
+      const frameLabelIndex =
+        typeof (currentFrame as any)?.originalIndex === "number"
+          ? (currentFrame as any).originalIndex + 1
+          : selectedFrameIndex + 1;
+
+      const imageAlt = currentFrame?.node_id
+        ? `Frame ${frameLabelIndex}`
+        : design?.project_name || "Design";
+
+      // Fallback: show centered "failed fetch" visual
+      if (imageError) {
+        return (
+          <div
+            className="flex flex-col items-center justify-center text-center p-6"
+            style={{
+              transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+              transformOrigin: "center center",
+              cursor: zoom > 1 ? (isPanning ? "grabbing" : "grab") : "default",
+            }}
+            onMouseDown={handlePanStart}
+          >
+            <Image
+              src="/images/fetch-failed_1.png"
+              alt="Failed to load design"
+              width={480}
+              height={360}
+              className="object-contain opacity-90"
+              priority
+            />
+
+            <div className="mt-2 flex gap-2">
+              {/* <button
+                type="button"
+                className="px-3 py-1.5 rounded-md text-sm bg-neutral-200 dark:bg-neutral-700 hover:bg-neutral-300 dark:hover:bg-neutral-600 transition cursor-pointer"
+                onClick={() => setImageError(false)}
+                title="Retry image load"
+              >
+                Retry
+              </button> */}
+       <div
+                role="status"
+                aria-live="polite"
+                className="px-3 py-1.5 rounded-md text-sm bg-amber-100 text-amber-800 border border-amber-300/60
+                           dark:bg-amber-400/15 dark:text-amber-200"
+              >
+                Please try again some later!
+              </div> 
+            </div>
+
           </div>
+        );
+      }
+
+      return (
+        <Image
+          src={imageSrc}
+          alt={imageAlt}
+          width={600}
+          height={400}
+          className="w-full h-full object-contain"
+          style={{
+            opacity: 1,
+            transition: isPanning ? "none" : "opacity 0.3s, transform 0.2s",
+            transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+            transformOrigin: "center center",
+            cursor: zoom > 1 ? (isPanning ? "grabbing" : "grab") : "default",
+          }}
+          onMouseDown={handlePanStart}
+          onError={() => setImageError(true)}
+          priority
+        />
+      );
+    })()
+  )}
+</div> 
         </div>
 
         {/* {!isOwner && <VisitorEngagement designId={design.id} />} */}
@@ -2951,7 +2991,7 @@ const compareDiag = useMemo(() => {
                   </div>
                 )} */}
 
-                  {isOwner && (
+                  {isOwner && !imageError &&(
                     <div className="mt-auto pt-4">
                       <button
                         type="button"
@@ -2985,7 +3025,7 @@ const compareDiag = useMemo(() => {
                               "text-white font-semibold tracking-wide"
                         }`}
                       >
-                        {loadingEval ? (
+                        {loadingEval? (
                           // plain neutral appearance while evaluating
                           <span className="relative z-10">Evaluating...</span>
                         ) : (

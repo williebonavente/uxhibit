@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
       .toString(36)
       .substring(7)}`;
 
-    // Upload all validated images to Supabase Storage
+    // Preview-only: build data URLs instead of uploading to storage
     const frameImages: Record<string, string> = {};
     const uploadResults: Array<{
       name: string;
@@ -181,65 +181,35 @@ export async function POST(request: NextRequest) {
 
     let thumbnailUrl: string | null = null;
 
-    console.log(`[parse-file] Uploading ${validatedFiles.length} frame(s) to storage...`);
+    console.log(`[parse-file] Generating preview data URLs for ${validatedFiles.length} frame(s)...`);
 
     for (let i = 0; i < validatedFiles.length; i++) {
       const { file, buffer, validation } = validatedFiles[i];
       const frameKey = `${fileKey}_frame_${i}`;
-      
-      // Determine file extension from detected type
-      const extension = 
-        validation.type === 'image/png' ? '.png' :
-        validation.type === 'image/jpeg' ? '.jpg' :
-        validation.type === 'image/webp' ? '.webp' : '.png';
-      
-      const storagePath = `${user.id}/${frameKey}${extension}`;
       const frameName = file.name.replace(/\.(png|jpg|jpeg|webp)$/i, "");
 
-      console.log(`[parse-file] Uploading frame ${i + 1}/${validatedFiles.length}: ${frameName} -> ${storagePath}`);
+      // Create a base64 data URL for preview
+      const base64 = buffer.toString('base64');
+      const dataUrl = `data:${validation.type};base64,${base64}`;
 
-      // Upload to Supabase
-      const { error: uploadError } = await supabase.storage
-        .from("figma-frames")
-        .upload(storagePath, buffer, {
-          contentType: validation.type!,
-          upsert: false,
-          cacheControl: '3600',
-        });
-
-      if (uploadError) {
-        console.error(`[parse-file] Upload error for frame ${i}:`, uploadError);
-        uploadResults.push({
-          name: file.name,
-          success: false,
-          error: uploadError.message,
-        });
-        continue;
-      }
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from("figma-frames")
-        .getPublicUrl(storagePath);
-
-      frameImages[frameKey] = urlData.publicUrl;
+      frameImages[frameKey] = dataUrl;
       uploadResults.push({
         name: file.name,
         success: true,
-        url: urlData.publicUrl,
+        url: dataUrl,
       });
 
-      console.log(`[parse-file] ✓ Frame ${i} uploaded successfully: ${frameKey}`);
+      console.log(`[parse-file] ✓ Frame ${i + 1}/${validatedFiles.length} prepared for preview: ${frameKey}`);
 
       // Use first image as thumbnail
       if (i === 0) {
-        thumbnailUrl = urlData.publicUrl;
+        thumbnailUrl = dataUrl;
       }
     }
 
     if (Object.keys(frameImages).length === 0) {
       return NextResponse.json(
-        { error: "Failed to upload any images. Please try again." },
+        { error: "Failed to prepare any images for preview. Please try again." },
         { status: 500 }
       );
     }
@@ -247,7 +217,7 @@ export async function POST(request: NextRequest) {
     const successCount = uploadResults.filter(r => r.success).length;
     const failureCount = uploadResults.filter(r => !r.success).length;
 
-    console.log(`[parse-file] Upload complete: ${successCount} succeeded, ${failureCount} failed`);
+    console.log(`[parse-file] Preview generation complete: ${successCount} succeeded, ${failureCount} failed`);
     console.log(`[parse-file] Frame keys:`, Object.keys(frameImages));
 
     // Use the first file's name as the design name
@@ -258,8 +228,8 @@ export async function POST(request: NextRequest) {
       name: designName,
       thumbnailUrl: thumbnailUrl,
       nodeImageUrl: thumbnailUrl,
-      frameImages: frameImages,
-      type: "upload",
+      frameImages: frameImages, // data URLs for client-side preview
+      type: "preview",
       nodeId: fileKey,
       uploadUrl: thumbnailUrl,
       extractedFrameCount: validatedFiles.length,

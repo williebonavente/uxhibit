@@ -27,6 +27,7 @@ type ParsedMeta = {
   frameImages?: Record<string, string>;
   type?: string;
   uploadedFileName?: string;
+  uploadedAt?: string; // ISO timestamp
 };
 
 export default function Evaluate() {
@@ -69,15 +70,19 @@ export default function Evaluate() {
     null
   );
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [filePreviews, setFilePreviews] = useState<string[]>([]);
   const [showParsedDetails, setShowParsedDetails] = useState(false);
   const [rateLimitCountdown, setRateLimitCountdown] = useState<number | null>(
     null
   );
   const [initialCountdown, setInitialCountdown] = useState<number | null>(null);
+  const [evalError, setEvalError] = useState<string | null>(null);
 
   const canNextFrom1 = !!age && !!occupation;
-  const canParse = !!link && !parsing;
+  const canParse =
+    (uploadMethod === "link" && !!link && !parsing) ||
+    (uploadMethod === "file" && uploadedFiles.length > 0 && !parsing);
 
   useEffect(() => {
     if (rateLimitCountdown === null || rateLimitCountdown <= 0) {
@@ -140,7 +145,8 @@ export default function Evaluate() {
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url: link }),
+            credentials: "include",
+            body: JSON.stringify({ url: link, force: true }),
           }
         );
 
@@ -206,19 +212,17 @@ export default function Evaluate() {
         }
 
         data = await res.json();
-      } else if (uploadMethod === "file" && uploadedFile) {
-        // Handle file upload parsing
+      } else if (uploadMethod === "file" && uploadedFiles.length > 0) {
         const formData = new FormData();
-        formData.append("file", uploadedFile);
+        for (const f of uploadedFiles) {
+          formData.append("files", f); // send all files under "files"
+        }
         formData.append("age", age);
         formData.append("occupation", occupation);
 
         const res = await fetch(
           `${process.env.NEXT_PUBLIC_APP_URL}/api/figma/parse-file`,
-          {
-            method: "POST",
-            body: formData,
-          }
+          { method: "POST", body: formData }
         );
 
         if (res.status === 429) {
@@ -262,6 +266,17 @@ export default function Evaluate() {
         }
 
         data = await res.json();
+        if (data.cached) {
+          if (data.stale) {
+            toast.warning("Using cached data (rate limited)", {
+              description: `Cache age: ${data.cacheAge}s. Fresh data unavailable due to rate limits.`,
+            });
+          } else {
+            toast.info("Loaded from cache", {
+              description: `Cache age: ${data.cacheAge}s. No API calls made.`,
+            });
+          }
+        }
         // Debug logging
         console.log("[handleParse] API Response:", data);
         console.log("[handleParse] Frame Images:", data.frameImages);
@@ -290,6 +305,7 @@ export default function Evaluate() {
         frameImages: data.frameImages || {},
         type: data.type,
         uploadedFileName: uploadedFile?.name,
+        uploadedAt: new Date().toISOString(),
       };
       console.log("[handleParse] Setting parsed data:", parsedData);
       console.log(
@@ -376,37 +392,88 @@ export default function Evaluate() {
         const checkRes = await fetch(
           `/api/designs?file_key=${encodeURIComponent(parsed.fileKey)}`
         );
+
+
+        // TODO: FIX THIS!!
+
+              const evalRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          method: uploadMethod,           // "link" | "file"
+          link,                           // when method === "link"
+          frames: parsed.frameImages,     // when method === "file"
+          meta: { age, occupation, file_key: parsed.fileKey, node_id: parsed.nodeId },
+        }),
+      });
+
+            console.log("[handleSubmit] AI evaluate response status", evalRes.status);
+
+                  // Hard stop on any 4xx from /api/ai/evaluate
+      if (evalRes.status >= 400 && evalRes.status < 500) {
+        const evalJson = await evalRes.json().catch(() => ({}));
+        const msg = evalJson?.error || evalJson?.message || evalRes.statusText || "AI evaluate failed";
+        setEvalError(msg);
+        toast.error(`[AI Evaluate] ${msg}`);
+
+        // Route back to the logical step based on input method
+        if (uploadMethod === "link") {
+          setStep(2); // fix the link
+        } else {
+          setStep(3); // review upload details
+        }
+        setSubmitting(false);
+        setLoadingEval(false);
+        return;
+      }
+
+      // Optional: treat ok:false or status:error as failure even with 200
+      const evalData = await evalRes.json().catch(() => ({}));
+      if (
+        evalData?.ok === false ||
+        String(evalData?.status || "").toLowerCase() === "error" ||
+        evalData?.error
+      ) {
+        const msg = evalData?.error || evalData?.message || "AI evaluate failed";
+        setEvalError(msg);
+        toast.error(`[AI Evaluate] ${msg}`);
+        setSubmitting(false);
+        setLoadingEval(false);
+        setStep(uploadMethod === "link" ? 2 : 3);
+        return;
+      }
+
+
         if (checkRes.status === 405) {
-          toast.error(
-            "Pre-check endpoint not implemented (405) - skipping precheck"
-          );
-          console.warn(
-            "[handleSubmit] Pre-check endpoint not implemented (405) - skipping precheck"
-          );
+          toast.error("Pre-check endpoint not implemented (405) - skipping precheck");
+          console.warn("[handleSubmit] Pre-check endpoint not implemented (405) - skipping precheck");
           setStep(3);
           return;
         } else if (checkRes.status >= 500) {
-          // Server error — surface message and return to review
           const body = await checkRes.text().catch(() => "");
           const msg = body ? body : checkRes.statusText || "Server error";
           toast.error(`Server error during pre-check: ${msg}`);
           setStep(3);
           setSubmitting(false);
           return;
+        } else if (checkRes.status >= 400 && checkRes.status < 500) {
+          // Handle client-side errors explicitly and stop flow
+          const bodyText = await checkRes.text().catch(() => "");
+          let bodyJson: any = null;
+          try { bodyJson = JSON.parse(bodyText); } catch {}
+          const msg = bodyJson?.error || bodyText || "Invalid request";
+          toast.error(`Pre-check failed (${checkRes.status}): ${msg}`);
+          console.warn("[handleSubmit] Pre-check failed", checkRes.status, msg);
+          setStep(3);
+          setSubmitting(false);
+          return;
         } else if (!checkRes.ok) {
           const body = await checkRes.text().catch(() => "(no body)");
-          console.warn(
-            "[handleSubmit] Pre-check failed",
-            checkRes.status,
-            body
-          );
+          console.warn("[handleSubmit] Pre-check non-ok response", checkRes.status, body);
         } else {
           precheckedExisting = await checkRes.json().catch(() => null);
           if (precheckedExisting?.design?.id) {
-            console.log(
-              "[handleSubmit] Found existing design by file_key",
-              precheckedExisting.design.id
-            );
+            console.log("[handleSubmit] Found existing design by file_key", precheckedExisting.design.id);
           }
         }
       } catch (e) {
@@ -438,20 +505,91 @@ export default function Evaluate() {
       console.log("[handleSubmit] Save response status", saveRes.status);
 
       const saved = await saveRes.json().catch(() => ({}));
+
+          // Immediate stop on any 4xx save response (surface backend message)
+      if (saveRes.status >= 400 && saveRes.status < 500) {
+        const msg = saved?.error || saved?.message || saveRes.statusText || "Save failed";
+        toast.error(`AI evaluation failed: ${msg}`);
+        setSubmitting(false);
+        setLoadingEval(false);
+        setStep(uploadMethod === "link" ? 2 : 3);
+        return;
+      }
+
+
+            // If backend returned an error message, surface it and stop
+      if (saved?.error || (saveRes.status >= 400 && saveRes.status < 500)) {
+        const msg = saved?.error || saveRes.statusText || "Save failed";
+        toast.error(`AI evaluation failed: ${msg}`);
+        setSubmitting(false);
+        setStep(3);
+        return;
+      }
+
+           // Also stop if backend included an error field
+      if (saved?.error) {
+        toast.error(`AI evaluation failed: ${saved.error}`);
+        setSubmitting(false);
+        setStep(3);
+        return;
+      }
+
       const designId =
         saved?.design?.id ??
         saved?.id ??
         saved?.design_id ??
         saved?.data?.design?.id ??
         null;
-      if (!saveRes.ok || !designId) {
-        console.log("[handleSubmit] Save failed or missing design id", {
-          status: saveRes.status,
-          saved,
-        });
+
+              if (!saveRes.ok || !designId) {
+        console.log("[handleSubmit] Save failed or missing design id", { status: saveRes.status, saved });
         toast.error(saved?.error || "Save failed (no design id).");
+        setSubmitting(false);
+        setLoadingEval(false);
+        setStep(3);
         return;
       }
+
+       // Hard guard: do not start polling if required inputs are missing for chosen method
+      if (uploadMethod === "link" && (!link || !link.trim())) {
+        toast.error("Missing design link. Cannot start evaluation.");
+        setSubmitting(false);
+        setLoadingEval(false);
+        setStep(3);
+        return;
+      }
+
+      
+      // Hard guard: inputs required for chosen method
+      const expectedNodeIds = Object.keys(parsed.frameImages || {});
+      if (uploadMethod === "link" && (!link || !link.trim())) {
+        const msg = "Missing design link. Cannot start evaluation.";
+        setEvalError(msg);
+        toast.error(msg);
+        setSubmitting(false);
+        setLoadingEval(false);
+        setStep(2);
+        return;
+      }
+
+      if (uploadMethod === "file" && expectedNodeIds.length === 0) {
+        const msg = "No frames found from uploaded images. Cannot start evaluation."
+        setSubmitting(false);
+        setEvalError(msg);
+        setStep(2);
+        return;
+      }
+
+      if (saved?.ai_started === false || saved?.evaluation_started === false) {
+        const msg = saved?.message || "Evaluatoin did not start";
+        setEvalError(msg);
+        toast.error(msg);
+        setSubmitting(false);
+        setLoadingEval(false);
+        setStep(3);
+        return;
+      }
+      
       let resolvedVersionId = saved?.version_id ?? null;
       if (!resolvedVersionId) {
         try {
@@ -532,14 +670,13 @@ export default function Evaluate() {
         ? `&version=${saved.version_id}`
         : "";
 
+            let emptyStreak = 0;
+      const maxEmptyStreak = 8;
+
       try {
-        while (pollCount < maxPolls) {
-          pollCount++;
-          console.log(
-            `[handleSubmit] Polling evaluation (attempt ${pollCount}) for design ID: ${designId} version:${
-              saved?.version_id ?? "n/a"
-            }`
-          );
+         while (pollCount < maxPolls) {
+         pollCount++;
+          console.log(`[handleSubmit] Polling evaluation (attempt ${pollCount}) for design ID: ${designId} version:${saved?.version_id ?? "n/a"}`);
 
           let res: Response | null = null;
           let data: any = null;
@@ -558,97 +695,94 @@ export default function Evaluate() {
             continue;
           }
 
+          // Stop immediately on 4xx from evaluations
+          if (res.status >= 400 && res.status < 500) {
+            let errMsg = "";
+            try { const j = await res.json(); errMsg = j?.error || j?.message || ""; } catch {}
+            const msg = errMsg || res.statusText || "Evaluation error";
+            setEvalError(msg);
+            toast.error(`Evaluation error (${res.status}): ${msg}`);
+            setLoadingEval(false);
+            setStep(3);
+            break;
+          }
+
           try {
             data = await res.json();
           } catch (err) {
-            console.error(
-              "[handleSubmit] Failed to parse evaluation JSON:",
-              err
-            );
+            console.error("[handleSubmit] Failed to parse evaluation JSON:", err);
             await new Promise((r) => setTimeout(r, 2000));
             continue;
           }
 
-          console.log(
-            `[handleSubmit] Evaluation response status: ${res.status}`,
-            {
-              statusField: data?.status,
-              returnedIds: (data?.results || []).map(
-                (r: any) => r.nodeId ?? r.node_id
-              ),
-              expectedIds,
+          // Backend error statuses
+          if (data?.status === "error" || data?.error) {
+            const msg = data?.error || data?.message || "Evaluation failed";
+            setEvalError(msg);
+            toast.error(`Evaluation stopped: ${msg}`);
+            setLoadingEval(false);
+            setStep(3);
+            break;
+          }
+          if (data?.status === "not_found") {
+            const msg = "Evaluation not found for this design.";
+            setEvalError(msg);
+            toast.warning(`${msg} Stopping polling.`);
+            setLoadingEval(false);
+            setStep(3);
+            break;
+          }
+
+          const results = Array.isArray(data?.results) ? data.results : [];
+
+          // Empty progress safeguard
+          if (results.length === 0) {
+            emptyStreak++;
+            if (emptyStreak >= maxEmptyStreak) {
+              const msg = "Evaluation did not start. Please check your inputs.";
+              console.warn("[handleSubmit] No evaluation progress; stopping polling.");
+              setEvalError(msg);
+              toast.warning(msg);
+              setLoadingEval(false);
+              setStep(3);
+              break;
             }
-          );
-
-          if (!res.ok && res.status >= 400 && res.status < 500) {
-            console.error("[handleSubmit] Permanent polling error:", data);
-            toast.error("Failed to fetch evaluation results.");
-            break;
+          } else {
+            emptyStreak = 0;
           }
 
-          // Backend signalled stop
-          if (data?.status === "not_found" || data?.status === "error") {
-            console.log(
-              "[handleSubmit] Backend signaled stop:",
-              data?.status,
-              data?.message
-            );
-            break;
-          }
-
-          // Collect frames matching current parsed node ids
-          frames = (Array.isArray(data.results) ? data.results : []).filter(
-            (f: any) => expectedIds.includes(f.nodeId ?? f.node_id)
-          );
+          frames = results.filter((f: any) => expectedIds.includes(f.nodeId ?? f.node_id));
           setEvaluatedFrames(frames);
 
-          console.warn("frames.length", frames.length);
-          console.warn("expectedIds", expectedIds.length);
-
-          // Success: all expected frames present
           if (frames.length === expectedIds.length) {
             setLoadingEval(false);
-            try {
-              window.dispatchEvent(new Event("uxhibit:soft-refresh"));
-            } catch {}
+            try { window.dispatchEvent(new Event("uxhibit:soft-refresh")); } catch {}
             toast.success("Design and AI evaluation completed for all frames");
-            try {
-              controller.abort();
-            } catch (e) {}
+            try { controller.abort(); } catch {}
             pollControllerRef.current = null;
             isPollingRef.current = false;
             router.push(`/designs/${designId}`);
             return;
           }
 
-          // If results exist but none match after several attempts -> abort to avoid infinite polling
-          const returnedIds = Array.isArray(data.results)
-            ? data.results.map((r: any) => r.nodeId ?? r.node_id)
-            : [];
+          const returnedIds = results.map((r: any) => (r.nodeId ?? r.node_id));
           if (returnedIds.length > 0 && pollCount > 10 && frames.length === 0) {
-            console.warn(
-              "[handleSubmit] Returned results do not match expected node ids; aborting polling.",
-              { expectedIds, returnedIds }
-            );
-            toast.warning(
-              "Evaluation returned unexpected frame ids. Check version/node mapping."
-            );
+            const msg = "Evaluation returned unexpected frame ids. Check node mapping.";
+            console.warn("[handleSubmit] Unexpected node ids; aborting.", { expectedIds, returnedIds });
+            setEvalError(msg);
+            toast.warning(msg);
+            setLoadingEval(false);
+            setStep(3);
             break;
           }
 
-          // If backend explicitly marks done -> stop
           if (data?.status === "done") {
             setLoadingEval(false);
-            try {
-              window.dispatchEvent(new Event("uxhibit:soft-refresh"));
-            } catch {}
-            console.log(
-              "[handleSubmit] Backend marked done but not all frames present"
-            );
+            try { window.dispatchEvent(new Event("uxhibit:soft-refresh")); } catch {}
+            console.log("[handleSubmit] Backend marked done but not all frames present");
             break;
           }
 
-          // backoff before next attempt
           await new Promise((r) => setTimeout(r, 2000));
         }
       } finally {
@@ -672,8 +806,11 @@ export default function Evaluate() {
           "[handleSubmit] Polling finished without completing all frames",
           { framesEvaluated: frames.length, expected: expectedIds.length }
         );
-        toast.warning("Design saved, but AI evaluation did not complete.");
-        router.push(`/designs/${designId}`);
+        if (!evalError) {
+          setEvalError("Design saved, but AI evaluation did not complete.")
+          toast.warning("Design saved, but AI evaluation did not complete.");
+          router.push(`/designs/${designId}`);
+        }
       }
     } catch (error) {
       console.error("[handleSubmit] Submit failed:", error);
@@ -1052,7 +1189,6 @@ export default function Evaluate() {
                       setUploadMethod(null);
                       setLink("");
                       setUploadedFile(null);
-                      setFilePreview(null);
                       setParsed(null);
                     }}
                     className="cursor-pointer text-sm text-neutral-600 dark:text-neutral-400 hover:text-[#ED5E20] transition-colors underline"
@@ -1234,32 +1370,29 @@ export default function Evaluate() {
                             className="hidden"
                             accept="image/png,image/jpeg,image/jpg,image/webp"
                             multiple
-                            onChange={(e) => {
+                            onChange={async (e) => {
                               const files = Array.from(e.target.files || []);
                               if (files.length === 0) return;
 
-                              // Validate all files
                               const validExtensions = [
                                 ".png",
                                 ".jpg",
                                 ".jpeg",
                                 ".webp",
                               ];
-                              const maxSize = 10 * 1024 * 1024; // 10MB
+                              const maxSize = 10 * 1024 * 1024;
 
                               for (const file of files) {
-                                const fileExt = file.name
+                                const ext = file.name
                                   .toLowerCase()
                                   .substring(file.name.lastIndexOf("."));
-
-                                if (!validExtensions.includes(fileExt)) {
+                                if (!validExtensions.includes(ext)) {
                                   toast.error(
                                     `${file.name}: Invalid file type. Only PNG, JPG, JPEG, and WEBP are supported.`
                                   );
                                   e.target.value = "";
                                   return;
                                 }
-
                                 if (file.size > maxSize) {
                                   toast.error(
                                     `${file.name}: File too large. Maximum size is 10MB.`
@@ -1269,16 +1402,28 @@ export default function Evaluate() {
                                 }
                               }
 
-                              // Use first file for display
+                              // Store all files; use the first for preview
+                              setUploadedFiles(files);
                               const firstFile = files[0];
                               setUploadedFile(firstFile);
 
-                              // Create preview for first image
-                              const reader = new FileReader();
-                              reader.onload = (event) => {
-                                setFilePreview(event.target?.result as string);
-                              };
-                              reader.readAsDataURL(firstFile);
+                              // Build data URLs for all files (for local preview carousel)
+                              const reads = files.map(
+                                (f) =>
+                                  new Promise<string>((resolve, reject) => {
+                                    const r = new FileReader();
+                                    r.onload = () =>
+                                      resolve(r.result as string);
+                                    r.onerror = reject;
+                                    r.readAsDataURL(f);
+                                  })
+                              );
+                              try {
+                                const previews = await Promise.all(reads);
+                                setFilePreviews(previews);
+                              } catch {
+                                toast.error("Failed to build previews.");
+                              }
 
                               toast.success(
                                 `${files.length} file${
@@ -1295,17 +1440,17 @@ export default function Evaluate() {
                             {/* Image Preview */}
                             <div className="relative rounded-xl overflow-hidden border-2 border-[#ED5E20]/20">
                               {/* Image Preview */}
-                              {filePreview && (
-                                <div className="relative rounded-xl overflow-hidden border-2 border-[#ED5E20]/20">
-                                  <div className="relative w-full h-64">
-                                    <Image
-                                      src={filePreview}
-                                      alt="Upload preview"
-                                      fill
-                                      className="object-contain bg-neutral-50 dark:bg-neutral-900"
-                                      unoptimized // Since it's a data URL from FileReader
-                                    />
-                                  </div>
+                              {filePreviews.length > 1 && (
+                                <div className="mt-3">
+                                  <FrameCarousel
+                                    frameImages={filePreviews.reduce(
+                                      (acc, url, i) => {
+                                        acc[`local_${i}`] = url;
+                                        return acc;
+                                      },
+                                      {} as Record<string, string>
+                                    )}
+                                  />
                                 </div>
                               )}
                             </div>
@@ -1349,7 +1494,6 @@ export default function Evaluate() {
                               <button
                                 onClick={() => {
                                   setUploadedFile(null);
-                                  setFilePreview(null);
                                 }}
                                 className="flex-shrink-0 p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
                                 title="Remove file"
@@ -1619,6 +1763,25 @@ export default function Evaluate() {
                           </div>
                         </div>
 
+                          {/* Uploaded Date */}
+  {parsed?.uploadedAt && (
+    <div className="mt-3 flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+      <svg
+        className="h-3.5 w-3.5"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      >
+        <circle cx="12" cy="12" r="10" />
+        <path d="M12 6v6l4 2" />
+      </svg>
+      <span>
+        Uploaded: {new Date(parsed.uploadedAt).toLocaleString()}
+      </span>
+    </div>
+  )}
+
                         {/* File Details Grid - Only for uploaded files */}
                         {uploadMethod === "file" && uploadedFile && (
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1758,6 +1921,48 @@ export default function Evaluate() {
                               </div>
                             </div>
                           )}
+
+                        {uploadedFiles.length > 0 && (
+                          <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 rounded-xl border border-green-200 dark:border-green-800">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-green-900 dark:text-green-100 truncate">
+                                {uploadedFiles[0].name}{" "}
+                                {uploadedFiles.length > 1
+                                  ? `+ ${uploadedFiles.length - 1} more`
+                                  : ""}
+                              </p>
+                              <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">
+                                {(
+                                  uploadedFiles.reduce(
+                                    (s, f) => s + f.size,
+                                    0
+                                  ) / 1024
+                                ).toFixed(2)}{" "}
+                                KB total • Multiple images
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setUploadedFiles([]);
+                                setUploadedFile(null);
+                              }}
+                              className="flex-shrink-0 p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                              title="Remove files"
+                            >
+                              {/* X icon */}
+                              <svg
+                                className="h-5 w-5 text-red-600 dark:text-red-400"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                              >
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                              </svg>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2148,7 +2353,40 @@ export default function Evaluate() {
 
         {step === 4 && (
           <div>
-            {evaluatedFrames.length < expectedFrameCount ? (
+            {evalError ? (
+              <div className="flex flex-col items-center justify-center text-center py-16">
+                <Image
+                  src="/images/fetch-failed_1.png"
+                  alt="Evaluation failed"
+                  height={140}
+                  width={180}
+                  className="object-contain mb-4 opacity-90"
+                  priority
+                />
+                <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-2">
+                  Evaluation failed
+                </h2>
+                <p className="text-sm text-neutral-600 dark:text-neutral-300 max-w-md">
+                  {evalError}
+                </p>
+                <div className="mt-6 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setStep(3)}
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-neutral-200 dark:bg-neutral-700 hover:bg-neutral-300 dark:hover:bg-neutral-600 transition-colors cursor-pointer"
+                  >
+                    Back to Review
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-[#ED5E20] hover:bg-orange-600 transition-colors cursor-pointer"
+                  >
+                    Edit Upload
+                  </button>
+                </div>
+              </div>
+            ) : evaluatedFrames.length < expectedFrameCount ? (
               <div className="flex flex-col items-center justify-center text-center py-24">
                 <div className="flex flex-col items-center justify-center text-center animate-pulse mb-6">
                   <Image
@@ -2174,9 +2412,7 @@ export default function Evaluate() {
                 </div>
                 <div className="text-center text-base text-gray-700 dark:text-gray-300 mt-2">
                   Design{" "}
-                  <span className="font-mono text-[#ED5E20]">
-                    {savedDesignId}
-                  </span>{" "}
+                  <span className="font-mono text-[#ED5E20]">{savedDesignId}</span>{" "}
                   has been saved and evaluated.
                 </div>
               </div>

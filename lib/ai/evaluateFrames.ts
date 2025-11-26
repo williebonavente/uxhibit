@@ -104,29 +104,56 @@ export async function evaluateFrames({
   const res = await fetch(
     `${baseUrl}/api/figma/parse?url=${encodeURIComponent(figmaFileUrl)}`
   );
+
+
+    if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(
+      `Figma parse failed: ${err?.error || res.statusText} (code: ${err?.code || res.status})`
+    );
+  }
+
+
   const figmaContext = await res.json();
-  const heuristics = getHeuristicScores(figmaContext);
-  const accessibilityResults = figmaContext.accessibilityResults;
-  const layoutResults = figmaContext.layoutResults;
-  const textNodes = figmaContext.textNodes;
-  const detectedButtons = figmaContext.detectedButtons;
+
+    const heuristics = getHeuristicScores(figmaContext);
+
+  // Safe defaults
+  const accessibilityResults = Array.isArray(figmaContext.accessibilityResults)
+    ? figmaContext.accessibilityResults
+    : [];
+  const layoutResults =
+    figmaContext && typeof figmaContext.layoutResults === "object"
+      ? figmaContext.layoutResults
+      : {};
+  const textNodes =
+    figmaContext && typeof figmaContext.textNodes === "object"
+      ? figmaContext.textNodes
+      : {};
+  const detectedButtons = Array.isArray(figmaContext.detectedButtons)
+    ? figmaContext.detectedButtons
+    : [];
 
   console.log(figmaContext);
   console.log("Detected Buttons COMING FROM FIGMA CONTEXT: ", detectedButtons);
 
-  const minimalAccessibilityResults = accessibilityResults.map((result) => ({
+  const accessibilityArray = accessibilityResults;
+  const minimalAccessibilityResults = accessibilityArray.map((result) => ({
     frameId: result.frameId,
     frameName: result.frameName,
     layoutScore: result.layoutScore,
-    averageContrastScore: result.averageContrastScore,
+    layoutIssues: result.layoutIssues,
+    layoutSummary: result.layoutSummary,
+    contrastScore: result.contrastScore,
+    textCount: result.textCount,
   }));
 
   const minimalLayoutResults = Object.entries(layoutResults).map(
-    ([frameId, result]) => ({
+    ([frameId, result]: [string, any]) => ({
       frameId,
-      score: result.score,
-      summary: result.summary,
-      // issues: result.issues,
+      score: result?.score ?? 0,
+      summary: result?.summary ?? "",
+      // issues: result?.issues ?? []
     })
   );
 
