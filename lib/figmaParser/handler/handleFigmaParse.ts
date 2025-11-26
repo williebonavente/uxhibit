@@ -34,6 +34,27 @@ export async function handleFigmaParse(url: string) {
         headers: { "X-Figma-Token": FIGMA_TOKEN },
         cache: "no-store",
     });
+    
+    // Handle Figma rate limit errors
+    if (fileRes.status === 429) {
+        const retryAfter = fileRes.headers.get('Retry-After') || '60';
+        return NextResponse.json(
+            { 
+                error: "Figma API rate limit exceeded",
+                code: "FIGMA_RATE_LIMIT",
+                retryAfter: parseInt(retryAfter, 10),
+                message: "Figma allows 150 requests per minute. Please wait before trying again.",
+                fileKey: parsed.fileKey 
+            },
+            { 
+                status: 429,
+                headers: {
+                    'Retry-After': retryAfter
+                }
+            }
+        );
+    }
+    
     if (!fileRes.ok) {
         const detail = await fileRes.text().catch(() => "");
         return NextResponse.json(
@@ -70,14 +91,6 @@ export async function handleFigmaParse(url: string) {
         }
     }
 
-    // Fetch images for the node and its parent frame (if available)
-    const [nodeImageUrl, frameImageUrl, metadataJson] = await Promise.all([
-        parsed.nodeId ? fetchFigmaImage(parsed.fileKey, parsed.nodeId) : Promise.resolve(null),
-        extractedFrameId ? fetchFigmaImage(parsed.fileKey, extractedFrameId) : Promise.resolve(null),
-        // We'll fetch metadata only if there are frame IDs, but assign below
-        Promise.resolve(null)
-    ]);
-
     // Collect all frame IDs and themed frame IDs from the target pages
     const { ids: allFrameIds, themedIds } = targetPages.reduce(
         (acc: { ids: string[]; themedIds: string[] }, page: FigmaNode) => {
@@ -89,6 +102,18 @@ export async function handleFigmaParse(url: string) {
         { ids: [], themedIds: [] }
     );
 
+    // Fetch node and frame images sequentially
+    let nodeImageUrl: string | null = null;
+    let frameImageUrl: string | null = null;
+    
+    if (parsed.nodeId) {
+        nodeImageUrl = await fetchFigmaImage(parsed.fileKey, parsed.nodeId);
+    }
+    
+    if (extractedFrameId) {
+        frameImageUrl = await fetchFigmaImage(parsed.fileKey, extractedFrameId);
+    }
+
     // Fetch images for all frames if there are any
     let frameImages: Record<string, string> = {};
     if (allFrameIds.length > 0) {
@@ -97,6 +122,26 @@ export async function handleFigmaParse(url: string) {
             `https://api.figma.com/v1/images/${parsed.fileKey}?ids=${idsParam}&format=png&scale=0.75`,
             { headers: { "X-Figma-Token": FIGMA_TOKEN } }
         );
+
+        // Handle rate limit for image fetching
+        if (imgRes.status === 429) {
+            const retryAfter = imgRes.headers.get('Retry-After') || '60';
+            return NextResponse.json(
+                { 
+                    error: "Figma API rate limit exceeded while fetching images",
+                    code: "FIGMA_RATE_LIMIT",
+                    retryAfter: parseInt(retryAfter, 10),
+                    message: "Too many image requests. Please wait before trying again.",
+                    fileKey: parsed.fileKey 
+                },
+                { 
+                    status: 429,
+                    headers: {
+                        'Retry-After': retryAfter
+                    }
+                }
+            );
+        }
 
         if (imgRes.ok) {
             const imgJson = await imgRes.json();
@@ -111,10 +156,9 @@ export async function handleFigmaParse(url: string) {
     let accessibilityResults: any = null;
 
     // Fetch frame metadata and run accessibility evaluation if there are frame IDs
-    let actualMetadataJson = metadataJson;
     if (allFrameIds.length > 0) {
-        actualMetadataJson = await fetchFigmaNodeData(parsed.fileKey, allFrameIds);
-        frameMetadata = actualMetadataJson?.nodes || {};
+        const metadataJson = await fetchFigmaNodeData(parsed.fileKey, allFrameIds);
+        frameMetadata = metadataJson?.nodes || {};
 
         // Evaluate accessibility for each frame
         accessibilityResults = evaluateFrameAccessibility({

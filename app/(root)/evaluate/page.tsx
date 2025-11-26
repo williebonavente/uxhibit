@@ -71,214 +71,254 @@ export default function Evaluate() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [showParsedDetails, setShowParsedDetails] = useState(false);
-  const [rateLimitCountdown, setRateLimitCountdown] = useState<number | null>(null);
-
+  const [rateLimitCountdown, setRateLimitCountdown] = useState<number | null>(
+    null
+  );
+  const [initialCountdown, setInitialCountdown] = useState<number | null>(null);
 
   const canNextFrom1 = !!age && !!occupation;
   const canParse = !!link && !parsing;
 
-
   useEffect(() => {
-  if (rateLimitCountdown === null || rateLimitCountdown <= 0) return;
-  
-  const timer = setInterval(() => {
-    setRateLimitCountdown(prev => {
-      if (prev === null || prev <= 1) {
-        clearInterval(timer);
-        return null;
-      }
-      return prev - 1;
-    });
-  }, 1000);
-  
-  return () => clearInterval(timer);
-}, [rateLimitCountdown]);
+    if (rateLimitCountdown === null || rateLimitCountdown <= 0) {
+      setInitialCountdown(null);
+      return;
+    }
 
-async function handleParse() {
-    if (!age || !occupation) {
-    toast.error("Select parameters first.");
-    return;
-  }
-  
-  // Check if we're in cooldown
-  if (rateLimitCountdown !== null && rateLimitCountdown > 0) {
-    toast.error(`Please wait ${rateLimitCountdown} seconds before trying again.`);
-    return;
-  }
+    // Set initial value on first countdown
+    if (initialCountdown === null) {
+      setInitialCountdown(rateLimitCountdown);
+    }
 
-  // Validate based on upload method
-  if (uploadMethod === "link" && !link.trim()) {
-    toast.error("Enter a Figma link.");
-    return;
-  }
-
-  if (uploadMethod === "file" && !uploadedFile) {
-    toast.error("Please upload an image file.");
-    return;
-  }
-
-  setParsing(true);
-
-  try {
-    let data;
-
-    if (uploadMethod === "link") {
-      // Handle Figma link parsing with retry logic
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_APP_URL}/api/figma/parse`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: link }),
+    const timer = setInterval(() => {
+      setRateLimitCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(timer);
+          return null;
         }
-      );
+        return prev - 1;
+      });
+    }, 1000);
 
-      if (res.status === 429) {
-        const errorData = await res.json();
-        const retryAfter = errorData.retryAfter || 60;
-        
-        // Start countdown
-        setRateLimitCountdown(retryAfter);
-        
-        // Toast will auto-dismiss after the retry period
-        toast.error(
-          `Rate limit exceeded. Please wait ${retryAfter} seconds.`,
-          { 
-            duration: retryAfter * 1000, // Auto-dismiss after retryAfter seconds
-            description: "Too many requests in a short time period"
+    return () => clearInterval(timer);
+  }, [rateLimitCountdown, initialCountdown]);
+
+  async function handleParse() {
+    if (!age || !occupation) {
+      toast.error("Select parameters first.");
+      return;
+    }
+
+    // Check if we're in cooldown
+    if (rateLimitCountdown !== null && rateLimitCountdown > 0) {
+      toast.error(
+        `Please wait ${rateLimitCountdown} seconds before trying again.`
+      );
+      return;
+    }
+
+    // Validate based on upload method
+    if (uploadMethod === "link" && !link.trim()) {
+      toast.error("Enter a Figma link.");
+      return;
+    }
+
+    if (uploadMethod === "file" && !uploadedFile) {
+      toast.error("Please upload an image file.");
+      return;
+    }
+
+    setParsing(true);
+
+    try {
+      let data;
+
+      if (uploadMethod === "link") {
+        // Handle Figma link parsing with retry logic
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_APP_URL}/api/figma/parse`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: link }),
           }
         );
-        
-        setParsing(false);
-        return;
-      }
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        
-        if (errorData.code === "FIGMA_RATE_LIMIT") {
+        if (res.status === 429) {
+          const errorData = await res.json();
           const retryAfter = errorData.retryAfter || 60;
+
+          // Start countdown
           setRateLimitCountdown(retryAfter);
-          
-          // Toast will auto-dismiss after 60 seconds
+
+          // Toast with manual dismiss - no auto-dismiss
           toast.error(
-            "Figma API rate limit reached. Please wait a moment before trying again.",
-            { 
-              duration: retryAfter * 1000, // Auto-dismiss after retryAfter seconds
-              description: "Figma allows 150 requests per minute per token"
+            `Rate limit exceeded. Please wait ${retryAfter} seconds.`,
+            {
+              duration: Infinity, // Won't auto-dismiss
+              description: "Too many requests in a short time period",
+              action: {
+                label: "✕",
+                onClick: () => {
+                  // Toast will close when clicked
+                },
+              },
             }
           );
-        } else {
-          toast.error(errorData.error || "Failed to parse Figma link", {
-            description: "Please check your link and try again"
-          });
+
+          setParsing(false);
+          return;
         }
-        
-        setParsing(false);
-        return;
-      }
 
-      data = await res.json();
-    }
-  
-  else if (uploadMethod === "file" && uploadedFile) {
-      // Handle file upload parsing
-      const formData = new FormData();
-      formData.append("file", uploadedFile);
-      formData.append("age", age);
-      formData.append("occupation", occupation);
+        if (!res.ok) {
+          const errorData = await res.json();
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_APP_URL}/api/figma/parse-file`,
-        {
-          method: "POST",
-          body: formData,
+          if (errorData.code === "FIGMA_RATE_LIMIT") {
+            const retryAfter = errorData.retryAfter || 60;
+            setRateLimitCountdown(retryAfter);
+
+            // Toast with manual dismiss
+            toast.error(
+              "Figma API rate limit reached. Please wait a moment before trying again.",
+              {
+                duration: Infinity, // Won't auto-dismiss
+                description: "Figma allows 150 requests per minute per token",
+                action: {
+                  label: "✕",
+                  onClick: () => {
+                    // Toast will close when clicked
+                  },
+                },
+              }
+            );
+          } else {
+            toast.error(errorData.error || "Failed to parse Figma link", {
+              description: "Please check your link and try again",
+              action: {
+                label: "✕",
+                onClick: () => {},
+              },
+            });
+          }
+
+          setParsing(false);
+          return;
         }
-      );
 
-      if (res.status === 429) {
-        const errorData = await res.json();
-        const retryAfter = errorData.retryAfter || 60;
-        
-        // Start countdown
-        setRateLimitCountdown(retryAfter);
-        
-        // Toast will auto-dismiss after the retry period
-        toast.error(
-          `Too many uploads. Please wait ${retryAfter} seconds before trying again.`,
-          { 
-            duration: retryAfter * 1000 // Auto-dismiss after retryAfter seconds
+        data = await res.json();
+      } else if (uploadMethod === "file" && uploadedFile) {
+        // Handle file upload parsing
+        const formData = new FormData();
+        formData.append("file", uploadedFile);
+        formData.append("age", age);
+        formData.append("occupation", occupation);
+
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_APP_URL}/api/figma/parse-file`,
+          {
+            method: "POST",
+            body: formData,
           }
         );
-        
-        setParsing(false);
-        return;
+
+        if (res.status === 429) {
+          const errorData = await res.json();
+          const retryAfter = errorData.retryAfter || 60;
+
+          // Start countdown
+          setRateLimitCountdown(retryAfter);
+
+          // Toast with manual dismiss
+          toast.error(
+            `Too many uploads. Please wait ${retryAfter} seconds before trying again.`,
+            {
+              duration: Infinity, // Won't auto-dismiss
+              action: {
+                label: "✕",
+                onClick: () => {
+                  // Toast will close when clicked
+                },
+              },
+            }
+          );
+
+          setParsing(false);
+          return;
+        }
+
+        if (!res.ok) {
+          const error = await res
+            .json()
+            .catch(() => ({ error: "Parse failed" }));
+          toast.error(error?.error || "Failed to parse file", {
+            description: "Please check the file and try again",
+            action: {
+              label: "✕",
+              onClick: () => {},
+            },
+          });
+          setParsing(false);
+          return;
+        }
+
+        data = await res.json();
+        // Debug logging
+        console.log("[handleParse] API Response:", data);
+        console.log("[handleParse] Frame Images:", data.frameImages);
+        console.log(
+          "[handleParse] Frame Count:",
+          Object.keys(data.frameImages || {}).length
+        );
       }
 
-      if (!res.ok) {
-        const error = await res
-          .json()
-          .catch(() => ({ error: "Parse failed" }));
-        toast.error(error?.error || "Failed to parse file", {
-          description: "Please check the file and try again"
+      if (!data) {
+        toast.error("Failed to parse design", {
+          action: {
+            label: "✕",
+            onClick: () => {},
+          },
         });
         setParsing(false);
         return;
       }
 
-      data = await res.json();
-      // Debug logging
-      console.log("[handleParse] API Response:", data);
-      console.log("[handleParse] Frame Images:", data.frameImages);
+      const parsedData = {
+        fileKey: data.fileKey,
+        nodeId: data.nodeId,
+        name: data.name || uploadedFile?.name || "Untitled",
+        thumbnail: data.nodeImageUrl || data.thumbnailUrl || null,
+        frameImages: data.frameImages || {},
+        type: data.type,
+        uploadedFileName: uploadedFile?.name,
+      };
+      console.log("[handleParse] Setting parsed data:", parsedData);
       console.log(
-        "[handleParse] Frame Count:",
-        Object.keys(data.frameImages || {}).length
-      );
-    }
-
-    if (!data) {
-      toast.error("Failed to parse design");
-      setParsing(false);
-      return;
-    }
-
-    const parsedData = {
-      fileKey: data.fileKey,
-      nodeId: data.nodeId,
-      name: data.name || uploadedFile?.name || "Untitled",
-      thumbnail: data.nodeImageUrl || data.thumbnailUrl || null,
-      frameImages: data.frameImages || {},
-      type: data.type,
-      uploadedFileName: uploadedFile?.name,
-    };
-    console.log("[handleParse] Setting parsed data:", parsedData);
-    console.log(
-      "[handleParse] Frame images count:",
-      Object.keys(parsedData.frameImages).length
-    );
-
-    setParsed(parsedData);
-
-    toast.success(
-      `Design parsed successfully - ${
+        "[handleParse] Frame images count:",
         Object.keys(parsedData.frameImages).length
-      } frames found`
-    );
+      );
 
-    setStep(3);
-  } catch (error: any) {
-    console.error("Parse error:", error);
-    
-    // Check for network errors
-    if (error.name === 'TypeError' && error.message.includes('fetch')) {
-      toast.error("Network error - please check your connection");
-    } else {
-      toast.error("An unexpected error occurred");
+      setParsed(parsedData);
+
+      toast.success(
+        `Design parsed successfully - ${
+          Object.keys(parsedData.frameImages).length
+        } frames found`
+      );
+
+      setStep(3);
+    } catch (error: any) {
+      console.error("Parse error:", error);
+
+      // Check for network errors
+      if (error.name === "TypeError" && error.message.includes("fetch")) {
+        toast.error("Network error - please check your connection");
+      } else {
+        toast.error("An unexpected error occurred");
+      }
+    } finally {
+      setParsing(false);
     }
-  } finally {
-    setParsing(false);
   }
-}
 
   async function handleSubmit() {
     console.log("[handleSubmit] Started");
@@ -1022,131 +1062,141 @@ async function handleParse() {
                 </div>
 
                 {/* Figma Link Input */}
-        {uploadMethod === "link" && (
-          <div className="space-y-4">
-            <div className="relative group">
-              <div className="absolute inset-0 bg-gradient-to-r from-[#ED5E20]/20 to-orange-500/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="relative bg-white dark:bg-neutral-800/60 rounded-2xl p-6 border border-neutral-200 dark:border-neutral-700 hover:border-[#ED5E20]/50 transition-all duration-300">
-                <div className="space-y-2">
-                  <Input
-                    type="url"
-                    value={link}
-                    onChange={(e) => setLink(e.target.value)}
-                    placeholder="https://www.figma.com/design/..."
-                    disabled={rateLimitCountdown !== null}
-                    className="w-full h-12 px-4 rounded-lg bg-accent/10 dark:bg-neutral-900/60 text-sm focus:outline-none focus:ring-2 focus:ring-[#ED5E20]/50 border-neutral-200 dark:border-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-        
-                  {/* Show full link toggle */}
-                  {link && link.length > 50 && (
-                    <div className="flex items-center justify-between px-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowFullLink(!showFullLink)}
-                        className="flex items-center gap-1 text-xs text-[#ED5E20] hover:text-orange-600 transition-colors"
-                      >
-                        <svg
-                          className="h-3 w-3"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          {showFullLink ? (
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />
-                          ) : (
-                            <>
-                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-                              <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-                              <line x1="1" y1="1" x2="23" y2="23" />
-                            </>
-                          )}
-                        </svg>
-                        {showFullLink ? "Hide full link" : "Show full link"}
-                      </button>
-        
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(link);
-                          toast.success("Link copied to clipboard!");
-                        }}
-                        className="flex items-center gap-1 text-xs text-neutral-600 dark:text-neutral-400 hover:text-[#ED5E20] transition-colors"
-                      >
-                        <svg
-                          className="h-3 w-3"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <rect
-                            x="9"
-                            y="9"
-                            width="13"
-                            height="13"
-                            rx="2"
-                            ry="2"
+                {uploadMethod === "link" && (
+                  <div className="space-y-4">
+                    <div className="relative group">
+                      <div className="absolute inset-0 bg-gradient-to-r from-[#ED5E20]/20 to-orange-500/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      <div className="relative bg-white dark:bg-neutral-800/60 rounded-2xl p-6 border border-neutral-200 dark:border-neutral-700 hover:border-[#ED5E20]/50 transition-all duration-300">
+                        <div className="space-y-2">
+                          <Input
+                            type="url"
+                            value={link}
+                            onChange={(e) => setLink(e.target.value)}
+                            placeholder="https://www.figma.com/design/..."
+                            disabled={rateLimitCountdown !== null}
+                            className="w-full h-12 px-4 rounded-lg bg-accent/10 dark:bg-neutral-900/60 text-sm focus:outline-none focus:ring-2 focus:ring-[#ED5E20]/50 border-neutral-200 dark:border-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
                           />
-                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                        </svg>
-                        Copy
-                      </button>
+
+                          {/* Show full link toggle */}
+                          {link && link.length > 50 && (
+                            <div className="flex items-center justify-between px-2">
+                              <button
+                                type="button"
+                                onClick={() => setShowFullLink(!showFullLink)}
+                                className="flex items-center gap-1 text-xs text-[#ED5E20] hover:text-orange-600 transition-colors"
+                              >
+                                <svg
+                                  className="h-3 w-3"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                >
+                                  {showFullLink ? (
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />
+                                  ) : (
+                                    <>
+                                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                                      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                                      <line x1="1" y1="1" x2="23" y2="23" />
+                                    </>
+                                  )}
+                                </svg>
+                                {showFullLink
+                                  ? "Hide full link"
+                                  : "Show full link"}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(link);
+                                  toast.success("Link copied to clipboard!");
+                                }}
+                                className="flex items-center gap-1 text-xs text-neutral-600 dark:text-neutral-400 hover:text-[#ED5E20] transition-colors"
+                              >
+                                <svg
+                                  className="h-3 w-3"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                >
+                                  <rect
+                                    x="9"
+                                    y="9"
+                                    width="13"
+                                    height="13"
+                                    rx="2"
+                                    ry="2"
+                                  />
+                                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                </svg>
+                                Copy
+                              </button>
+                            </div>
+                          )}
+
+                          {showFullLink && link && (
+                            <div className="p-3 bg-neutral-50 dark:bg-neutral-900/80 rounded-lg border border-neutral-200 dark:border-neutral-700">
+                              <p className="text-xs font-mono text-neutral-700 dark:text-neutral-300 break-all">
+                                {link}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  )}
-        
-                  {showFullLink && link && (
-                    <div className="p-3 bg-neutral-50 dark:bg-neutral-900/80 rounded-lg border border-neutral-200 dark:border-neutral-700">
-                      <p className="text-xs font-mono text-neutral-700 dark:text-neutral-300 break-all">
-                        {link}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-        
-            {/* Rate Limit Warning Banner */}
-            {rateLimitCountdown !== null && (
-              <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-800 animate-in fade-in slide-in-from-top-2 duration-300">
-                <div className="flex-shrink-0 p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
-                  <svg
-                    className="h-5 w-5 text-amber-600 dark:text-amber-400 animate-pulse"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                    <line x1="12" y1="9" x2="12" y2="13" />
-                    <line x1="12" y1="17" x2="12.01" y2="17" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-sm text-amber-900 dark:text-amber-100 mb-1">
-                    Rate Limit Active
-                  </p>
-                  <p className="text-xs text-amber-700 dark:text-amber-300 mb-2">
-                    Too many requests detected. Please wait before parsing again.
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-2 bg-amber-200 dark:bg-amber-900/40 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-amber-500 dark:bg-amber-600 transition-all duration-1000 ease-linear"
-                        style={{
-                          width: `${((60 - rateLimitCountdown) / 60) * 100}%`,
-                        }}
-                      />
-                    </div>
-                    <span className="text-sm font-semibold text-amber-900 dark:text-amber-100 tabular-nums min-w-[3ch]">
-                      {rateLimitCountdown}s
-                    </span>
+
+                    {/* Rate Limit Warning Banner */}
+                    {rateLimitCountdown !== null && (
+                      <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-800 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="flex-shrink-0 p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                          <svg
+                            className="h-5 w-5 text-amber-600 dark:text-amber-400 animate-pulse"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                          </svg>
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-sm text-amber-900 dark:text-amber-100 mb-1">
+                            Rate Limit Active
+                          </p>
+                          <p className="text-xs text-amber-700 dark:text-amber-300 mb-2">
+                            Too many requests detected. Please wait before
+                            parsing again.
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-2 bg-amber-200 dark:bg-amber-900/40 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-amber-500 dark:bg-amber-600 transition-all duration-1000 ease-linear"
+                                style={{
+                                  width: initialCountdown
+                                    ? `${
+                                        ((initialCountdown -
+                                          rateLimitCountdown) /
+                                          initialCountdown) *
+                                        100
+                                      }%`
+                                    : "0%",
+                                }}
+                              />
+                            </div>
+                            <span className="text-sm font-semibold text-amber-900 dark:text-amber-100 tabular-nums min-w-[3ch]">
+                              {rateLimitCountdown}s
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+                )}
 
                 {/* File Upload */}
                 {uploadMethod === "file" && (
@@ -1802,42 +1852,48 @@ async function handleParse() {
                   </button>
                 )}
 
-                        {parsed && !parsing && (
-              <button
-                type="button"
-                onClick={() => setStep(3)}
-                disabled={rateLimitCountdown !== null}
-                className={`relative px-6 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all duration-200
+                {parsed && !parsing && (
+                  <button
+                    type="button"
+                    onClick={() => setStep(3)}
+                    disabled={rateLimitCountdown !== null}
+                    className={`relative px-6 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all duration-200
                   ${
                     rateLimitCountdown !== null
                       ? "bg-gray-400 text-white cursor-not-allowed opacity-60"
                       : "cursor-pointer text-white bg-gradient-to-r from-[#ED5E20] to-orange-600 hover:from-orange-600 hover:to-[#ED5E20] shadow-lg shadow-[#ED5E20]/30 hover:shadow-xl hover:shadow-[#ED5E20]/40"
                   }`}
-              >
-                {rateLimitCountdown !== null ? (
-                  <>
-                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="12" cy="12" r="10" opacity="0.25"/>
-                      <path d="M12 2a10 10 0 0 1 10 10" opacity="0.75"/>
-                    </svg>
-                    Wait {rateLimitCountdown}s
-                  </>
-                ) : (
-                  <>
-                    Next
-                    <svg
-                      className="h-4 w-4"
-                      viewBox="0 0 20 20"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path d="M7 3l5 5-5 5" />
-                    </svg>
-                  </>
+                  >
+                    {rateLimitCountdown !== null ? (
+                      <>
+                        <svg
+                          className="h-4 w-4 animate-spin"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <circle cx="12" cy="12" r="10" opacity="0.25" />
+                          <path d="M12 2a10 10 0 0 1 10 10" opacity="0.75" />
+                        </svg>
+                        Wait {rateLimitCountdown}s
+                      </>
+                    ) : (
+                      <>
+                        Next
+                        <svg
+                          className="h-4 w-4"
+                          viewBox="0 0 20 20"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M7 3l5 5-5 5" />
+                        </svg>
+                      </>
+                    )}
+                  </button>
                 )}
-              </button>
-            )}
               </div>
             </div>
           </div>
