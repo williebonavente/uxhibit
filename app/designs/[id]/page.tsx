@@ -38,7 +38,8 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { DesignComparison } from "./dialogs/DesignComparison";
-import Link from "next/link";
+import { ReadingsPanel } from "./dialogs/ReadingPanel";
+import { GradientActionButton } from "@/components/gradient-action-btn";
 
 export interface FrameEvaluation {
   id: string;
@@ -221,18 +222,45 @@ type ProgressPayload = {
   [key: string]: any;
 };
 
+// ...existing code...
 export async function evaluateDesign(
   input: EvaluateInput
 ): Promise<EvalResponse[]> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   console.log("Calling evaluate with:", input);
 
+  // Build/validate Figma URL for "link" method
+  const figmaUrl =
+    (input.url && input.url.trim()) ||
+    (input.fileKey
+      ? `https://www.figma.com/file/${input.fileKey}${
+          input.nodeId ? `?node-id=${encodeURIComponent(input.nodeId)}` : ""
+        }`
+      : "");
+
+  if (!figmaUrl) {
+    throw new Error(
+      "Missing Figma link. Provide input.url or input.fileKey to evaluate."
+    );
+  }
+
+  const payload = {
+    method: "link" as const,
+    url: figmaUrl,
+    designId: input.designId,
+    versionId: input.versionId,
+    snapshot: input.snapshot,
+    meta: {
+      file_key: input.fileKey,
+      node_id: input.nodeId,
+      thumbnail_url: input.fallbackImageUrl,
+    },
+  };
+
   const res = await fetch(`${baseUrl}/api/ai/evaluate`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(input),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });
 
   const data = await res.json();
@@ -302,7 +330,7 @@ export default function DesignDetailPage({
   const [isPanning, setIsPanning] = useState(false);
   const panStart = useRef({ x: 0, y: 0 });
   const mouseStart = useRef({ x: 0, y: 0 });
-  const [sidebarTab, setSidebarTab] = useState<"ai" | "comments">("ai");
+  const [sidebarTab, setSidebarTab] = useState<"ai" | "comments" | "readings">("ai");
   const [expectedFrameCount, setExpectedFrameCount] = useState<number>(0);
   const [evaluatedFramesCount, setEvaluatedFramesCount] = useState<number>(0);
   const pageSize = 6;
@@ -325,7 +353,7 @@ export default function DesignDetailPage({
     setIsResizing(true);
   }
 
-  React.useEffect(() => {
+  useEffect(() => {
     function handleMouseMove(e: MouseEvent) {
       if (!isResizing) return;
       const newWidth = window.innerWidth - e.clientX - 8;
@@ -1374,169 +1402,229 @@ export default function DesignDetailPage({
       }));
   }, []);
 
-    function computeFrameScoreFromAi(root: any): number {
-    if (!root || typeof root !== "object") return 0;
-    const dbg = root?.debug_calc;
+  const computeFrameScoreFromAi = React.useCallback((root: any): number => {
+  if (!root || typeof root !== "object") return 0;
+  const dbg = root?.debug_calc;
 
-    // Heuristic average
-    let heurAvg: number | undefined =
-      typeof dbg?.heuristics_avg === "number" ? dbg.heuristics_avg : undefined;
-    if (heurAvg === undefined) {
-      const hb: any[] = Array.isArray(root?.heuristic_breakdown)
-        ? root.heuristic_breakdown
-        : [];
-      if (hb.length) {
-        const pctSum = hb.reduce((acc, h) => {
-          const s = typeof h?.score === "number" ? h.score : 0;
-          const m =
-            typeof h?.max_points === "number" && h.max_points > 0
-              ? h.max_points
-              : 4;
-          return acc + (s / m) * 100;
-        }, 0);
-        heurAvg = Math.round(pctSum / hb.length);
-      }
-    }
-
-    // Category avg
-    const cs =
-      root?.category_scores && typeof root.category_scores === "object"
-        ? root.category_scores
-        : undefined;
-    const catVals = cs
-      ? Object.values(cs).filter(
-          (v: any): v is number => typeof v === "number" && Number.isFinite(v)
-        )
+  let heurAvg: number | undefined =
+    typeof dbg?.heuristics_avg === "number" ? dbg.heuristics_avg : undefined;
+  if (heurAvg === undefined) {
+    const hb: any[] = Array.isArray(root?.heuristic_breakdown)
+      ? root.heuristic_breakdown
       : [];
-    const catAvg = catVals.length
-      ? Math.round(catVals.reduce((a: number, b: number) => a + b, 0) / catVals.length)
+    if (hb.length) {
+      const pctSum = hb.reduce((acc, h) => {
+        const s = typeof h?.score === "number" ? h.score : 0;
+        const m = typeof h?.max_points === "number" && h.max_points > 0 ? h.max_points : 4;
+        return acc + (s / m) * 100;
+      }, 0);
+      heurAvg = Math.round(pctSum / hb.length);
+    }
+  }
+
+  const cs = root?.category_scores && typeof root.category_scores === "object" ? root.category_scores : undefined;
+  const catVals = cs ? Object.values(cs).filter((v: any): v is number => typeof v === "number" && Number.isFinite(v)) : [];
+  const catAvg = catVals.length ? Math.round(catVals.reduce((a: number, b: number) => a + b, 0) / catVals.length) : undefined;
+
+  const biasWeighted =
+    typeof dbg?.bias_weighted_overall === "number"
+      ? dbg.bias_weighted_overall
+      : typeof root?.bias?.weighted_overall === "number"
+      ? root.bias.weighted_overall
       : undefined;
 
-    // Bias weighted
-    const biasWeighted =
-      typeof dbg?.bias_weighted_overall === "number"
-        ? dbg.bias_weighted_overall
-        : typeof root?.bias?.weighted_overall === "number"
-        ? root.bias.weighted_overall
-        : undefined;
+  const tri =
+    typeof heurAvg === "number" && typeof catAvg === "number" && typeof biasWeighted === "number"
+      ? Math.round((heurAvg + catAvg + biasWeighted) / 3)
+      : undefined;
 
-    const tri =
-      typeof heurAvg === "number" &&
-      typeof catAvg === "number" &&
-      typeof biasWeighted === "number"
-        ? Math.round((heurAvg + catAvg + biasWeighted) / 3)
-        : undefined;
+  if (typeof tri === "number") return tri;
+  if (typeof dbg?.final === "number") return dbg.final;
+  if (typeof root?.overall_score === "number") return root.overall_score;
+  if (typeof catAvg === "number" && typeof heurAvg === "number") return Math.round((catAvg + heurAvg) / 2);
+  if (typeof catAvg === "number") return catAvg;
+  if (typeof heurAvg === "number") return heurAvg;
+  return 0;
+}, []);
 
-    if (typeof tri === "number") return tri;
-    if (typeof dbg?.final === "number") return dbg.final;
-    if (typeof root?.overall_score === "number") return root.overall_score;
-    if (typeof catAvg === "number" && typeof heurAvg === "number")
-      return Math.round((catAvg + heurAvg) / 2);
-    if (typeof catAvg === "number") return catAvg;
-    if (typeof heurAvg === "number") return heurAvg;
-    return 0;
+const parseVersionScores = React.useCallback((v: any): ParsedVersionData | null => {
+  if (!v) return null;
+
+  const persisted = typeof v.total_score === "number" && v.total_score > 0 ? Math.round(v.total_score) : undefined;
+
+  let raw = v.ai_data;
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return { id: v.id, version: v.version, overall: persisted, categories: {} };
+    }
   }
 
-  function parseVersionScores(v: any): ParsedVersionData | null {
-    if (!v) return null;
-
-    // 1) Prefer persisted total_score if valid (>0) to avoid recompute noise
-    const persisted =
-      typeof v.total_score === "number" && v.total_score > 0
-        ? Math.round(v.total_score)
-        : undefined;
-
-    let raw = v.ai_data;
-    if (typeof raw === "string") {
-      try {
-        raw = JSON.parse(raw);
-      } catch {
-        return {
-          id: v.id,
-            version: v.version,
-            overall: persisted,
-            categories: {},
-        };
+  const toEntries = (x: any): any[] => {
+    if (!x) return [];
+    if (Array.isArray(x)) return x;
+    if (typeof x === "object") {
+      const keys = Object.keys(x);
+      if (keys.length && keys.every((k) => /^\d+$/.test(k))) {
+        return keys.sort((a, b) => Number(a) - Number(b)).map((k) => x[k]);
       }
+      if (Array.isArray(x.frames)) return x.frames;
+      return [x];
     }
+    return [];
+  };
 
-    const toEntries = (x: any): any[] => {
-      if (!x) return [];
-      if (Array.isArray(x)) return x;
-      if (typeof x === "object") {
-        // numeric index object
-        const keys = Object.keys(x);
-        if (keys.length && keys.every((k) => /^\d+$/.test(k))) {
-          return keys.sort((a, b) => Number(a) - Number(b)).map((k) => x[k]);
+  const entries = toEntries(raw).map((e) => (e && typeof e === "object" && "ai" in e ? e.ai : e));
+
+  const frameScores: number[] = [];
+  const perCategory: Record<string, { sum: number; n: number }> = {};
+
+  entries.forEach((root) => {
+    if (!root || typeof root !== "object") return;
+    const score = computeFrameScoreFromAi(root);
+    if (score > 0) frameScores.push(score);
+
+    const cats = root?.category_scores;
+    if (cats && typeof cats === "object") {
+      Object.entries(cats).forEach(([k, val]) => {
+        if (typeof val === "number" && Number.isFinite(val)) {
+          if (!perCategory[k]) perCategory[k] = { sum: 0, n: 0 };
+          perCategory[k].sum += val;
+          perCategory[k].n += 1;
         }
-        if (Array.isArray(x.frames)) return x.frames;
-        return [x];
-      }
-      return [];
-    };
-
-    const entries = toEntries(raw).map((e) =>
-      e && typeof e === "object" && "ai" in e ? e.ai : e
-    );
-
-    // Aggregate per-frame robust score
-    const frameScores: number[] = [];
-    const perCategory: Record<string, { sum: number; n: number }> = {};
-
-    entries.forEach((root) => {
-      if (!root || typeof root !== "object") return;
-      const score = computeFrameScoreFromAi(root);
-      if (score > 0) frameScores.push(score);
-
-      const cats = root?.category_scores;
-      if (cats && typeof cats === "object") {
-        Object.entries(cats).forEach(([k, val]) => {
-          if (typeof val === "number" && Number.isFinite(val)) {
-            if (!perCategory[k]) perCategory[k] = { sum: 0, n: 0 };
-            perCategory[k].sum += val;
-            perCategory[k].n += 1;
-          }
-        });
-      }
-    });
-
-    // Fallback: if entries empty, inspect single root
-    if (!entries.length && raw && typeof raw === "object") {
-      const root: any = raw.ai ?? raw;
-      const loneScore = computeFrameScoreFromAi(root);
-      if (loneScore > 0) frameScores.push(loneScore);
-      const cats = root?.category_scores;
-      if (cats && typeof cats === "object") {
-        Object.entries(cats).forEach(([k, val]) => {
-          if (typeof val === "number" && Number.isFinite(val)) {
-            perCategory[k] = { sum: val, n: 1 };
-          }
-        });
-      }
+      });
     }
+  });
 
-    const avg = (arr: number[]) =>
-      arr.length
-        ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length)
-        : undefined;
-
-    const recomputed = avg(frameScores);
-
-    // Final overall: persisted > recomputed > undefined
-    const overall = persisted ?? recomputed ?? undefined;
-
-    const categories: Record<string, number> = {};
-    Object.entries(perCategory).forEach(([k, { sum, n }]) => {
-      categories[k] = Math.round(sum / Math.max(1, n));
-    });
-
-    return {
-      id: v.id,
-      version: v.version,
-      overall,
-      categories,
-    };
+  if (!entries.length && raw && typeof raw === "object") {
+    const root: any = (raw as any).ai ?? raw;
+    const loneScore = computeFrameScoreFromAi(root);
+    if (loneScore > 0) frameScores.push(loneScore);
+    const cats = root?.category_scores;
+    if (cats && typeof cats === "object") {
+      Object.entries(cats).forEach(([k, val]) => {
+        if (typeof val === "number" && Number.isFinite(val)) {
+          perCategory[k] = { sum: val, n: 1 };
+        }
+      });
+    }
   }
+
+  const avg = (arr: number[]) => (arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : undefined);
+  const recomputed = avg(frameScores);
+  const overall = persisted ?? recomputed ?? undefined;
+
+  const categories: Record<string, number> = {};
+  Object.entries(perCategory).forEach(([k, { sum, n }]) => {
+    categories[k] = Math.round(sum / Math.max(1, n));
+  });
+
+  return { id: v.id, version: v.version, overall, categories };
+}, [computeFrameScoreFromAi]);
+
+
+
+  // function parseVersionScores(v: any): ParsedVersionData | null {
+  //   if (!v) return null;
+
+  //   // 1) Prefer persisted total_score if valid (>0) to avoid recompute noise
+  //   const persisted =
+  //     typeof v.total_score === "number" && v.total_score > 0
+  //       ? Math.round(v.total_score)
+  //       : undefined;
+
+  //   let raw = v.ai_data;
+  //   if (typeof raw === "string") {
+  //     try {
+  //       raw = JSON.parse(raw);
+  //     } catch {
+  //       return {
+  //         id: v.id,
+  //           version: v.version,
+  //           overall: persisted,
+  //           categories: {},
+  //       };
+  //     }
+  //   }
+
+  //   const toEntries = (x: any): any[] => {
+  //     if (!x) return [];
+  //     if (Array.isArray(x)) return x;
+  //     if (typeof x === "object") {
+  //       // numeric index object
+  //       const keys = Object.keys(x);
+  //       if (keys.length && keys.every((k) => /^\d+$/.test(k))) {
+  //         return keys.sort((a, b) => Number(a) - Number(b)).map((k) => x[k]);
+  //       }
+  //       if (Array.isArray(x.frames)) return x.frames;
+  //       return [x];
+  //     }
+  //     return [];
+  //   };
+
+  //   const entries = toEntries(raw).map((e) =>
+  //     e && typeof e === "object" && "ai" in e ? e.ai : e
+  //   );
+
+  //   // Aggregate per-frame robust score
+  //   const frameScores: number[] = [];
+  //   const perCategory: Record<string, { sum: number; n: number }> = {};
+
+  //   entries.forEach((root) => {
+  //     if (!root || typeof root !== "object") return;
+  //     const score = computeFrameScoreFromAi(root);
+  //     if (score > 0) frameScores.push(score);
+
+  //     const cats = root?.category_scores;
+  //     if (cats && typeof cats === "object") {
+  //       Object.entries(cats).forEach(([k, val]) => {
+  //         if (typeof val === "number" && Number.isFinite(val)) {
+  //           if (!perCategory[k]) perCategory[k] = { sum: 0, n: 0 };
+  //           perCategory[k].sum += val;
+  //           perCategory[k].n += 1;
+  //         }
+  //       });
+  //     }
+  //   });
+
+  //   // Fallback: if entries empty, inspect single root
+  //   if (!entries.length && raw && typeof raw === "object") {
+  //     const root: any = raw.ai ?? raw;
+  //     const loneScore = computeFrameScoreFromAi(root);
+  //     if (loneScore > 0) frameScores.push(loneScore);
+  //     const cats = root?.category_scores;
+  //     if (cats && typeof cats === "object") {
+  //       Object.entries(cats).forEach(([k, val]) => {
+  //         if (typeof val === "number" && Number.isFinite(val)) {
+  //           perCategory[k] = { sum: val, n: 1 };
+  //         }
+  //       });
+  //     }
+  //   }
+
+  //   const avg = (arr: number[]) =>
+  //     arr.length
+  //       ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length)
+  //       : undefined;
+
+  //   const recomputed = avg(frameScores);
+
+  //   // Final overall: persisted > recomputed > undefined
+  //   const overall = persisted ?? recomputed ?? undefined;
+
+  //   const categories: Record<string, number> = {};
+  //   Object.entries(perCategory).forEach(([k, { sum, n }]) => {
+  //     categories[k] = Math.round(sum / Math.max(1, n));
+  //   });
+
+  //   return {
+  //     id: v.id,
+  //     version: v.version,
+  //     overall,
+  //     categories,
+  //   };
+  // }
 
   function diffArrow(newVal?: number, oldVal?: number) {
     if (typeof newVal !== "number" || typeof oldVal !== "number") {
@@ -2605,8 +2693,21 @@ const compareDiag = useMemo(() => {
                   onClick={() => setSidebarTab("ai")}
                 >
                   AI Evaluation
-                </button>
+                </button> 
+                {/* Readings tab */}
                 <button
+                  className={`text-lg font-semibold flex-1 text-center cursor-pointer
+                  ${
+                    sidebarTab === "readings"
+                      ? "text-[#ED5E20] border-b-2 border-[#ED5E20]"
+                      : "text-gray-500"
+                  }`}
+                  onClick={() => setSidebarTab("readings")}
+                >
+                  Readings
+                </button>
+                {/* Comments Tab */}
+                 <button
                   className={`text-lg font-semibold flex-1 text-center cursor-pointer
                   ${
                     sidebarTab === "comments"
@@ -2993,68 +3094,34 @@ const compareDiag = useMemo(() => {
 
                   {isOwner && !imageError &&(
                     <div className="mt-auto pt-4">
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (loadingEval) return;
-                          if (pendingParams) {
-                            await handleEvalParamsSubmit(
-                              pendingParams,
-                              handleEvaluateWithParams,
-                              design,
-                              setLoadingEval,
-                              setEvalError,
-                              setEvalResult,
-                              setFrameEvaluations,
-                              setExpectedFrameCount,
-                              setEvaluatedFramesCount,
-                              fetchEvaluations,
-                              setShowEvalParams
-                            );
-                          } else {
-                            handleOpenEvalParams();
-                          }
-                        }}
-                        disabled={loadingEval}
-                        aria-busy={loadingEval}
-                        className={`cursor-pointer relative flex-1 inline-flex items-center justify-center rounded-xl text-sm transition-all duration-300 h-12 overflow-hidden focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40 group/button w-full ${
-                          loadingEval
-                            ? // use the "Cancel" button colors when evaluating (cursor disabled)
-                              "flex-1 inline-flex items-center justify-center rounded-xl text-sm font-medium border border-neutral-300/70 dark:border-neutral-600/60 bg-white/70 dark:bg-neutral-800/70 text-neutral-700 dark:text-neutral-200 shadow-sm backdrop-blur transition-colors h-12 cursor-not-allowed opacity-90"
-                            : // default gradient "Re-Evaluate" appearance
-                              "text-white font-semibold tracking-wide"
-                        }`}
-                      >
-                        {loadingEval? (
-                          // plain neutral appearance while evaluating
-                          <span className="relative z-10">Evaluating...</span>
-                        ) : (
-                          <>
-                            {/* Gradient background */}
-                            <span
-                              aria-hidden
-                              className="absolute inset-0 bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b] transition-transform duration-300 group-hover:scale-105"
-                            />
-
-                            {/* Glass effect overlay */}
-                            <span
-                              aria-hidden
-                              className="absolute inset-[2px] rounded-[10px] bg-[linear-gradient(145deg,rgba(255,255,255,0.25),rgba(255,255,255,0.06))] backdrop-blur-[2px]"
-                            />
-
-                            {/* Light sweep animation */}
-                            <span
-                              aria-hidden
-                              className="absolute inset-y-0 -left-full w-1/2 bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 transition-all duration-700 group-hover/button:translate-x-[220%] group-hover/button:opacity-70"
-                            />
-
-                            <span className="relative z-10 flex items-center gap-2">
-                              <span>Re-Evaluate</span>
-                            </span>
-                          </>
-                        )}
-                      </button>
-                    </div>
+                      <GradientActionButton
+      loading={loadingEval}
+      loadingText="Evaluating..."
+      onClick={async () => {
+        if (loadingEval) return;
+        if (pendingParams) {
+          await handleEvalParamsSubmit(
+            pendingParams,
+            handleEvaluateWithParams,
+            design,
+            setLoadingEval,
+            setEvalError,
+            setEvalResult,
+            setFrameEvaluations,
+            setExpectedFrameCount,
+            setEvaluatedFramesCount,
+            fetchEvaluations,
+            setShowEvalParams
+          );
+        } else {
+          handleOpenEvalParams();
+        }
+      }}
+      className="w-full"
+    >
+      Re-Evaluate
+    </GradientActionButton>
+  </div>
                   )}
                 </>
               )}
@@ -3076,6 +3143,9 @@ const compareDiag = useMemo(() => {
                   />
                 </div>
               )}
+              {sidebarTab === "readings" && (
+  <ReadingsPanel snapshot={design?.snapshot as any} />
+)}            
             </div>
           </div>
         )}

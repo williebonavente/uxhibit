@@ -2,146 +2,292 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { evaluateFrames } from "@/lib/ai/evaluateFrames";
 import { saveDesignVersion } from "@/lib/ai/saveDesignVersion";
+
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
-
-    const { url, designId, nodeId, thumbnailUrl, fallbackImageUrl, versionId, snapshot } = await req.json();
+  try {
+    const body = await req.json().catch(() => ({}));
+    const {
+      method,
+      url,
+      frames,
+      designId,
+      versionId,
+      snapshot,
+      meta,
+    }: {
+      method?: "link" | "file" | string;
+      url?: string;
+      frames?: Record<string, string>;
+      designId?: string;
+      versionId?: string;
+      snapshot?: any;
+      meta?: { file_key?: string; node_id?: string; thumbnail_url?: string };
+    } = body || {};
 
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
     if (authError) console.log("[AI Evaluate] Supabase auth error:", authError);
 
-    if (!url) {
-        console.log("[AI Evaluate] Missing Figma URL");
-        return NextResponse.json({ error: "Missing Figma URL" }, { status: 400 });
+    if (!user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    console.log("[AI Evaluate] Parsing Figma file at:", baseUrl);
-
-    const parseRes = await fetch(`${baseUrl}/api/figma/parse`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            cookie: req.headers.get('cookie') || '',
-        },
-        body: JSON.stringify({ url }),
-    });
-
-    console.log("[AI Evaluate] Figma parse response status:", parseRes.status);
-
-    if (!parseRes.ok) {
-        const detail = await parseRes.text();
-        console.log("[AI Evaluate] Failed to parse Figma file. Detail:", detail);
-        return NextResponse.json({ error: "Failed to parse Figma file", detail }, { status: 500 });
-    }
-
-    const parseData = await parseRes.json();
-    // console.log("[AI Evaluate] Parsed Figma data:", parseData);
-
-    const fileKey = parseData.fileKey;
-    const frameImages = parseData.frameImages || {};
-    const frameIds = Object.keys(frameImages);
-
-    console.log("[AI Evaluate] Extracted frame IDs:", frameIds);
-
-    if (frameIds.length === 0) {
-        console.log("[AI Evaluate] No frames found in Figma file");
-        return NextResponse.json({
-            error: "No frames found in Figma file",
-            details: parseData
-        }, { status: 400 });
-    }
-
     if (!designId) {
-        console.log("[AI Evaluate] Missing designId param");
-        return NextResponse.json({
-            error: "Missing required params",
-            details: {
-                hasFileKey: !!fileKey,
-                hasDesignId: !!designId
-            }
-        }, { status: 400 });
+      return NextResponse.json({ error: "Missing designId" }, { status: 400 });
     }
 
-    let finalThumbnailUrl = thumbnailUrl;
-    if (!finalThumbnailUrl) {
-        const { data: designRow } = await supabase
-            .from("designs")
-            .select("thumbnail_url")
-            .eq("id", designId)
-            .maybeSingle();
-        if (designRow?.thumbnail_url) finalThumbnailUrl = designRow.thumbnail_url;
+    // Normalize/Infer method
+    const rawMethod = typeof method === "string" ? method.toLowerCase().trim() : undefined;
+    const fileAliases = new Set(["file", "upload", "files"]);
+    const linkAliases = new Set(["link", "url", "figma"]);
+    const hasFrames = !!frames && Object.keys(frames || {}).length > 0;
+    const hasUrl = !!(url && url.trim());
+
+    let resolvedMethod: "file" | "link" | null = null;
+    if (rawMethod && fileAliases.has(rawMethod)) resolvedMethod = "file";
+    else if (rawMethod && linkAliases.has(rawMethod)) resolvedMethod = "link";
+    else if (hasFrames) resolvedMethod = "file";
+    else if (hasUrl) resolvedMethod = "link";
+
+    if (!resolvedMethod) {
+      return NextResponse.json(
+        { error: "Invalid request. Provide frames (file) or url (link)." },
+        { status: 400 }
+      );
     }
 
-    await supabase
-        .from("frame_evaluation_progress")
-        .insert({
-            job_id: versionId,
-            progress: 0,
-            status: "started",
-            user_id: user?.id,
-            created_at: new Date().toISOString(),
-        });
+    const fileKey = meta?.file_key;
+    const nodeId = meta?.node_id;
+    let finalThumbnailUrl = meta?.thumbnail_url || undefined;
 
-    const { frameResults, total_score, summary } = await evaluateFrames({
+    // progress row
+    try {
+      await supabase.from("frame_evaluation_progress").insert({
+        job_id: versionId,
+        progress: 0,
+        status: "started",
+        user_id: user.id,
+        created_at: new Date().toISOString(),
+      });
+    } catch (progressErr) {
+      console.error("[AI Evaluate] Failed to insert progress:", progressErr);
+    }
+
+        // FILE path
+    if (resolvedMethod === "file") {
+      // validate frames
+      const entries = Object.entries(frames || {});
+      if (entries.length === 0) {
+        return NextResponse.json({ error: "No frames provided" }, { status: 400 });
+      }
+
+      // store data URLs to storage, collect public URLs
+      const bucket = "figma-frames";
+      const frameImages: Record<string, string> = {};
+            for (const [frameId, dataUrl] of entries) {
+        try {
+          const [, base64] = String(dataUrl).split("base64,");
+          const bytes = Buffer.from(base64 || "", "base64");
+          const path = `${user.id}/${designId}/${frameId}.png`;
+          const { error: upErr } = await supabase.storage
+            .from(bucket)
+            .upload(path, bytes, { contentType: "image/png", upsert: true });
+          if (upErr) {
+            return NextResponse.json(
+              { error: `Failed to store frame ${frameId}: ${upErr.message}` },
+              { status: 500 }
+            );
+          }
+          const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+          frameImages[frameId] = data.publicUrl;
+        } catch {
+          return NextResponse.json(
+            { error: `Invalid data URL for frame ${frameId}` },
+            { status: 400 }
+          );
+        }
+      }
+
+      if (!finalThumbnailUrl) {
+        finalThumbnailUrl = Object.values(frameImages)[0];
+      }
+
+      const frameIds = Object.keys(frameImages);
+
+            const { frameResults, total_score, summary } = await evaluateFrames({
         frameIds,
         frameImages,
         user,
         designId,
-        fileKey,
+        fileKey: fileKey || "",
         versionId,
         snapshot,
         authError,
         supabase,
-        figmaFileUrl: url,
+        figmaFileUrl: undefined,
         onProgress: async (current, total) => {
+          try {
             await supabase
-                .from("frame_evaluation_progress")
-                .update({
-                    progress: Math.round((current / total) * 100),
-                    status: "processing",
-                    updated_at: new Date().toISOString(),
-                })
-                .eq("job_id", versionId);
-        }
-    });
+              .from("frame_evaluation_progress")
+              .update({
+                progress: Math.round((current / total) * 100),
+                status: "processing",
+                updated_at: new Date().toISOString(),
+              })
+              .eq("job_id", versionId);
+          } catch (err) {
+            console.error("[AI Evaluate] Progress update error:", err);
+          }
+        },
+      });
 
-    await supabase
-        .from("frame_evaluation_progress")
-        .update({
-            progress: 100,
+      try {
+        await supabase
+          .from("frame_evaluation_progress")
+          .update({
+            progress: 0,
             status: "completed",
             updated_at: new Date().toISOString(),
-        }).eq("job_id", versionId);
+          })
+          .eq("job_id", versionId);
+      } catch (progressErr) {
+        console.error("[AI Evaluate] Final progress update error:", progressErr);
+      }
 
-    console.log("[Backend] Updating frame_evaluation_progress for job_id:", versionId);
-
-    const saveResult = await saveDesignVersion({
+      const saveResult = await saveDesignVersion({
         supabase,
         versionId,
         designId,
-        fileKey,
-        nodeId,
+        fileKey: fileKey ?? null,
+        nodeId: nodeId ?? null,
         thumbnailUrl: finalThumbnailUrl,
-        fallbackImageUrl,
+        fallbackImageUrl: finalThumbnailUrl,
         summary,
         frameResults,
         total_score,
         snapshot,
         user: user ?? undefined,
-    });
+      });
 
-    console.log("[AI Evaluate] Design version saved for designId:", designId);
-
-    // Respond after the evaluatoin is complete
-    console.log("[AI Evaluate] Responding immediately: processing started");
-    return NextResponse.json({
+      return NextResponse.json({
         status: "processing",
-        message: "AI evaluation started. Results will be available soon.",
+        message: "AI evaluation started (file).",
         frameCount: frameIds.length,
         designId,
         versionId: saveResult.versionId,
+      });
+    }
+
+    // link method
+    if (resolvedMethod === "link"  && !hasUrl) {
+      return NextResponse.json({ error: "Missing Figma URL" }, { status: 400 });
+    }
+
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const parseRes = await fetch(`${baseUrl}/api/figma/parse`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        cookie: req.headers.get("cookie") || "",
+      },
+      body: JSON.stringify({ url }),
     });
+    if (!parseRes.ok) {
+      const detail = await parseRes.text();
+      return NextResponse.json(
+        { error: "Failed to parse Figma file", detail },
+        { status: 500 }
+      );
+    }
+
+    const parseData = await parseRes.json();
+    const fileKeyParsed = parseData.fileKey;
+    const frameImages = parseData.frameImages || {};
+    const frameIds = Object.keys(frameImages);
+    if (frameIds.length === 0) {
+      return NextResponse.json(
+        { error: "No frames found in Figma file", details: parseData },
+        { status: 400 }
+      );
+    }
+
+    if (!finalThumbnailUrl) {
+      const { data: designRow } = await supabase
+        .from("designs")
+        .select("thumbnail_url")
+        .eq("id", designId)
+        .maybeSingle();
+      if (designRow?.thumbnail_url) finalThumbnailUrl = designRow.thumbnail_url;
+    }
+
+    const { frameResults, total_score, summary } = await evaluateFrames({
+      frameIds,
+      frameImages,
+      user,
+      designId,
+      fileKey: fileKeyParsed || "",
+      versionId,
+      snapshot,
+      authError,
+      supabase,
+      figmaFileUrl: url,
+      onProgress: async (current, total) => {
+        try {
+          await supabase
+            .from("frame_evaluation_progress")
+            .update({
+              progress: Math.round((current / total) * 100),
+              status: "processing",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("job_id", versionId);
+        } catch (err) {
+          console.error("[AI Evaluate] Progress update error:", err);
+        }
+      },
+    });
+
+    try {
+      await supabase
+        .from("frame_evaluation_progress")
+        .update({
+          progress: 100,
+          status: "completed",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("job_id", versionId);
+    } catch (err) {
+      console.error("[AI Evaluate] Final progress update error:", err);
+    }
+
+    const saveResult = await saveDesignVersion({
+      supabase,
+      versionId,
+      designId,
+      fileKey: fileKeyParsed,
+      nodeId,
+      thumbnailUrl: finalThumbnailUrl,
+      fallbackImageUrl: finalThumbnailUrl,
+      summary,
+      frameResults,
+      total_score,
+      snapshot,
+      user: user ?? undefined,
+    });
+
+    return NextResponse.json({
+      status: "processing",
+      message: "AI evaluation started (link).",
+      frameCount: frameIds.length,
+      designId,
+      versionId: saveResult.versionId,
+    });
+  } catch (e: any) {
+    console.error("[/api/ai/evaluate] error", e);
+    return NextResponse.json({ error: e?.message || "Internal error" }, { status: 500 });
+  }
 }

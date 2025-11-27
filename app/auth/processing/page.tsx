@@ -57,7 +57,7 @@ export default function ProcessingPage() {
           Connecting to Figma
         </h2>
         <p className="text-gray-500 text-sm mb-4">
-          Signing you in, please wait.
+          Please wait.
         </p>
       </div>
     </div>

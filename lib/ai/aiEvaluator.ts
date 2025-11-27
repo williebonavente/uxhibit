@@ -734,9 +734,9 @@ export async function aiEvaluator(
   - When recommending resources, only pick from provided ResourceContext and tie them to specific weaknesses or improvement opportunities clearly.
   - If no resource is directly helpful, return an empty resources array.
     `;
-  try {
+    try {
     const completion = await client.chat.complete({
-      model: "ft:ministral-8b-latest:521112c6:20251101:fbb300c8",
+      model: "pixtral-12b",
       temperature: 0,
       messages: [
         {
@@ -746,9 +746,15 @@ export async function aiEvaluator(
               type: "text",
               text: prompt,
             },
-            // {
-            //     type: "image_url", imageUrl: { url: imageUrl }
-            // }
+            // Include the frame image for multimodal evaluation
+            ...(imageUrl && typeof imageUrl === "string"
+              ? [
+                  {
+                    type: "image_url",
+                    imageUrl: { url: imageUrl },
+                  } as any,
+                ]
+              : []),
           ],
         },
       ],

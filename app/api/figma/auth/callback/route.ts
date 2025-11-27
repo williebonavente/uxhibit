@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
 
     console.log('Attempting to exchange code for session...');
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-    console.log('Exchange result:', { error, data });
+    // console.log('Exchange result:', { error, data });
 
     if (error) {
       console.error('Error exchanging code for session:', error);

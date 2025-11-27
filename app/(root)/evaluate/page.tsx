@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { EvalResponse } from "@/app/designs/[id]/page";
 import { AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { parse } from "path";
 type ParsedMeta = {
   fileKey: string;
   nodeId?: string;
@@ -229,19 +230,15 @@ export default function Evaluate() {
           const errorData = await res.json();
           const retryAfter = errorData.retryAfter || 60;
 
-          // Start countdown
           setRateLimitCountdown(retryAfter);
 
-          // Toast with manual dismiss
           toast.error(
             `Too many uploads. Please wait ${retryAfter} seconds before trying again.`,
             {
-              duration: Infinity, // Won't auto-dismiss
+              duration: Infinity,
               action: {
                 label: "✕",
-                onClick: () => {
-                  // Toast will close when clicked
-                },
+                onClick: () => {},
               },
             }
           );
@@ -388,147 +385,63 @@ export default function Evaluate() {
       });
 
       let precheckedExisting: any = null;
-      try {
-        const checkRes = await fetch(
-          `/api/designs?file_key=${encodeURIComponent(parsed.fileKey)}`
-        );
 
+      const method: "link" | "file" =
+        uploadMethod === "file" ||
+        (uploadMethod === null &&
+          parsed?.frameImages &&
+          Object.keys(parsed.frameImages).length > 0)
+          ? "file"
+          : "link";
 
-        // TODO: FIX THIS!!
-
-              const evalRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          method: uploadMethod,           // "link" | "file"
-          link,                           // when method === "link"
-          frames: parsed.frameImages,     // when method === "file"
-          meta: { age, occupation, file_key: parsed.fileKey, node_id: parsed.nodeId },
-        }),
-      });
-
-            console.log("[handleSubmit] AI evaluate response status", evalRes.status);
-
-                  // Hard stop on any 4xx from /api/ai/evaluate
-      if (evalRes.status >= 400 && evalRes.status < 500) {
-        const evalJson = await evalRes.json().catch(() => ({}));
-        const msg = evalJson?.error || evalJson?.message || evalRes.statusText || "AI evaluate failed";
-        setEvalError(msg);
-        toast.error(`[AI Evaluate] ${msg}`);
-
-        // Route back to the logical step based on input method
-        if (uploadMethod === "link") {
-          setStep(2); // fix the link
-        } else {
-          setStep(3); // review upload details
-        }
-        setSubmitting(false);
-        setLoadingEval(false);
+      // Sanity checks per method
+      if (method === "link" && (!link || !link.trim())) {
+        toast.error("Missing design link. Cannot start evaluation.");
         return;
       }
-
-      // Optional: treat ok:false or status:error as failure even with 200
-      const evalData = await evalRes.json().catch(() => ({}));
       if (
-        evalData?.ok === false ||
-        String(evalData?.status || "").toLowerCase() === "error" ||
-        evalData?.error
+        method === "file" &&
+        (!parsed.frameImages || Object.keys(parsed.frameImages).length === 0)
       ) {
-        const msg = evalData?.error || evalData?.message || "AI evaluate failed";
-        setEvalError(msg);
-        toast.error(`[AI Evaluate] ${msg}`);
-        setSubmitting(false);
-        setLoadingEval(false);
-        setStep(uploadMethod === "link" ? 2 : 3);
+        toast.error(
+          "No frames found from uploaded images. Cannot start evaluation."
+        );
         return;
       }
 
-
-        if (checkRes.status === 405) {
-          toast.error("Pre-check endpoint not implemented (405) - skipping precheck");
-          console.warn("[handleSubmit] Pre-check endpoint not implemented (405) - skipping precheck");
-          setStep(3);
-          return;
-        } else if (checkRes.status >= 500) {
-          const body = await checkRes.text().catch(() => "");
-          const msg = body ? body : checkRes.statusText || "Server error";
-          toast.error(`Server error during pre-check: ${msg}`);
-          setStep(3);
+      // Build design creation payload (omit empty figma_link for file uploads)
+      const designCreatePayload: any = {
+        title: parsed.name,
+        file_key: parsed.fileKey || null,
+        node_id: parsed.nodeId || null,
+        thumbnail_url: parsed.thumbnail || null,
+        age,
+        occupation,
+        snapshot: { age, occupation },
+      };
+      if (method === "link") {
+        if (!link || !link.trim()) {
+          toast.error("Missing Figma link.");
           setSubmitting(false);
           return;
-        } else if (checkRes.status >= 400 && checkRes.status < 500) {
-          // Handle client-side errors explicitly and stop flow
-          const bodyText = await checkRes.text().catch(() => "");
-          let bodyJson: any = null;
-          try { bodyJson = JSON.parse(bodyText); } catch {}
-          const msg = bodyJson?.error || bodyText || "Invalid request";
-          toast.error(`Pre-check failed (${checkRes.status}): ${msg}`);
-          console.warn("[handleSubmit] Pre-check failed", checkRes.status, msg);
-          setStep(3);
-          setSubmitting(false);
-          return;
-        } else if (!checkRes.ok) {
-          const body = await checkRes.text().catch(() => "(no body)");
-          console.warn("[handleSubmit] Pre-check non-ok response", checkRes.status, body);
-        } else {
-          precheckedExisting = await checkRes.json().catch(() => null);
-          if (precheckedExisting?.design?.id) {
-            console.log("[handleSubmit] Found existing design by file_key", precheckedExisting.design.id);
-          }
         }
-      } catch (e) {
-        console.warn(
-          "[handleSubmit] pre-save check failed (network), continuing to save",
-          e
-        );
+        designCreatePayload.figma_link = link.trim();
       }
 
+      // Create design first
       const saveRes = await fetch(
         `${process.env.NEXT_PUBLIC_APP_URL}/api/designs`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            title: parsed.name,
-            figma_link: link,
-            file_key: parsed.fileKey,
-            node_id: parsed.nodeId,
-            thumbnail_url: parsed.thumbnail,
-            age,
-            occupation,
-            snapshot: { age, occupation },
-          }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(designCreatePayload),
         }
       );
       console.log("[handleSubmit] Save response status", saveRes.status);
-
       const saved = await saveRes.json().catch(() => ({}));
 
-          // Immediate stop on any 4xx save response (surface backend message)
-      if (saveRes.status >= 400 && saveRes.status < 500) {
-        const msg = saved?.error || saved?.message || saveRes.statusText || "Save failed";
-        toast.error(`AI evaluation failed: ${msg}`);
-        setSubmitting(false);
-        setLoadingEval(false);
-        setStep(uploadMethod === "link" ? 2 : 3);
-        return;
-      }
-
-
-            // If backend returned an error message, surface it and stop
-      if (saved?.error || (saveRes.status >= 400 && saveRes.status < 500)) {
-        const msg = saved?.error || saveRes.statusText || "Save failed";
-        toast.error(`AI evaluation failed: ${msg}`);
-        setSubmitting(false);
-        setStep(3);
-        return;
-      }
-
-           // Also stop if backend included an error field
-      if (saved?.error) {
-        toast.error(`AI evaluation failed: ${saved.error}`);
+      if (!saveRes.ok || !saved) {
+        toast.error(saved?.error || "Failed to save design");
         setSubmitting(false);
         setStep(3);
         return;
@@ -541,8 +454,122 @@ export default function Evaluate() {
         saved?.data?.design?.id ??
         null;
 
-              if (!saveRes.ok || !designId) {
-        console.log("[handleSubmit] Save failed or missing design id", { status: saveRes.status, saved });
+      // Prepare evaluation payload
+      let evalPayload: any;
+      if (method === "file") {
+        // Frames as data URLs already in parsed.frameImages
+        const frames = parsed.frameImages || {};
+        if (!frames || Object.keys(frames).length === 0) {
+          toast.error("No frames to evaluate.");
+          setSubmitting(false);
+          setStep(3);
+          return;
+        }
+        evalPayload = {
+          method: "file",
+          designId,
+          versionId: saved?.version_id || undefined,
+          frames,
+          snapshot: { age, occupation },
+          meta: {
+            file_key: parsed.fileKey || null,
+            node_id: parsed.nodeId || null,
+            thumbnail_url: parsed.thumbnail || undefined,
+          },
+        };
+      } else {
+        // Link method
+        evalPayload = {
+          method: "link",
+          url: link.trim(),
+          designId,
+          versionId: saved?.version_id || undefined,
+          snapshot: { age, occupation },
+          meta: {
+            file_key: parsed.fileKey || null,
+            node_id: parsed.nodeId || null,
+            thumbnail_url: parsed.thumbnail || undefined,
+          },
+        };
+      }
+
+      console.log("[handleSubmit] Starting evaluation with payload:", {
+        method,
+        designId,
+        versionId: evalPayload.versionId,
+        frameCount:
+          method === "file"
+            ? Object.keys(evalPayload.frames || {}).length
+            : undefined,
+      });
+
+      const evalRes = await fetch(
+        `${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(evalPayload),
+        }
+      );
+      const evalJson = await evalRes.json().catch(() => ({}));
+      if (!evalRes.ok) {
+        toast.error(
+          `AI evaluation failed: ${evalJson?.error || evalRes.statusText}`
+        );
+        setSubmitting(false);
+        setLoadingEval(false);
+        setStep(3);
+        return;
+      }
+
+      // Use version id from evaluation response if provided
+      const effectiveVersionId =
+        evalJson?.versionId ||
+        evalJson?.version_id ||
+        saved?.version_id ||
+        null;
+      if (effectiveVersionId) {
+        console.log(
+          "[handleSubmit] Effective version id for polling:",
+          effectiveVersionId
+        );
+        saved.version_id = effectiveVersionId;
+      }
+
+      console.log("[handleSubmit] Save response status", saveRes.status);
+
+      // Immediate stop on any 4xx save response (surface backend message)
+      if (saveRes.status >= 400 && saveRes.status < 500) {
+        const msg =
+          saved?.error || saved?.message || saveRes.statusText || "Save failed";
+        toast.error(`AI evaluation failed: ${msg}`);
+        setSubmitting(false);
+        setLoadingEval(false);
+        setStep(uploadMethod === "link" ? 2 : 3);
+        return;
+      }
+
+      if (saved?.error || (saveRes.status >= 400 && saveRes.status < 500)) {
+        const msg = saved?.error || saveRes.statusText || "Save failed";
+        toast.error(`AI evaluation failed: ${msg}`);
+        setSubmitting(false);
+        setStep(3);
+        return;
+      }
+
+      // Also stop if backend included an error field
+      if (saved?.error) {
+        toast.error(`AI evaluation failed: ${saved.error}`);
+        setSubmitting(false);
+        setStep(3);
+        return;
+      }
+
+      if (!saveRes.ok || !designId) {
+        console.log("[handleSubmit] Save failed or missing design id", {
+          status: saveRes.status,
+          saved,
+        });
         toast.error(saved?.error || "Save failed (no design id).");
         setSubmitting(false);
         setLoadingEval(false);
@@ -550,7 +577,7 @@ export default function Evaluate() {
         return;
       }
 
-       // Hard guard: do not start polling if required inputs are missing for chosen method
+      // Hard guard: do not start polling if required inputs are missing for chosen method
       if (uploadMethod === "link" && (!link || !link.trim())) {
         toast.error("Missing design link. Cannot start evaluation.");
         setSubmitting(false);
@@ -559,7 +586,6 @@ export default function Evaluate() {
         return;
       }
 
-      
       // Hard guard: inputs required for chosen method
       const expectedNodeIds = Object.keys(parsed.frameImages || {});
       if (uploadMethod === "link" && (!link || !link.trim())) {
@@ -573,7 +599,8 @@ export default function Evaluate() {
       }
 
       if (uploadMethod === "file" && expectedNodeIds.length === 0) {
-        const msg = "No frames found from uploaded images. Cannot start evaluation."
+        const msg =
+          "No frames found from uploaded images. Cannot start evaluation.";
         setSubmitting(false);
         setEvalError(msg);
         setStep(2);
@@ -589,7 +616,7 @@ export default function Evaluate() {
         setStep(3);
         return;
       }
-      
+
       let resolvedVersionId = saved?.version_id ?? null;
       if (!resolvedVersionId) {
         try {
@@ -643,18 +670,14 @@ export default function Evaluate() {
         );
       }
 
-      // Normalize returned design id (handle different backend shapes)
-
       setSavedDesignId(designId);
       console.log(
         "[handleSubmit] Normalized design Id",
         designId,
         "version_id:",
-        saved?.version_id
+        resolvedVersionId ?? saved?.version_id
       );
 
-      // Polling with AbortController, version param, robust guards
-      // abort any previous poll, create a new controller for this session
       setLoadingEval(true);
       try {
         pollControllerRef.current?.abort();
@@ -670,13 +693,17 @@ export default function Evaluate() {
         ? `&version=${saved.version_id}`
         : "";
 
-            let emptyStreak = 0;
+      let emptyStreak = 0;
       const maxEmptyStreak = 8;
 
       try {
-         while (pollCount < maxPolls) {
-         pollCount++;
-          console.log(`[handleSubmit] Polling evaluation (attempt ${pollCount}) for design ID: ${designId} version:${saved?.version_id ?? "n/a"}`);
+        while (pollCount < maxPolls) {
+          pollCount++;
+          console.log(
+            `[handleSubmit] Polling evaluation (attempt ${pollCount}) for design ID: ${designId} version:${
+              saved?.version_id ?? "n/a"
+            }`
+          );
 
           let res: Response | null = null;
           let data: any = null;
@@ -698,7 +725,10 @@ export default function Evaluate() {
           // Stop immediately on 4xx from evaluations
           if (res.status >= 400 && res.status < 500) {
             let errMsg = "";
-            try { const j = await res.json(); errMsg = j?.error || j?.message || ""; } catch {}
+            try {
+              const j = await res.json();
+              errMsg = j?.error || j?.message || "";
+            } catch {}
             const msg = errMsg || res.statusText || "Evaluation error";
             setEvalError(msg);
             toast.error(`Evaluation error (${res.status}): ${msg}`);
@@ -710,7 +740,10 @@ export default function Evaluate() {
           try {
             data = await res.json();
           } catch (err) {
-            console.error("[handleSubmit] Failed to parse evaluation JSON:", err);
+            console.error(
+              "[handleSubmit] Failed to parse evaluation JSON:",
+              err
+            );
             await new Promise((r) => setTimeout(r, 2000));
             continue;
           }
@@ -740,7 +773,9 @@ export default function Evaluate() {
             emptyStreak++;
             if (emptyStreak >= maxEmptyStreak) {
               const msg = "Evaluation did not start. Please check your inputs.";
-              console.warn("[handleSubmit] No evaluation progress; stopping polling.");
+              console.warn(
+                "[handleSubmit] No evaluation progress; stopping polling."
+              );
               setEvalError(msg);
               toast.warning(msg);
               setLoadingEval(false);
@@ -751,24 +786,34 @@ export default function Evaluate() {
             emptyStreak = 0;
           }
 
-          frames = results.filter((f: any) => expectedIds.includes(f.nodeId ?? f.node_id));
+          frames = results.filter((f: any) =>
+            expectedIds.includes(f.nodeId ?? f.node_id)
+          );
           setEvaluatedFrames(frames);
 
           if (frames.length === expectedIds.length) {
             setLoadingEval(false);
-            try { window.dispatchEvent(new Event("uxhibit:soft-refresh")); } catch {}
+            try {
+              window.dispatchEvent(new Event("uxhibit:soft-refresh"));
+            } catch {}
             toast.success("Design and AI evaluation completed for all frames");
-            try { controller.abort(); } catch {}
+            try {
+              controller.abort();
+            } catch {}
             pollControllerRef.current = null;
             isPollingRef.current = false;
             router.push(`/designs/${designId}`);
             return;
           }
 
-          const returnedIds = results.map((r: any) => (r.nodeId ?? r.node_id));
+          const returnedIds = results.map((r: any) => r.nodeId ?? r.node_id);
           if (returnedIds.length > 0 && pollCount > 10 && frames.length === 0) {
-            const msg = "Evaluation returned unexpected frame ids. Check node mapping.";
-            console.warn("[handleSubmit] Unexpected node ids; aborting.", { expectedIds, returnedIds });
+            const msg =
+              "Evaluation returned unexpected frame ids. Check node mapping.";
+            console.warn("[handleSubmit] Unexpected node ids; aborting.", {
+              expectedIds,
+              returnedIds,
+            });
             setEvalError(msg);
             toast.warning(msg);
             setLoadingEval(false);
@@ -778,8 +823,12 @@ export default function Evaluate() {
 
           if (data?.status === "done") {
             setLoadingEval(false);
-            try { window.dispatchEvent(new Event("uxhibit:soft-refresh")); } catch {}
-            console.log("[handleSubmit] Backend marked done but not all frames present");
+            try {
+              window.dispatchEvent(new Event("uxhibit:soft-refresh"));
+            } catch {}
+            console.log(
+              "[handleSubmit] Backend marked done but not all frames present"
+            );
             break;
           }
 
@@ -807,7 +856,7 @@ export default function Evaluate() {
           { framesEvaluated: frames.length, expected: expectedIds.length }
         );
         if (!evalError) {
-          setEvalError("Design saved, but AI evaluation did not complete.")
+          setEvalError("Design saved, but AI evaluation did not complete.");
           toast.warning("Design saved, but AI evaluation did not complete.");
           router.push(`/designs/${designId}`);
         }
@@ -1763,24 +1812,25 @@ export default function Evaluate() {
                           </div>
                         </div>
 
-                          {/* Uploaded Date */}
-  {parsed?.uploadedAt && (
-    <div className="mt-3 flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
-      <svg
-        className="h-3.5 w-3.5"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      >
-        <circle cx="12" cy="12" r="10" />
-        <path d="M12 6v6l4 2" />
-      </svg>
-      <span>
-        Uploaded: {new Date(parsed.uploadedAt).toLocaleString()}
-      </span>
-    </div>
-  )}
+                        {/* Uploaded Date */}
+                        {parsed?.uploadedAt && (
+                          <div className="mt-3 flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+                            <svg
+                              className="h-3.5 w-3.5"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <circle cx="12" cy="12" r="10" />
+                              <path d="M12 6v6l4 2" />
+                            </svg>
+                            <span>
+                              Uploaded:{" "}
+                              {new Date(parsed.uploadedAt).toLocaleString()}
+                            </span>
+                          </div>
+                        )}
 
                         {/* File Details Grid - Only for uploaded files */}
                         {uploadMethod === "file" && uploadedFile && (
@@ -2412,7 +2462,9 @@ export default function Evaluate() {
                 </div>
                 <div className="text-center text-base text-gray-700 dark:text-gray-300 mt-2">
                   Design{" "}
-                  <span className="font-mono text-[#ED5E20]">{savedDesignId}</span>{" "}
+                  <span className="font-mono text-[#ED5E20]">
+                    {savedDesignId}
+                  </span>{" "}
                   has been saved and evaluated.
                 </div>
               </div>

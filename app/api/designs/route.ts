@@ -39,7 +39,24 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { title, figma_link, file_key, node_id, thumbnail_url, snapshot, evaluate = true } = body;
+    const {
+      title,
+      figma_link,
+      file_key,
+      node_id,
+      thumbnail_url,
+      snapshot,
+      // CLIENT now triggers evaluation by default
+      // Pass "server" to run evaluation here
+      evaluate = "client",
+      method,
+      frames,
+    } = body;
+
+    // decide evaluation mode
+    const evalMode: "client" | "server" =
+      evaluate === "server" || evaluate === true ? "server" : "client";
+    const shouldEvalOnServer = evalMode === "server";
 
     // Check for existing design
     const { data: existing, error: existErr } = await supabase
@@ -61,51 +78,65 @@ export async function POST(req: Request) {
     // EXISTING DESIGN
     if (existing?.id) {
       designId = existing.id;
-      let thumbnailPromise: Promise<any> = Promise.resolve(null);
+
+      // upload/normalize thumbnail if provided
       if (thumbnail_url) {
-        thumbnailPromise = uploadThumbnailFromUrl(
+        const up = await uploadThumbnailFromUrl(
           supabase as any,
           thumbnail_url,
           designId,
           { makePublic: false }
-        );
+        ).catch((e) => {
+          console.warn("uploadThumbnailFromUrl failed:", e);
+          return null;
+        });
+
+        if (up) {
+          if (up.signedUrl) storedThumbnail = up.signedUrl;
+          else if (up.publicUrl) storedThumbnail = up.publicUrl;
+          else if (up.path) storedThumbnail = up.path;
+
+          const { error: thumbErr } = await supabase
+            .from("designs")
+            .update({ thumbnail_url: storedThumbnail })
+            .eq("id", existing.id);
+          if (thumbErr) console.error("Error updating thumbnail:", thumbErr);
+        }
       }
 
-      const up = await thumbnailPromise;
-      if (up) {
-        if (up.signedUrl) storedThumbnail = up.signedUrl;
-        else if (up.publicUrl) storedThumbnail = up.publicUrl;
-        else if (up.path) storedThumbnail = up.path;
-
-        // Update the design with the thumbnail URL
-        const { error: thumbErr } = await supabase
-          .from("designs")
-          .update({ thumbnail_url: storedThumbnail })
-          .eq("id", existing.id);
-        if (thumbErr) console.error("Error updating thumbnail:", thumbErr);
-      }
-
-      // Start AI evaluation synchronously
-      if (evaluate) {
-        console.log("Starting AI evaluation for existing design:", designId);
+      // Only trigger evaluation on the server if explicitly requested
+      if (shouldEvalOnServer) {
+        console.log("Starting AI evaluation (server) for existing design:", designId);
         const evalRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
-            cookie: req.headers.get('cookie') || '',
+            "Content-Type": "application/json",
+            cookie: req.headers.get("cookie") || "",
           },
           body: JSON.stringify({
-            url: figma_link,
-            designId: existing.id,
-            nodeId: node_id,
-            thumbnail_url: storedThumbnail,
-            snapshot
-          })
+            method: method ?? (frames ? "file" : "link"),
+            designId,
+            versionId: undefined,
+            snapshot,
+            url:
+              (method ?? (frames ? "file" : "link")) === "link" ? figma_link : undefined,
+            frames:
+              (method ?? (frames ? "file" : "link")) === "file" ? (frames ?? {}) : undefined,
+            meta: {
+              file_key,
+              node_id,
+              thumbnail_url: storedThumbnail,
+            },
+          }),
         });
         console.log("AI evaluation response status:", evalRes.status);
+
         if (!evalRes.ok) {
-          const detail = await evalRes.text();
-          console.error("AI evaluation failed:", detail);
+          const detailText = await evalRes.text().catch(() => "");
+          let detail: any = detailText;
+          try { detail = JSON.parse(detailText); } catch {}
+          const msg = detail?.error || detail?.message || "AI evaluation failed";
+          return NextResponse.json({ error: msg, detail, designId }, { status: evalRes.status });
         }
       }
 
@@ -117,7 +148,9 @@ export async function POST(req: Request) {
           thumbnail_url: storedThumbnail,
         },
         existed: true,
-        ai_evaluation: "processing",
+        // client should start evaluation when evalMode === "client"
+        ai_evaluation: shouldEvalOnServer ? "processing" : "pending",
+        eval_mode: evalMode,
       });
     }
 
@@ -131,7 +164,7 @@ export async function POST(req: Request) {
         file_key,
         node_id,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .select("*")
       .single();
@@ -139,51 +172,63 @@ export async function POST(req: Request) {
 
     designId = design.id;
     storedThumbnail = thumbnail_url || null;
-    let thumbnailPromise: Promise<any> = Promise.resolve(null);
+
     if (thumbnail_url) {
-      thumbnailPromise = uploadThumbnailFromUrl(
+      const up = await uploadThumbnailFromUrl(
         supabase as any,
         thumbnail_url,
         design.id,
         { makePublic: false }
-      );
+      ).catch((e) => {
+        console.warn("uploadThumbnailFromUrl failed:", e);
+        return null;
+      });
+
+      if (up) {
+        if (up.signedUrl) storedThumbnail = up.signedUrl;
+        else if (up.publicUrl) storedThumbnail = up.publicUrl;
+        else if (up.path) storedThumbnail = up.path;
+
+        const { error: thumbErr } = await supabase
+          .from("designs")
+          .update({ thumbnail_url: storedThumbnail })
+          .eq("id", design.id);
+        if (thumbErr) console.error("Error updating thumbnail:", thumbErr);
+      }
     }
 
-    const up = await thumbnailPromise;
-    if (up) {
-      if (up.signedUrl) storedThumbnail = up.signedUrl;
-      else if (up.publicUrl) storedThumbnail = up.publicUrl;
-      else if (up.path) storedThumbnail = up.path;
-
-      // Update the design with the thumbnail URL
-      const { error: thumbErr } = await supabase
-        .from("designs")
-        .update({ thumbnail_url: storedThumbnail })
-        .eq("id", design.id);
-      if (thumbErr) console.error("Error updating thumbnail:", thumbErr);
-    }
-
-    // Start AI evaluation synchronously
-    if (evaluate) {
-      console.log("Starting AI evaluation for new design:", designId);
+    if (shouldEvalOnServer) {
+      console.log("Starting AI evaluation (server) for new design:", designId);
       const evalRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          cookie: req.headers.get('cookie') || '',
+          "Content-Type": "application/json",
+          cookie: req.headers.get("cookie") || "",
         },
         body: JSON.stringify({
-          url: figma_link,
+          method: method ?? (frames ? "file" : "link"),
           designId,
-          nodeId: node_id,
-          thumbnail_url: storedThumbnail,
-          snapshot
-        })
+          versionId: undefined,
+          snapshot,
+          url:
+            (method ?? (frames ? "file" : "link")) === "link" ? figma_link : undefined,
+          frames:
+            (method ?? (frames ? "file" : "link")) === "file" ? (frames ?? {}) : undefined,
+          meta: {
+            file_key,
+            node_id,
+            thumbnail_url: storedThumbnail,
+          },
+        }),
       });
       console.log("AI evaluation response status:", evalRes.status);
+
       if (!evalRes.ok) {
-        const detail = await evalRes.text();
-        console.error("AI evaluation failed:", detail);
+        const detailText = await evalRes.text().catch(() => "");
+        let detail: any = detailText;
+        try { detail = JSON.parse(detailText); } catch {}
+        const msg = detail?.error || detail?.message || "AI evaluation failed";
+        return NextResponse.json({ error: msg, detail, designId }, { status: evalRes.status });
       }
     }
 
@@ -195,13 +240,15 @@ export async function POST(req: Request) {
         thumbnail_url: storedThumbnail,
       },
       existed: false,
-      ai_evaluation: "processing",
-    });
+      ai_evaluation: shouldEvalOnServer ? "processing" : "pending",
+      eval_mode: evalMode,
+    }, { status: 201 });
   } catch (e: unknown) {
     console.error("Server error:", e);
-    const errorMessage = typeof e === "object" && e !== null && "message" in e
-      ? (e as { message?: string }).message
-      : "Server error";
+    const errorMessage =
+      typeof e === "object" && e !== null && "message" in e
+        ? (e as { message?: string }).message
+        : "Server error";
     return NextResponse.json({ error: errorMessage || "Server error" }, { status: 500 });
   }
 }

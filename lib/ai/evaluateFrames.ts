@@ -24,7 +24,7 @@ export async function evaluateFrames({
   snapshot?: any;
   authError?: any;
   supabase: any;
-  figmaFileUrl: string;
+  figmaFileUrl: any;
   onProgress?: (current: number, total: number) => Promise<void>;
 }) {
   const frameSupabaseUrls: Record<string, string> = {};
@@ -59,64 +59,122 @@ export async function evaluateFrames({
     };
   }
 
-  await Promise.all(
-    Object.entries(frameImages).map(async ([frameId, figmaUrl]) => {
-      let supabaseUrl: string | null = null;
-      try {
-        // Add scale param for thumbnail
-        const thumbnailUrl = figmaUrl.includes("?")
-          ? `${figmaUrl}&scale=0.3`
-          : `${figmaUrl}?scale=0.3`;
-        const imgRes = await fetch(thumbnailUrl);
-        if (!imgRes.ok) {
-          frameSupabaseUrls[frameId] = figmaUrl;
-          return;
+  const isDataUrl = (u: string) =>
+    typeof u === "string" && u.startsWith("data:");
+  const isHttp = (u: string) =>
+    typeof u === "string" && /^https?:\/\//i.test(u);
+  const isFigmaImage = (u: string) =>
+    typeof u === "string" &&
+    (u.includes("figma.com") || u.includes("images.figma.com"));
+
+  // Upload or normalize incoming frameImages into our storage URLs when needed
+  try {
+    await Promise.all(
+      Object.entries(frameImages).map(async ([frameId, srcUrl]) => {
+        let finalUrl: string | null = null;
+
+        try {
+          // Case 1: data URL -> upload bytes directly
+          if (isDataUrl(srcUrl)) {
+            const [, base64] = String(srcUrl).split("base64,");
+            const bytes = Buffer.from(base64 || "", "base64");
+            const filePath = `${user?.id}/${designId}/${frameId}.png`;
+            const { error } = await supabase.storage
+              .from("figma-frames")
+              .upload(filePath, bytes, {
+                contentType: "image/png",
+                upsert: true,
+              });
+            if (!error) {
+              const { data: signedData } = await supabase.storage
+                .from("figma-frames")
+                .createSignedUrl(filePath, 60 * 60 * 24 * 365);
+              finalUrl = signedData?.signedUrl || null;
+            }
+          }
+
+          // Case 2: Figma-rendered URL -> fetch (optionally add scale) then upload
+          else if (isFigmaImage(srcUrl)) {
+            const thumbnailUrl = srcUrl.includes("?")
+              ? `${srcUrl}&scale=0.3`
+              : `${srcUrl}?scale=0.3`;
+            const imgRes = await fetch(thumbnailUrl);
+            if (imgRes.ok) {
+              const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
+              const filePath = `${user?.id}/${designId}/${frameId}.png`;
+              const { error } = await supabase.storage
+                .from("figma-frames")
+                .upload(filePath, imgBuffer, {
+                  contentType: "image/png",
+                  upsert: true,
+                });
+              if (!error) {
+                const { data: signedData } = await supabase.storage
+                  .from("figma-frames")
+                  .createSignedUrl(filePath, 60 * 60 * 24 * 365);
+                finalUrl = signedData?.signedUrl || null;
+              }
+            }
+          }
+
+          // Case 3: Already an http(s) URL (e.g., Supabase public URL) -> use as-is
+          else if (isHttp(srcUrl)) {
+            finalUrl = srcUrl;
+          }
+
+          // Fallback to original when upload failed
+          if (!finalUrl) finalUrl = srcUrl;
+        } catch (err) {
+          console.error(
+            `[evaluateFrames] Error processing frame ${frameId}:`,
+            err
+          );
+          finalUrl = srcUrl;
         }
-        const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
-        const filePath = `${user?.id}/${designId}/${frameId}.png`;
-        const { error } = await supabase.storage
-          .from("figma-frames")
-          .upload(filePath, imgBuffer, {
-            contentType: "image/png",
-            upsert: true,
-          });
-        if (!error) {
-          const { data: signedData } = await supabase.storage
-            .from("figma-frames")
-            .createSignedUrl(filePath, 60 * 60 * 24 * 365);
-          supabaseUrl = signedData?.signedUrl || figmaUrl;
-        } else {
-          supabaseUrl = figmaUrl;
-        }
-      } catch {
-        supabaseUrl = figmaUrl;
-      }
-      frameSupabaseUrls[frameId] = supabaseUrl || figmaUrl;
-    })
-  );
+
+        frameSupabaseUrls[frameId] = finalUrl!;
+      })
+    );
+  } catch (err) {
+    console.error("[evaluateFrames] Error in image processing:", err);
+    throw new Error("Failed to process frame images");
+  }
 
   if (authError || !user) {
     throw new Error("Unauthorized - user not found");
   }
-  figmaFileUrl = figmaFileUrl;
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  const res = await fetch(
-    `${baseUrl}/api/figma/parse?url=${encodeURIComponent(figmaFileUrl)}`
-  );
+  let figmaContext: any = {
+    accessibilityResults: [],
+    layoutResults: {},
+    textNodes: {},
+    normalizedFrames: {},
+  };
 
+  if (figmaFileUrl && typeof figmaFileUrl === "string" && figmaFileUrl.trim()) {
+    try {
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const res = await fetch(
+        `${baseUrl}/api/figma/parse?url=${encodeURIComponent(figmaFileUrl)}`
+      );
 
-    if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(
-      `Figma parse failed: ${err?.error || res.statusText} (code: ${err?.code || res.status})`
-    );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(
+          `Figma parse failed: ${err?.error || res.statusText} (code: ${
+            err?.code || res.status
+          })`
+        );
+      }
+      figmaContext = await res.json();
+    } catch (err) {
+      console.error("[evaluateFrames] Figma parse error:", err);
+      // Continue with empty figmaContext rather than throwing
+    }
   }
 
-
-  const figmaContext = await res.json();
-
-    const heuristics = getHeuristicScores(figmaContext);
+  const heuristics = getHeuristicScores(figmaContext);
 
   // Safe defaults
   const accessibilityResults = Array.isArray(figmaContext.accessibilityResults)

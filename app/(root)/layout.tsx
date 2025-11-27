@@ -2,10 +2,25 @@ import "@/app/globals.css";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ModeToggle } from "@/components/mode-toggle";
+import { notFound, redirect } from "next/navigation";
+import { cookies } from "next/headers";
 
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // Debug toggles via cookies (dev only)
+  const cookieStore = cookies();
+  const force404 = (await cookieStore).get("force404")?.value === "1";
+  const forceError = (await cookieStore).get("forceError")?.value === "1";
+
+  if (force404) notFound();
+  if (forceError) throw new Error("Forced layout error (testing error boundary)");
+
+  // Example auth gate (uncomment if needed)
+  // const supabase = await createClient();
+  // const { data: { user } } = await supabase.auth.getUser();
+  // if (!user) redirect("/login");
+
   return (
     <main className="root">
       <SidebarProvider>
