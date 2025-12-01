@@ -46,8 +46,6 @@ export async function POST(req: Request) {
       node_id,
       thumbnail_url,
       snapshot,
-      // CLIENT now triggers evaluation by default
-      // Pass "server" to run evaluation here
       evaluate = "client",
       method,
       frames,
@@ -70,6 +68,65 @@ export async function POST(req: Request) {
     if (existErr && existErr.code !== "PGRST116") {
       console.error("Error checking existing design:", existErr.message);
       return NextResponse.json({ error: existErr.message }, { status: 400 });
+    }
+
+    // Helper to decide evaluation payload for server bootstrap
+    function buildEvalPayload(designId: string, storedThumbnail?: string | null) {
+      const hasFrames = !!frames && Object.keys(frames || {}).length > 0;
+      const hasFigmaLink = !!(figma_link && figma_link.trim().length > 0);
+      const hasFileKey = !!(file_key && String(file_key).trim().length > 0);
+      const derivedFigmaUrl = hasFileKey
+        ? `https://www.figma.com/file/${String(file_key).trim()}${
+            node_id ? `?node-id=${encodeURIComponent(String(node_id).trim())}` : ""
+          }`
+        : "";
+
+      // Prefer explicit method, otherwise infer
+      const finalMethod: "file" | "link" | "image" =
+        method === "file" || hasFrames
+          ? "file"
+          : method === "link" || hasFigmaLink || hasFileKey
+          ? "link"
+          : storedThumbnail
+          ? "image"
+          : "link"; // default; we’ll skip call if no URL
+
+      const finalUrl =
+        finalMethod === "link"
+          ? (hasFigmaLink ? figma_link : derivedFigmaUrl)
+          : finalMethod === "image"
+          ? (storedThumbnail || undefined)
+          : undefined;
+
+      // In file/image modes, DO NOT include file_key/node_id (prevents accidental Figma parsing)
+      const payload: any = {
+        method: finalMethod,
+        designId,
+        versionId: undefined,
+        snapshot,
+        url: finalUrl,
+        frames: finalMethod === "file" ? (frames ?? {}) : undefined,
+        meta:
+          finalMethod === "image"
+            ? {
+                thumbnail_url: storedThumbnail || undefined,
+              }
+            : finalMethod === "file"
+            ? {
+                thumbnail_url: storedThumbnail || undefined,
+              }
+            : {
+                file_key: file_key || undefined,
+                node_id: node_id || undefined,
+                thumbnail_url: storedThumbnail || undefined,
+              },
+        // extra flags to hard-stop any Figma parsing in image mode
+        image_only: finalMethod === "image" ? true : undefined,
+        skipFigma: finalMethod === "image" ? true : undefined,
+        forceImageOnly: finalMethod === "image" ? true : undefined,
+      };
+
+      return { finalMethod, payload };
     }
 
     let designId: string;
@@ -107,36 +164,30 @@ export async function POST(req: Request) {
       // Only trigger evaluation on the server if explicitly requested
       if (shouldEvalOnServer) {
         console.log("Starting AI evaluation (server) for existing design:", designId);
-        const evalRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            cookie: req.headers.get("cookie") || "",
-          },
-          body: JSON.stringify({
-            method: method ?? (frames ? "file" : "link"),
-            designId,
-            versionId: undefined,
-            snapshot,
-            url:
-              (method ?? (frames ? "file" : "link")) === "link" ? figma_link : undefined,
-            frames:
-              (method ?? (frames ? "file" : "link")) === "file" ? (frames ?? {}) : undefined,
-            meta: {
-              file_key,
-              node_id,
-              thumbnail_url: storedThumbnail,
-            },
-          }),
-        });
-        console.log("AI evaluation response status:", evalRes.status);
 
-        if (!evalRes.ok) {
-          const detailText = await evalRes.text().catch(() => "");
-          let detail: any = detailText;
-          try { detail = JSON.parse(detailText); } catch {}
-          const msg = detail?.error || detail?.message || "AI evaluation failed";
-          return NextResponse.json({ error: msg, detail, designId }, { status: evalRes.status });
+        const { finalMethod, payload } = buildEvalPayload(designId, storedThumbnail);
+
+        // If link chosen but no URL, skip server eval
+        if (finalMethod === "link" && !payload.url) {
+          console.warn("[api/designs] Skipping server evaluation: no figma URL or file_key.");
+        } else {
+          const evalRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              cookie: req.headers.get("cookie") || "",
+            },
+            body: JSON.stringify(payload),
+          });
+          console.log("AI evaluation response status:", evalRes.status);
+
+          if (!evalRes.ok) {
+            const detailText = await evalRes.text().catch(() => "");
+            let detail: any = detailText;
+            try { detail = JSON.parse(detailText); } catch {}
+            const msg = detail?.error || detail?.message || "AI evaluation failed";
+            return NextResponse.json({ error: msg, detail, designId }, { status: evalRes.status });
+          }
         }
       }
 
@@ -148,7 +199,6 @@ export async function POST(req: Request) {
           thumbnail_url: storedThumbnail,
         },
         existed: true,
-        // client should start evaluation when evalMode === "client"
         ai_evaluation: shouldEvalOnServer ? "processing" : "pending",
         eval_mode: evalMode,
       });
@@ -199,36 +249,29 @@ export async function POST(req: Request) {
 
     if (shouldEvalOnServer) {
       console.log("Starting AI evaluation (server) for new design:", designId);
-      const evalRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          cookie: req.headers.get("cookie") || "",
-        },
-        body: JSON.stringify({
-          method: method ?? (frames ? "file" : "link"),
-          designId,
-          versionId: undefined,
-          snapshot,
-          url:
-            (method ?? (frames ? "file" : "link")) === "link" ? figma_link : undefined,
-          frames:
-            (method ?? (frames ? "file" : "link")) === "file" ? (frames ?? {}) : undefined,
-          meta: {
-            file_key,
-            node_id,
-            thumbnail_url: storedThumbnail,
-          },
-        }),
-      });
-      console.log("AI evaluation response status:", evalRes.status);
 
-      if (!evalRes.ok) {
-        const detailText = await evalRes.text().catch(() => "");
-        let detail: any = detailText;
-        try { detail = JSON.parse(detailText); } catch {}
-        const msg = detail?.error || detail?.message || "AI evaluation failed";
-        return NextResponse.json({ error: msg, detail, designId }, { status: evalRes.status });
+      const { finalMethod, payload } = buildEvalPayload(designId, storedThumbnail);
+
+      if (finalMethod === "link" && !payload.url) {
+        console.warn("[api/designs] Skipping server evaluation: no figma URL or file_key.");
+      } else {
+        const evalRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            cookie: req.headers.get("cookie") || "",
+          },
+          body: JSON.stringify(payload),
+        });
+        console.log("AI evaluation response status:", evalRes.status);
+
+        if (!evalRes.ok) {
+          const detailText = await evalRes.text().catch(() => "");
+          let detail: any = detailText;
+          try { detail = JSON.parse(detailText); } catch {}
+          const msg = detail?.error || detail?.message || "AI evaluation failed";
+          return NextResponse.json({ error: msg, detail, designId }, { status: evalRes.status });
+        }
       }
     }
 

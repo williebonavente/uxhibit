@@ -127,7 +127,7 @@ export function ReEvaluateModal({
                   loadingText={reEvalUploading ? "Uploading..." : "Evaluating..."}
                   disabled={!canRun}
                   onClick={() => {
-                    // Optionally close immediately on run. Comment out if you prefer closing after upload completes.
+                    // close immediately on run. Comment out if you prefer closing after upload completes.
                     onClose();
                     onRun();
                   }}

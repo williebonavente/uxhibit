@@ -135,13 +135,14 @@ export type Design = {
 
 export type EvaluateInput = {
   designId: string;
-  fileKey: string;
+  fileKey?: string;
   nodeId?: string;
   fallbackImageUrl?: string;
   snapshot?: Snapshot;
   url?: string;
   frameIds?: string[];
   versionId: string;
+  imageFrames?: Record<string, string>;
 };
 
 type AiDebugCalc = {
@@ -228,50 +229,110 @@ type ProgressPayload = {
 export async function evaluateDesign(
   input: EvaluateInput
 ): Promise<EvalResponse[]> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  console.log("Calling evaluate with:", input);
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (typeof window !== "undefined"
+      ? window.location.origin
+      : "http://localhost:3000");
+
+  const cleanedFileKey =
+    input.fileKey && input.fileKey.trim().length > 0
+      ? input.fileKey.trim()
+      : "";
+  const cleanedUrl =
+    input.url && input.url.trim().length > 0 ? input.url.trim() : "";
 
   const figmaUrl =
-    (input.url && input.url.trim()) ||
-    (input.fileKey
-      ? `https://www.figma.com/file/${input.fileKey}${
+    cleanedUrl ||
+    (cleanedFileKey
+      ? `https://www.figma.com/file/${cleanedFileKey}${
           input.nodeId ? `?node-id=${encodeURIComponent(input.nodeId)}` : ""
         }`
       : "");
 
-  if (!figmaUrl) {
+  const useImageOnly =
+    (!figmaUrl || figmaUrl.length === 0) &&
+    (!cleanedFileKey || cleanedFileKey.length === 0) &&
+    (!!input.fallbackImageUrl || !!input.imageFrames);
+
+  if (!figmaUrl && !useImageOnly) {
     throw new Error(
       "Missing Figma link. Provide input.url or input.fileKey to evaluate."
     );
   }
 
-  const payload = {
-    method: "link" as const,
-    url: figmaUrl,
+  const versionId =
+    input.versionId && input.versionId.trim().length > 0 && !useImageOnly
+      ? input.versionId
+      : crypto.randomUUID();
+
+  // Build payload
+  const payload: any = {
+    method: useImageOnly ? "image" : "link",
+    url: useImageOnly ? input.fallbackImageUrl : figmaUrl,
     designId: input.designId,
-    versionId: input.versionId,
+    versionId,
     snapshot: input.snapshot,
-    meta: {
-      file_key: input.fileKey,
-      node_id: input.nodeId,
-      thumbnail_url: input.fallbackImageUrl,
-    },
+    image_only: useImageOnly ? true : undefined,
+    forceImageOnly: useImageOnly ? true : undefined,
+    skipFigma: useImageOnly ? true : undefined,
+    meta: useImageOnly
+      ? { thumbnail_url: input.fallbackImageUrl }
+      : {
+          file_key: cleanedFileKey || undefined,
+          node_id: input.nodeId,
+          thumbnail_url: input.fallbackImageUrl,
+        },
   };
+
+  // For Figma link, allow explicit frameIds (optional)
+  if (!useImageOnly && input.frameIds?.length) {
+    payload.frameIds = input.frameIds;
+  }
+
+  // For image-only re-evaluate, send all uploaded images as frames
+  if (
+    useImageOnly &&
+    input.imageFrames &&
+    Object.keys(input.imageFrames).length
+  ) {
+    payload.frames = input.imageFrames;
+    // In image mode with frames, clear url to avoid “single image only”
+    payload.url = undefined;
+  }
+
+  console.log("[evaluateDesign] payload:", {
+    ...payload,
+    framesCount: payload.frames ? Object.keys(payload.frames).length : 0,
+  });
 
   const res = await fetch(`${baseUrl}/api/ai/evaluate`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-Eval-Mode": useImageOnly ? "image-only" : "figma-link",
+      "X-Force-Image-Only": useImageOnly ? "1" : "0",
+    },
     body: JSON.stringify(payload),
   });
 
-  const data = await res.json();
-  console.log("Evaluate response:", data);
+  let data: any = null;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(`Evaluate failed: HTTP ${res.status}`);
+  }
 
   if (!res.ok) {
-    console.error("Evaluate failed:", data);
-    throw new Error(data?.error || "Failed to evaluate");
+    const msg =
+      data?.message ||
+      data?.error ||
+      data?.details?.error ||
+      data?.details?.detail ||
+      `Evaluate failed: HTTP ${res.status}`;
+    throw new Error(msg);
   }
-  console.log("Existing data: ", data);
+
   return data as EvalResponse[];
 }
 
@@ -334,8 +395,6 @@ export default function DesignDetailPage({
   const [sidebarTab, setSidebarTab] = useState<"ai" | "comments" | "readings">(
     "ai"
   );
-  const [expectedFrameCount, setExpectedFrameCount] = useState<number>(0);
-  const [evaluatedFramesCount, setEvaluatedFramesCount] = useState<number>(0);
   const pageSize = 6;
   const sortRef = useRef<HTMLDivElement>(null);
   const [backendProgress, setBackendProgress] = useState(0);
@@ -357,115 +416,163 @@ export default function DesignDetailPage({
   const [reEvalImages, setReEvalImages] = useState<File[]>([]);
   const [reEvalUploading, setReEvalUploading] = useState(false);
 
-  async function uploadLocalImages(files: File[]): Promise<string[]> {
-    if (!files.length) return [];
-    const supabase = createClient();
-    setReEvalUploading(true);
-    const urls: string[] = [];
+
+  // Helper: make a stable frame id from filename (lowercase, no spaces)
+function makeStableFrameId(file: File): string {
+  const base = file.name.replace(/\.[^/.]+$/, ""); // remove extension
+  const slug = base.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  // Optional: prefix with a constant to avoid collision with Figma node_ids
+  return `uploaded:${slug}`;
+}
+
+async function uploadLocalImages(
+  files: File[],
+  opts: { makePublic?: boolean } = { makePublic: true }
+): Promise<Record<string, string>> {
+  if (!files.length) return {};
+
+  const supabase = createClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user?.id) {
+    console.warn("Upload aborted: missing user.", userError?.message);
+    return {};
+  }
+
+  setReEvalUploading(true);
+  const bucket = "figma-frames";
+  const out: Record<string, string> = {};
+
+  try {
     for (const f of files) {
-      const filePath = `manual-eval/${design?.id}/${Date.now()}-${Math.random()
+      const stableId = makeStableFrameId(f); 
+      const safeName = f.name.replace(/[^\w.-]/g, "_");
+      const filePath = `${user.id}/${design?.id ?? "unknown-design"}/${stableId}-${Date.now()}-${Math.random()
         .toString(36)
-        .slice(2)}-${f.name}`;
-      const { error } = await supabase.storage
-        .from("design-temp")
+        .slice(2)}-${safeName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(bucket)
         .upload(filePath, f, {
-          cacheControl: "3600",
+          cacheControl: "31536000",
           upsert: false,
+          contentType: f.type || "image/png",
         });
-      if (error) {
-        console.warn("Upload failed:", error.message);
+
+      if (uploadError) {
+        console.warn("Upload failed:", uploadError.message);
         continue;
       }
-      const { data: signed } = await supabase.storage
-        .from("design-temp")
-        .createSignedUrl(filePath, 3600);
-      if (signed?.signedUrl) urls.push(signed.signedUrl);
-    }
-    setReEvalUploading(false);
-    return urls;
-  }
 
-  async function handleCustomReEvaluate() {
-    if (!design?.id || !design?.fileKey) {
-      toast.error("Missing design base data.");
-      return;
+      const { data: pub } = supabase.storage.from(bucket).getPublicUrl(filePath);
+      if (pub?.publicUrl) {
+        out[stableId] = pub.publicUrl;
+      } else {
+        const { data: signed } = await supabase.storage
+          .from(bucket)
+          .createSignedUrl(filePath, 3600);
+        if (signed?.signedUrl) {
+          console.warn("Bucket not public; using temporary signed URL.");
+          out[stableId] = signed.signedUrl;
+        }
+      }
     }
-    if (!reEvalUrl && !reEvalImages.length) {
-      toast.error("Provide a Figma link or upload at least one image.");
-      return;
+    return out;
+  } finally {
+    setReEvalUploading(false);
+  }
+}
+
+async function handleCustomReEvaluate() {
+  if (!design?.id) {
+    toast.error("Missing design base data.");
+    return;
+  }
+  if (!reEvalUrl && !reEvalImages.length) {
+    toast.error("Provide a Figma link or upload at least one image.");
+    return;
+  }
+  setLoadingEval(true);
+  setEvalError(null);
+
+  try {
+    let imageUrlForAI: string | undefined;
+    let uploadedImageMap: Record<string, string> = {};
+    if (reEvalImages.length) {
+      uploadedImageMap = await uploadLocalImages(reEvalImages);
+      // pick first as thumbnail hint
+      imageUrlForAI = Object.values(uploadedImageMap)[0];
+    } else {
+      imageUrlForAI = design.thumbnail;
+      if (imageUrlForAI && !imageUrlForAI.startsWith("http")) {
+        const supabase = createClient();
+        const { data: signed } = await supabase.storage
+          .from("design-thumbnails")
+          .createSignedUrl(imageUrlForAI, 3600);
+        if (signed?.signedUrl) imageUrlForAI = signed.signedUrl;
+      }
     }
-    setLoadingEval(true);
-    setEvalError(null);
+
+    const isImageOnly = Object.keys(uploadedImageMap).length > 0 && !reEvalUrl.trim();
+
+    // Build frames with STABLE IDs so node_id matches across versions
+    const imageFrames = isImageOnly ? uploadedImageMap : undefined;
+
+    const evalData = await evaluateDesign({
+      designId: design.id,
+      fileKey: isImageOnly ? undefined : design.fileKey,
+      nodeId: isImageOnly ? undefined : design.nodeId,
+      fallbackImageUrl: imageUrlForAI,
+      snapshot:
+        typeof design.snapshot === "string"
+          ? JSON.parse(design.snapshot)
+          : design.snapshot,
+      url: isImageOnly ? "" : reEvalUrl || design.figma_link || "",
+      frameIds: isImageOnly
+        ? undefined
+        : design.frames?.map((f) => String(f.id)) ?? [],
+      versionId: isImageOnly ? "" : design.current_version_id || "",
+      imageFrames, // stable ids -> urls
+    });
+
+    setEvalResult(evalData[0]);
+    toast.success("Re-evaluation completed.");
+    setShowReEvalPanel(false);
+    setReEvalImages([]);
+    setReEvalUrl("");
 
     try {
-      let imageUrlForAI: string | undefined;
-      let uploadedImageUrls: string[] = [];
-      if (reEvalImages.length) {
-        uploadedImageUrls = await uploadLocalImages(reEvalImages);
-        imageUrlForAI = uploadedImageUrls[0];
-      } else {
-        imageUrlForAI = design.thumbnail;
-        if (imageUrlForAI && !imageUrlForAI.startsWith("http")) {
-          const supabase = createClient();
-          const { data: signed } = await supabase.storage
-            .from("design-thumbnails")
-            .createSignedUrl(imageUrlForAI, 3600);
-          if (signed?.signedUrl) imageUrlForAI = signed.signedUrl;
-        }
+      const supabase = createClient();
+      const { data: updatedDesign } = await supabase
+        .from("designs")
+        .select("id, current_version_id")
+        .eq("id", design.id)
+        .single();
+      if (updatedDesign?.current_version_id) {
+        setDesign((prev) =>
+          prev
+            ? { ...prev, current_version_id: updatedDesign.current_version_id }
+            : prev
+        );
       }
-
-      const frameIds = design?.frames?.map((f) => String(f.id)) ?? [];
-
-      const data = await evaluateDesign({
-        designId: design.id,
-        fileKey: design.fileKey,
-        nodeId: design.nodeId,
-        fallbackImageUrl: imageUrlForAI,
-        snapshot:
-          typeof design.snapshot === "string"
-            ? JSON.parse(design.snapshot)
-            : design.snapshot,
-        url: reEvalUrl || design.figma_link,
-        frameIds,
-        versionId: design.current_version_id || "",
-      });
-
-      setEvalResult(data[0]);
-      toast.success("Re-evaluation completed.");
-      setShowReEvalPanel(false);
-      setReEvalImages([]);
-      setReEvalUrl("");
-
-      try {
-        const supabase = createClient();
-        const { data: updatedDesign } = await supabase
-          .from("designs")
-          .select("id, current_version_id")
-          .eq("id", design.id)
-          .single();
-        if (updatedDesign?.current_version_id) {
-          setDesign((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  current_version_id: updatedDesign.current_version_id,
-                }
-              : prev
-          );
-        }
-      } catch (err) {
-        console.warn("Could not refresh version id after re-eval:", err);
-      }
-      setLoadingVersions(true);
-    } catch (e: any) {
-      console.error("Custom re-evaluate failed:", e);
-      setEvalError(e.message || "Failed custom re-evaluation");
-      toast.error("Failed re-evaluation.");
-    } finally {
-      setLoadingEval(false);
-      setLoadingVersions(false);
+    } catch (err) {
+      console.warn("Could not refresh version id after re-eval:", err);
     }
+    setLoadingVersions(true);
+  } catch (e: any) {
+    console.error("Custom re-evaluate failed:", e);
+    setEvalError(e.message || "Failed custom re-evaluation");
+    toast.error("Failed re-evaluation.");
+  } finally {
+    setLoadingEval(false);
+    setLoadingVersions(false);
   }
+}
+
+
 
   function startResizing() {
     setIsResizing(true);
@@ -2618,7 +2725,8 @@ export default function DesignDetailPage({
                   AI Evaluation
                 </button>
                 {/* Readings tab */}
-                {isOwner && (
+
+                {/* {isOwner && (
                   <button
                     className={`text-lg font-semibold flex-1 text-center cursor-pointer
                       ${
@@ -2630,7 +2738,8 @@ export default function DesignDetailPage({
                   >
                     Readings
                   </button>
-                )}
+                )} */}
+
                 {/* Comments Tab */}
                 <button
                   className={`text-lg font-semibold flex-1 text-center cursor-pointer

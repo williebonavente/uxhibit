@@ -19,7 +19,7 @@ export const GradientActionButton = forwardRef<HTMLButtonElement, GradientAction
         ? "h-10 text-xs rounded-lg"
         : size === "lg"
         ? "h-12 text-sm rounded-xl"
-        : "h-11 text-sm rounded-lg"; // md
+        : "h-11 text-sm rounded-lg"; 
 
     const widthClasses = fullWidth ? "w-full" : ""; 
 

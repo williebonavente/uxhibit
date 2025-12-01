@@ -192,7 +192,7 @@ export function ReEvaluatePanel({
             </span>
             <input
               type="text"
-              placeholder="https://www.figma.com/file/XXXXXYourFileId/..."
+              placeholder="https://www.figma.com/design/..."
               className="w-full pr-4 py-3 text-base sm:text-sm bg-transparent outline-none placeholder:text-neutral-400 dark:placeholder:text-neutral-500"
               value={reEvalUrl}
               onChange={(e) => setReEvalUrl(e.target.value)}
@@ -213,9 +213,9 @@ export function ReEvaluatePanel({
                   <button
                     type="button"
                     className="text-xs px-2.5 py-1.5 rounded-md border
-          bg-rose-50 text-rose-700 hover:bg-rose-100 active:bg-rose-200
-          dark:bg-rose-900/30 dark:text-rose-300 dark:hover:bg-rose-900/50 dark:active:bg-rose-900/70
-          border-rose-200 dark:border-rose-800 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                    bg-rose-50 text-rose-700 hover:bg-rose-100 active:bg-rose-200
+                    dark:bg-rose-900/30 dark:text-rose-300 dark:hover:bg-rose-900/50 dark:active:bg-rose-900/70
+                    border-rose-200 dark:border-rose-800 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                   >
                     <Trash2 className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
                     Clear ({reEvalImages.length})

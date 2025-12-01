@@ -241,7 +241,6 @@ export async function aiEvaluator(
       "usability",
     ] as const;
 
-    // Optional previous categories to stabilize progression
     const prevCats =
       (snapshot as any)?.previousCategoryScores ||
       (snapshot as any)?.prevCategoryScores ||
@@ -519,7 +518,6 @@ export async function aiEvaluator(
         total_iterations: totalIterations,
       };
     } else {
-      // No breakdown: fall back to categories → overall
       if (!out.category_scores) out.category_scores = {};
       out.overall_score = computeOverallFromCategories(
         out.category_scores as any

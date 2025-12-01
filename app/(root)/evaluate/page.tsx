@@ -384,7 +384,7 @@ export default function Evaluate() {
         snapshot: { age, occupation },
       });
 
-      let precheckedExisting: any = null;
+      const precheckedExisting: any = null;
 
       const method: "link" | "file" =
         uploadMethod === "file" ||
@@ -455,27 +455,30 @@ export default function Evaluate() {
         null;
 
       // Prepare evaluation payload
-      let evalPayload: any;
+            let evalPayload: any;
       if (method === "file") {
-        // Frames as data URLs already in parsed.frameImages
-        const frames = parsed.frameImages || {};
-        if (!frames || Object.keys(frames).length === 0) {
+        const framesMap = parsed.frameImages || {};
+        if (!framesMap || Object.keys(framesMap).length === 0) {
           toast.error("No frames to evaluate.");
           setSubmitting(false);
           setStep(3);
           return;
         }
+
         evalPayload = {
-          method: "file",
+        method: "file",
           designId,
           versionId: saved?.version_id || undefined,
-          frames,
+          frames: framesMap,
           snapshot: { age, occupation },
           meta: {
-            file_key: parsed.fileKey || null,
-            node_id: parsed.nodeId || null,
+            // only pass thumbnail as hint
             thumbnail_url: parsed.thumbnail || undefined,
           },
+          // extra guards to prevent any Figma parsing
+          image_only: true,
+          skipFigma: true,
+          forceImageOnly: true,
         };
       } else {
         // Link method
