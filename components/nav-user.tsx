@@ -77,6 +77,17 @@ export function NavUser({ user }: { user: User | null }) {
   const unreadNotifications = notifications.filter(n => !n.read);
   const readNotifications = notifications.filter(n => n.read);
 
+
+  // Derive auth provider for DeleteAccountPage (normalize "email" -> "password")
+  const authProvider = (() => {
+    const identityProvider =
+      user?.identities?.find((i) => i.provider)?.provider ??
+      user?.identities?.[0]?.provider;
+    const appProvider = (user?.app_metadata as any)?.provider as string | undefined;
+    const provider = identityProvider ?? appProvider ?? "password";
+    return provider === "email" ? "password" : provider;
+  })();
+
   const handleProfileClick = async () => {
     const supabase = createClient();
 
@@ -442,12 +453,15 @@ export function NavUser({ user }: { user: User | null }) {
         setAvatarUrl={setAvatarUrl}
         getProfile={getProfile}
       />
-      <DeleteAccountPage
+
+            <DeleteAccountPage
         open={showDeleteDialog}
         setOpen={setShowDeleteDialog}
         userId={user?.id}
         email={user?.email}
+        authProvider={authProvider}
       />
+      
       <NotificationsModal
         open={showNotifModal}
         onClose={() => setShowNotifModal(false)}

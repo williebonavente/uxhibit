@@ -27,6 +27,7 @@ import { createClient } from "@/utils/supabase/client";
 import { Loader2 } from "lucide-react";
 import BackgroundVideo from "./background_video/backgroundVideo";
 import ReCAPTCHA from "react-google-recaptcha";
+import { getFigmaAuthUrl } from "@/lib/figma-auth";
 
 const formSchema = loginFormSchema;
 
@@ -41,7 +42,7 @@ export default function LoginForm() {
 
   const [loginLoading, setLoginLoading] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
-  // const [figmaLoading, setFigmaLoading] = useState(false);
+  const [figmaLoading, setFigmaLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "";
@@ -55,29 +56,29 @@ export default function LoginForm() {
     },
   });
 
-  // async function handleFigmaLogin(e: React.MouseEvent) {
-  //   e.preventDefault();
-  //   setFigmaLoading(true);
-  //   try {
-  //     // Get the Figma auth URL
-  //     const authUrl = await getFigmaAuthUrl();
-  //     if (!authUrl) {
-  //       toast.error("Failed to initialize Figma login");
-  //       setFigmaLoading(false);
-  //       return;
-  //     }
+  async function handleFigmaLogin(e: MouseEvent) {
+    e.preventDefault();
+    setFigmaLoading(true);
+    try {
+      // Get the Figma auth URL
+      const authUrl = await getFigmaAuthUrl();
+      if (!authUrl) {
+        toast.error("Failed to initialize Figma login");
+        setFigmaLoading(false);
+        return;
+      }
 
-  //     if (typeof window !== 'undefined') {
-  //       localStorage.setItem('preAuthPath', window.location.pathname);
-  //     }
-  //     // Redirect to Figma OAuth
-  //     window.location.href = authUrl;
-  //   } catch (error) {
-  //     setFigmaLoading(false);
-  //     console.error('Figma login error:', error);
-  //     toast.error("Failed to start Figma authentication");
-  //   }
-  // }
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('preAuthPath', window.location.pathname);
+      }
+      // Redirect to Figma OAuth
+      window.location.href = authUrl;
+    } catch (error) {
+      setFigmaLoading(false);
+      console.error('Figma login error:', error);
+      toast.error("Failed to start Figma authentication");
+    }
+  }
 
   useEffect(() => {
     // Check for auth errors
@@ -353,7 +354,7 @@ export default function LoginForm() {
           {/* End of Login Form submission */}
 
           {/* Figma Login */}
-          {/* <Button
+          <Button
             type="button"
             onClick={handleFigmaLogin}
             disabled={figmaLoading}
@@ -397,7 +398,7 @@ export default function LoginForm() {
                 </>
               )}
             </span>
-          </Button> */}
+          </Button>
 
           {/* Links: Sign Up + Forgot Password */}
           <div className="mt-8 text-center text-xs sm:text-sm text-white font-light">

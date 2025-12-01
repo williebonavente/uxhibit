@@ -39,7 +39,22 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { title, figma_link, file_key, node_id, thumbnail_url, snapshot, evaluate = true } = body;
+    const {
+      title,
+      figma_link,
+      file_key,
+      node_id,
+      thumbnail_url,
+      snapshot,
+      evaluate = "client",
+      method,
+      frames,
+    } = body;
+
+    // decide evaluation mode
+    const evalMode: "client" | "server" =
+      evaluate === "server" || evaluate === true ? "server" : "client";
+    const shouldEvalOnServer = evalMode === "server";
 
     // Check for existing design
     const { data: existing, error: existErr } = await supabase
@@ -55,57 +70,124 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: existErr.message }, { status: 400 });
     }
 
+    // Helper to decide evaluation payload for server bootstrap
+    function buildEvalPayload(designId: string, storedThumbnail?: string | null) {
+      const hasFrames = !!frames && Object.keys(frames || {}).length > 0;
+      const hasFigmaLink = !!(figma_link && figma_link.trim().length > 0);
+      const hasFileKey = !!(file_key && String(file_key).trim().length > 0);
+      const derivedFigmaUrl = hasFileKey
+        ? `https://www.figma.com/file/${String(file_key).trim()}${
+            node_id ? `?node-id=${encodeURIComponent(String(node_id).trim())}` : ""
+          }`
+        : "";
+
+      // Prefer explicit method, otherwise infer
+      const finalMethod: "file" | "link" | "image" =
+        method === "file" || hasFrames
+          ? "file"
+          : method === "link" || hasFigmaLink || hasFileKey
+          ? "link"
+          : storedThumbnail
+          ? "image"
+          : "link"; // default; we’ll skip call if no URL
+
+      const finalUrl =
+        finalMethod === "link"
+          ? (hasFigmaLink ? figma_link : derivedFigmaUrl)
+          : finalMethod === "image"
+          ? (storedThumbnail || undefined)
+          : undefined;
+
+      // In file/image modes, DO NOT include file_key/node_id (prevents accidental Figma parsing)
+      const payload: any = {
+        method: finalMethod,
+        designId,
+        versionId: undefined,
+        snapshot,
+        url: finalUrl,
+        frames: finalMethod === "file" ? (frames ?? {}) : undefined,
+        meta:
+          finalMethod === "image"
+            ? {
+                thumbnail_url: storedThumbnail || undefined,
+              }
+            : finalMethod === "file"
+            ? {
+                thumbnail_url: storedThumbnail || undefined,
+              }
+            : {
+                file_key: file_key || undefined,
+                node_id: node_id || undefined,
+                thumbnail_url: storedThumbnail || undefined,
+              },
+        // extra flags to hard-stop any Figma parsing in image mode
+        image_only: finalMethod === "image" ? true : undefined,
+        skipFigma: finalMethod === "image" ? true : undefined,
+        forceImageOnly: finalMethod === "image" ? true : undefined,
+      };
+
+      return { finalMethod, payload };
+    }
+
     let designId: string;
     let storedThumbnail: any = thumbnail_url || null;
 
     // EXISTING DESIGN
     if (existing?.id) {
       designId = existing.id;
-      let thumbnailPromise: Promise<any> = Promise.resolve(null);
+
+      // upload/normalize thumbnail if provided
       if (thumbnail_url) {
-        thumbnailPromise = uploadThumbnailFromUrl(
+        const up = await uploadThumbnailFromUrl(
           supabase as any,
           thumbnail_url,
           designId,
           { makePublic: false }
-        );
-      }
-
-      const up = await thumbnailPromise;
-      if (up) {
-        if (up.signedUrl) storedThumbnail = up.signedUrl;
-        else if (up.publicUrl) storedThumbnail = up.publicUrl;
-        else if (up.path) storedThumbnail = up.path;
-
-        // Update the design with the thumbnail URL
-        const { error: thumbErr } = await supabase
-          .from("designs")
-          .update({ thumbnail_url: storedThumbnail })
-          .eq("id", existing.id);
-        if (thumbErr) console.error("Error updating thumbnail:", thumbErr);
-      }
-
-      // Start AI evaluation synchronously
-      if (evaluate) {
-        console.log("Starting AI evaluation for existing design:", designId);
-        const evalRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            cookie: req.headers.get('cookie') || '',
-          },
-          body: JSON.stringify({
-            url: figma_link,
-            designId: existing.id,
-            nodeId: node_id,
-            thumbnail_url: storedThumbnail,
-            snapshot
-          })
+        ).catch((e) => {
+          console.warn("uploadThumbnailFromUrl failed:", e);
+          return null;
         });
-        console.log("AI evaluation response status:", evalRes.status);
-        if (!evalRes.ok) {
-          const detail = await evalRes.text();
-          console.error("AI evaluation failed:", detail);
+
+        if (up) {
+          if (up.signedUrl) storedThumbnail = up.signedUrl;
+          else if (up.publicUrl) storedThumbnail = up.publicUrl;
+          else if (up.path) storedThumbnail = up.path;
+
+          const { error: thumbErr } = await supabase
+            .from("designs")
+            .update({ thumbnail_url: storedThumbnail })
+            .eq("id", existing.id);
+          if (thumbErr) console.error("Error updating thumbnail:", thumbErr);
+        }
+      }
+
+      // Only trigger evaluation on the server if explicitly requested
+      if (shouldEvalOnServer) {
+        console.log("Starting AI evaluation (server) for existing design:", designId);
+
+        const { finalMethod, payload } = buildEvalPayload(designId, storedThumbnail);
+
+        // If link chosen but no URL, skip server eval
+        if (finalMethod === "link" && !payload.url) {
+          console.warn("[api/designs] Skipping server evaluation: no figma URL or file_key.");
+        } else {
+          const evalRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              cookie: req.headers.get("cookie") || "",
+            },
+            body: JSON.stringify(payload),
+          });
+          console.log("AI evaluation response status:", evalRes.status);
+
+          if (!evalRes.ok) {
+            const detailText = await evalRes.text().catch(() => "");
+            let detail: any = detailText;
+            try { detail = JSON.parse(detailText); } catch {}
+            const msg = detail?.error || detail?.message || "AI evaluation failed";
+            return NextResponse.json({ error: msg, detail, designId }, { status: evalRes.status });
+          }
         }
       }
 
@@ -117,7 +199,8 @@ export async function POST(req: Request) {
           thumbnail_url: storedThumbnail,
         },
         existed: true,
-        ai_evaluation: "processing",
+        ai_evaluation: shouldEvalOnServer ? "processing" : "pending",
+        eval_mode: evalMode,
       });
     }
 
@@ -131,7 +214,7 @@ export async function POST(req: Request) {
         file_key,
         node_id,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .select("*")
       .single();
@@ -139,51 +222,56 @@ export async function POST(req: Request) {
 
     designId = design.id;
     storedThumbnail = thumbnail_url || null;
-    let thumbnailPromise: Promise<any> = Promise.resolve(null);
+
     if (thumbnail_url) {
-      thumbnailPromise = uploadThumbnailFromUrl(
+      const up = await uploadThumbnailFromUrl(
         supabase as any,
         thumbnail_url,
         design.id,
         { makePublic: false }
-      );
-    }
-
-    const up = await thumbnailPromise;
-    if (up) {
-      if (up.signedUrl) storedThumbnail = up.signedUrl;
-      else if (up.publicUrl) storedThumbnail = up.publicUrl;
-      else if (up.path) storedThumbnail = up.path;
-
-      // Update the design with the thumbnail URL
-      const { error: thumbErr } = await supabase
-        .from("designs")
-        .update({ thumbnail_url: storedThumbnail })
-        .eq("id", design.id);
-      if (thumbErr) console.error("Error updating thumbnail:", thumbErr);
-    }
-
-    // Start AI evaluation synchronously
-    if (evaluate) {
-      console.log("Starting AI evaluation for new design:", designId);
-      const evalRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          cookie: req.headers.get('cookie') || '',
-        },
-        body: JSON.stringify({
-          url: figma_link,
-          designId,
-          nodeId: node_id,
-          thumbnail_url: storedThumbnail,
-          snapshot
-        })
+      ).catch((e) => {
+        console.warn("uploadThumbnailFromUrl failed:", e);
+        return null;
       });
-      console.log("AI evaluation response status:", evalRes.status);
-      if (!evalRes.ok) {
-        const detail = await evalRes.text();
-        console.error("AI evaluation failed:", detail);
+
+      if (up) {
+        if (up.signedUrl) storedThumbnail = up.signedUrl;
+        else if (up.publicUrl) storedThumbnail = up.publicUrl;
+        else if (up.path) storedThumbnail = up.path;
+
+        const { error: thumbErr } = await supabase
+          .from("designs")
+          .update({ thumbnail_url: storedThumbnail })
+          .eq("id", design.id);
+        if (thumbErr) console.error("Error updating thumbnail:", thumbErr);
+      }
+    }
+
+    if (shouldEvalOnServer) {
+      console.log("Starting AI evaluation (server) for new design:", designId);
+
+      const { finalMethod, payload } = buildEvalPayload(designId, storedThumbnail);
+
+      if (finalMethod === "link" && !payload.url) {
+        console.warn("[api/designs] Skipping server evaluation: no figma URL or file_key.");
+      } else {
+        const evalRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/evaluate`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            cookie: req.headers.get("cookie") || "",
+          },
+          body: JSON.stringify(payload),
+        });
+        console.log("AI evaluation response status:", evalRes.status);
+
+        if (!evalRes.ok) {
+          const detailText = await evalRes.text().catch(() => "");
+          let detail: any = detailText;
+          try { detail = JSON.parse(detailText); } catch {}
+          const msg = detail?.error || detail?.message || "AI evaluation failed";
+          return NextResponse.json({ error: msg, detail, designId }, { status: evalRes.status });
+        }
       }
     }
 
@@ -195,13 +283,15 @@ export async function POST(req: Request) {
         thumbnail_url: storedThumbnail,
       },
       existed: false,
-      ai_evaluation: "processing",
-    });
+      ai_evaluation: shouldEvalOnServer ? "processing" : "pending",
+      eval_mode: evalMode,
+    }, { status: 201 });
   } catch (e: unknown) {
     console.error("Server error:", e);
-    const errorMessage = typeof e === "object" && e !== null && "message" in e
-      ? (e as { message?: string }).message
-      : "Server error";
+    const errorMessage =
+      typeof e === "object" && e !== null && "message" in e
+        ? (e as { message?: string }).message
+        : "Server error";
     return NextResponse.json({ error: errorMessage || "Server error" }, { status: 500 });
   }
 }

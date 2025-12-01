@@ -10,7 +10,7 @@ export default function ProcessingPage() {
   useEffect(() => {
     const supabase = createClient();
     const startTime = Date.now();
-    const minDelay = 1200;
+    const minDelay = 200;
 
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -57,7 +57,7 @@ export default function ProcessingPage() {
           Connecting to Figma
         </h2>
         <p className="text-gray-500 text-sm mb-4">
-          Signing you in, please wait.
+          Please wait.
         </p>
       </div>
     </div>

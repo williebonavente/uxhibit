@@ -1,11 +1,13 @@
 import { FIGMA_TOKEN } from "@/constants/figma_token";
 
-export async function fetchFigmaNodeData(fileKey: string, ids: string[]): Promise<any> {
-  const idsParam = ids.map(encodeURIComponent).join(",");
+export async function fetchFigmaNodeData(fileKey: string, ids: string[], token: string) {
+  const isOAuth = !token.startsWith("FIGMA_") && token.length > 0; // heuristic optional; using presence from caller is fine
+  const headers: HeadersInit = isOAuth
+    ? { Authorization: `Bearer ${token}` }
+    : { "X-Figma-Token": token };
   const res = await fetch(
-    `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${idsParam}`,
-    { headers: { "X-Figma-Token": FIGMA_TOKEN } }
+    `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${ids.map(encodeURIComponent).join(",")}`,
+    { headers }
   );
-  if (!res.ok) return null;
   return res.json();
 }

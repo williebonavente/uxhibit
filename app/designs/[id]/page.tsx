@@ -38,6 +38,12 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { DesignComparison } from "./dialogs/DesignComparison";
+import { ReadingsPanel } from "./dialogs/ReadingPanel";
+import { GradientActionButton } from "@/components/gradient-action-btn";
+import { VersionProgress } from "./dialogs/VersionProgress";
+import { ReEvaluatePanel } from "./dialogs/ReEvaluatePanel";
+import { ReEvaluateModal } from "./dialogs/ReEvaluateModal";
+import { LoadingOverlay } from "./dialogs/LoadingOverlay";
 
 export interface FrameEvaluation {
   id: string;
@@ -129,13 +135,14 @@ export type Design = {
 
 export type EvaluateInput = {
   designId: string;
-  fileKey: string;
+  fileKey?: string;
   nodeId?: string;
   fallbackImageUrl?: string;
   snapshot?: Snapshot;
   url?: string;
   frameIds?: string[];
   versionId: string;
+  imageFrames?: Record<string, string>;
 };
 
 type AiDebugCalc = {
@@ -150,7 +157,6 @@ type AiDebugCalc = {
   total_iterations: number;
   extra_pull_applied: boolean;
   bias_weighted_overall: number;
-  
 };
 
 type AiBiasParams = {
@@ -164,7 +170,7 @@ type AiBiasParams = {
   categoryWeights?: Record<string, number>;
   weighted_overall?: number;
   severityMultipliers?: Record<string, number>;
-}
+};
 export type EvalResponse = {
   nodeId: string;
   imageUrl: string;
@@ -223,25 +229,110 @@ type ProgressPayload = {
 export async function evaluateDesign(
   input: EvaluateInput
 ): Promise<EvalResponse[]> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  console.log("Calling evaluate with:", input);
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (typeof window !== "undefined"
+      ? window.location.origin
+      : "http://localhost:3000");
+
+  const cleanedFileKey =
+    input.fileKey && input.fileKey.trim().length > 0
+      ? input.fileKey.trim()
+      : "";
+  const cleanedUrl =
+    input.url && input.url.trim().length > 0 ? input.url.trim() : "";
+
+  const figmaUrl =
+    cleanedUrl ||
+    (cleanedFileKey
+      ? `https://www.figma.com/file/${cleanedFileKey}${
+          input.nodeId ? `?node-id=${encodeURIComponent(input.nodeId)}` : ""
+        }`
+      : "");
+
+  const useImageOnly =
+    (!figmaUrl || figmaUrl.length === 0) &&
+    (!cleanedFileKey || cleanedFileKey.length === 0) &&
+    (!!input.fallbackImageUrl || !!input.imageFrames);
+
+  if (!figmaUrl && !useImageOnly) {
+    throw new Error(
+      "Missing Figma link. Provide input.url or input.fileKey to evaluate."
+    );
+  }
+
+  const versionId =
+    input.versionId && input.versionId.trim().length > 0 && !useImageOnly
+      ? input.versionId
+      : crypto.randomUUID();
+
+  // Build payload
+  const payload: any = {
+    method: useImageOnly ? "image" : "link",
+    url: useImageOnly ? input.fallbackImageUrl : figmaUrl,
+    designId: input.designId,
+    versionId,
+    snapshot: input.snapshot,
+    image_only: useImageOnly ? true : undefined,
+    forceImageOnly: useImageOnly ? true : undefined,
+    skipFigma: useImageOnly ? true : undefined,
+    meta: useImageOnly
+      ? { thumbnail_url: input.fallbackImageUrl }
+      : {
+          file_key: cleanedFileKey || undefined,
+          node_id: input.nodeId,
+          thumbnail_url: input.fallbackImageUrl,
+        },
+  };
+
+  // For Figma link, allow explicit frameIds (optional)
+  if (!useImageOnly && input.frameIds?.length) {
+    payload.frameIds = input.frameIds;
+  }
+
+  // For image-only re-evaluate, send all uploaded images as frames
+  if (
+    useImageOnly &&
+    input.imageFrames &&
+    Object.keys(input.imageFrames).length
+  ) {
+    payload.frames = input.imageFrames;
+    // In image mode with frames, clear url to avoid “single image only”
+    payload.url = undefined;
+  }
+
+  console.log("[evaluateDesign] payload:", {
+    ...payload,
+    framesCount: payload.frames ? Object.keys(payload.frames).length : 0,
+  });
 
   const res = await fetch(`${baseUrl}/api/ai/evaluate`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "X-Eval-Mode": useImageOnly ? "image-only" : "figma-link",
+      "X-Force-Image-Only": useImageOnly ? "1" : "0",
     },
-    body: JSON.stringify(input),
+    body: JSON.stringify(payload),
   });
 
-  const data = await res.json();
-  console.log("Evaluate response:", data);
+  let data: any = null;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(`Evaluate failed: HTTP ${res.status}`);
+  }
 
   if (!res.ok) {
-    console.error("Evaluate failed:", data);
-    throw new Error(data?.error || "Failed to evaluate");
+    const msg =
+      data?.message ||
+      data?.error ||
+      data?.details?.error ||
+      data?.details?.detail ||
+      `Evaluate failed: HTTP ${res.status}`;
+    throw new Error(msg);
   }
-  console.log("Existing data: ", data);
+
   return data as EvalResponse[];
 }
 
@@ -301,9 +392,9 @@ export default function DesignDetailPage({
   const [isPanning, setIsPanning] = useState(false);
   const panStart = useRef({ x: 0, y: 0 });
   const mouseStart = useRef({ x: 0, y: 0 });
-  const [sidebarTab, setSidebarTab] = useState<"ai" | "comments">("ai");
-  const [expectedFrameCount, setExpectedFrameCount] = useState<number>(0);
-  const [evaluatedFramesCount, setEvaluatedFramesCount] = useState<number>(0);
+  const [sidebarTab, setSidebarTab] = useState<"ai" | "comments" | "readings">(
+    "ai"
+  );
   const pageSize = 6;
   const sortRef = useRef<HTMLDivElement>(null);
   const [backendProgress, setBackendProgress] = useState(0);
@@ -318,12 +409,176 @@ export default function DesignDetailPage({
   const [softRefreshing, setSoftRefreshing] = useState(false);
   const [vpCollapsed, setVpCollapsed] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [showReEvalPanel, setShowReEvalPanel] = useState(false);
+  const [showReEvalModal, setShowReEvalModal] = useState(false);
+  const [reEvalUrl, setReEvalUrl] = useState("");
+  const [reEvalImages, setReEvalImages] = useState<File[]>([]);
+  const [reEvalUploading, setReEvalUploading] = useState(false);
+
+
+  // Helper: make a stable frame id from filename (lowercase, no spaces)
+function makeStableFrameId(file: File): string {
+  const base = file.name.replace(/\.[^/.]+$/, ""); // remove extension
+  const slug = base.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  // Optional: prefix with a constant to avoid collision with Figma node_ids
+  return `uploaded:${slug}`;
+}
+
+async function uploadLocalImages(
+  files: File[],
+  opts: { makePublic?: boolean } = { makePublic: true }
+): Promise<Record<string, string>> {
+  if (!files.length) return {};
+
+  const supabase = createClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user?.id) {
+    console.warn("Upload aborted: missing user.", userError?.message);
+    return {};
+  }
+
+  setReEvalUploading(true);
+  const bucket = "figma-frames";
+  const out: Record<string, string> = {};
+
+  try {
+    for (const f of files) {
+      const stableId = makeStableFrameId(f); 
+      const safeName = f.name.replace(/[^\w.-]/g, "_");
+      const filePath = `${user.id}/${design?.id ?? "unknown-design"}/${stableId}-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2)}-${safeName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(bucket)
+        .upload(filePath, f, {
+          cacheControl: "31536000",
+          upsert: false,
+          contentType: f.type || "image/png",
+        });
+
+      if (uploadError) {
+        console.warn("Upload failed:", uploadError.message);
+        continue;
+      }
+
+      const { data: pub } = supabase.storage.from(bucket).getPublicUrl(filePath);
+      if (pub?.publicUrl) {
+        out[stableId] = pub.publicUrl;
+      } else {
+        const { data: signed } = await supabase.storage
+          .from(bucket)
+          .createSignedUrl(filePath, 3600);
+        if (signed?.signedUrl) {
+          console.warn("Bucket not public; using temporary signed URL.");
+          out[stableId] = signed.signedUrl;
+        }
+      }
+    }
+    return out;
+  } finally {
+    setReEvalUploading(false);
+  }
+}
+
+async function handleCustomReEvaluate() {
+  if (!design?.id) {
+    toast.error("Missing design base data.");
+    return;
+  }
+  if (!reEvalUrl && !reEvalImages.length) {
+    toast.error("Provide a Figma link or upload at least one image.");
+    return;
+  }
+  setLoadingEval(true);
+  setEvalError(null);
+
+  try {
+    let imageUrlForAI: string | undefined;
+    let uploadedImageMap: Record<string, string> = {};
+    if (reEvalImages.length) {
+      uploadedImageMap = await uploadLocalImages(reEvalImages);
+      // pick first as thumbnail hint
+      imageUrlForAI = Object.values(uploadedImageMap)[0];
+    } else {
+      imageUrlForAI = design.thumbnail;
+      if (imageUrlForAI && !imageUrlForAI.startsWith("http")) {
+        const supabase = createClient();
+        const { data: signed } = await supabase.storage
+          .from("design-thumbnails")
+          .createSignedUrl(imageUrlForAI, 3600);
+        if (signed?.signedUrl) imageUrlForAI = signed.signedUrl;
+      }
+    }
+
+    const isImageOnly = Object.keys(uploadedImageMap).length > 0 && !reEvalUrl.trim();
+
+    // Build frames with STABLE IDs so node_id matches across versions
+    const imageFrames = isImageOnly ? uploadedImageMap : undefined;
+
+    const evalData = await evaluateDesign({
+      designId: design.id,
+      fileKey: isImageOnly ? undefined : design.fileKey,
+      nodeId: isImageOnly ? undefined : design.nodeId,
+      fallbackImageUrl: imageUrlForAI,
+      snapshot:
+        typeof design.snapshot === "string"
+          ? JSON.parse(design.snapshot)
+          : design.snapshot,
+      url: isImageOnly ? "" : reEvalUrl || design.figma_link || "",
+      frameIds: isImageOnly
+        ? undefined
+        : design.frames?.map((f) => String(f.id)) ?? [],
+      versionId: isImageOnly ? "" : design.current_version_id || "",
+      imageFrames, // stable ids -> urls
+    });
+
+    setEvalResult(evalData[0]);
+    toast.success("Re-evaluation completed.");
+    setShowReEvalPanel(false);
+    setReEvalImages([]);
+    setReEvalUrl("");
+
+    try {
+      const supabase = createClient();
+      const { data: updatedDesign } = await supabase
+        .from("designs")
+        .select("id, current_version_id")
+        .eq("id", design.id)
+        .single();
+      if (updatedDesign?.current_version_id) {
+        setDesign((prev) =>
+          prev
+            ? { ...prev, current_version_id: updatedDesign.current_version_id }
+            : prev
+        );
+      }
+    } catch (err) {
+      console.warn("Could not refresh version id after re-eval:", err);
+    }
+    setLoadingVersions(true);
+  } catch (e: any) {
+    console.error("Custom re-evaluate failed:", e);
+    setEvalError(e.message || "Failed custom re-evaluation");
+    toast.error("Failed re-evaluation.");
+  } finally {
+    setLoadingEval(false);
+    setLoadingVersions(false);
+  }
+}
+
+
 
   function startResizing() {
     setIsResizing(true);
   }
 
-  React.useEffect(() => {
+  useEffect(() => {
     function handleMouseMove(e: MouseEvent) {
       if (!isResizing) return;
       const newWidth = window.innerWidth - e.clientX - 8;
@@ -345,14 +600,14 @@ export default function DesignDetailPage({
     };
   }, [isResizing, sidebarWidth, minSidebarWidth, maxSidebarWidth]);
 
-  function handlePanStart(e: React.MouseEvent) {
+  function handlePanStart(e: MouseEvent) {
     if (zoom === 1) return;
     setIsPanning(true);
     panStart.current = { ...pan };
     mouseStart.current = { x: e.clientX, y: e.clientY };
   }
 
-  const handlePanMove = React.useCallback(
+  const handlePanMove = useCallback(
     (e: MouseEvent) => {
       if (!isPanning) return;
       const dx = e.clientX - mouseStart.current.x;
@@ -380,7 +635,6 @@ export default function DesignDetailPage({
   const showVersionProgress = React.useMemo(() => {
     if (loadingEval || designLoading || softRefreshing) return false;
     if (!currentVersionScores || !previousVersionScores) return false;
-    // optional: avoid showing if somehow comparing same version
     if (currentVersionScores.version === previousVersionScores.version)
       return false;
     return true;
@@ -392,7 +646,7 @@ export default function DesignDetailPage({
     previousVersionScores,
   ]);
 
-  const fetchEvaluations = React.useCallback(
+  const fetchEvaluations = useCallback(
     async (overrideVersionId?: string | null) => {
       const supabase = createClient();
       console.log(
@@ -402,8 +656,6 @@ export default function DesignDetailPage({
         overrideVersionId
       );
 
-      // If a version id is provided, fetch that specific version.
-      // Otherwise, fall back to the latest version for this design.
       let versionData: any = null;
       let versionError: any = null;
 
@@ -688,10 +940,7 @@ export default function DesignDetailPage({
             uniq.push(w);
           }
         });
-        // debug: group by version and show small samples
-        // toast.message(
-        //   `fetchWeaknesses vid=${vid} collected=${collected.length} uniq=${uniq.length}`
-        // );
+
         const byVersion = uniq.reduce<Record<string, any[]>>((acc, item) => {
           const k = String(item.versionId ?? "no-version");
           (acc[k] = acc[k] || []).push(item);
@@ -710,14 +959,6 @@ export default function DesignDetailPage({
           );
         });
         console.groupEnd();
-        // console.error(
-        //   "fetchWeaknesses: vid=",
-        //   vid,
-        //   "collected=",
-        //   collected.length,
-        //   "uniq=",
-        //   uniq.length
-        // );
         setWeaknesses(uniq);
       } catch (err) {
         console.error("fetchWeaknesses failed:", err);
@@ -737,15 +978,12 @@ export default function DesignDetailPage({
       const root = ai.ai ?? ai;
       const dbg = root?.debug_calc;
 
-      // 1) Prefer mean you show in the ring
       if (typeof dbg?.combined === "number") return dbg.combined;
       if (typeof dbg?.final === "number") return dbg.final;
 
-      // 2) Fallback: explicit overall_score
       if (typeof root?.overall_score === "number") return root.overall_score;
       if (typeof f.total_score === "number") return f.total_score;
 
-      // 3) Fallback: compute from categories/heuristics if present
       let catsAvg: number | undefined;
       const cats = root?.category_scores;
       if (cats && typeof cats === "object") {
@@ -777,7 +1015,6 @@ export default function DesignDetailPage({
       if (typeof catsAvg === "number") return catsAvg;
       if (typeof heurAvg === "number") return heurAvg;
 
-      // 4) Last resort
       return 0;
     };
 
@@ -1372,11 +1609,10 @@ export default function DesignDetailPage({
       }));
   }, []);
 
-    function computeFrameScoreFromAi(root: any): number {
+  const computeFrameScoreFromAi = React.useCallback((root: any): number => {
     if (!root || typeof root !== "object") return 0;
     const dbg = root?.debug_calc;
 
-    // Heuristic average
     let heurAvg: number | undefined =
       typeof dbg?.heuristics_avg === "number" ? dbg.heuristics_avg : undefined;
     if (heurAvg === undefined) {
@@ -1396,7 +1632,6 @@ export default function DesignDetailPage({
       }
     }
 
-    // Category avg
     const cs =
       root?.category_scores && typeof root.category_scores === "object"
         ? root.category_scores
@@ -1407,10 +1642,11 @@ export default function DesignDetailPage({
         )
       : [];
     const catAvg = catVals.length
-      ? Math.round(catVals.reduce((a: number, b: number) => a + b, 0) / catVals.length)
+      ? Math.round(
+          catVals.reduce((a: number, b: number) => a + b, 0) / catVals.length
+        )
       : undefined;
 
-    // Bias weighted
     const biasWeighted =
       typeof dbg?.bias_weighted_overall === "number"
         ? dbg.bias_weighted_overall
@@ -1433,128 +1669,99 @@ export default function DesignDetailPage({
     if (typeof catAvg === "number") return catAvg;
     if (typeof heurAvg === "number") return heurAvg;
     return 0;
-  }
+  }, []);
 
-  function parseVersionScores(v: any): ParsedVersionData | null {
-    if (!v) return null;
+  const parseVersionScores = React.useCallback(
+    (v: any): ParsedVersionData | null => {
+      if (!v) return null;
 
-    // 1) Prefer persisted total_score if valid (>0) to avoid recompute noise
-    const persisted =
-      typeof v.total_score === "number" && v.total_score > 0
-        ? Math.round(v.total_score)
-        : undefined;
+      const persisted =
+        typeof v.total_score === "number" && v.total_score > 0
+          ? Math.round(v.total_score)
+          : undefined;
 
-    let raw = v.ai_data;
-    if (typeof raw === "string") {
-      try {
-        raw = JSON.parse(raw);
-      } catch {
-        return {
-          id: v.id,
+      let raw = v.ai_data;
+      if (typeof raw === "string") {
+        try {
+          raw = JSON.parse(raw);
+        } catch {
+          return {
+            id: v.id,
             version: v.version,
             overall: persisted,
             categories: {},
-        };
-      }
-    }
-
-    const toEntries = (x: any): any[] => {
-      if (!x) return [];
-      if (Array.isArray(x)) return x;
-      if (typeof x === "object") {
-        // numeric index object
-        const keys = Object.keys(x);
-        if (keys.length && keys.every((k) => /^\d+$/.test(k))) {
-          return keys.sort((a, b) => Number(a) - Number(b)).map((k) => x[k]);
+          };
         }
-        if (Array.isArray(x.frames)) return x.frames;
-        return [x];
       }
-      return [];
-    };
 
-    const entries = toEntries(raw).map((e) =>
-      e && typeof e === "object" && "ai" in e ? e.ai : e
-    );
-
-    // Aggregate per-frame robust score
-    const frameScores: number[] = [];
-    const perCategory: Record<string, { sum: number; n: number }> = {};
-
-    entries.forEach((root) => {
-      if (!root || typeof root !== "object") return;
-      const score = computeFrameScoreFromAi(root);
-      if (score > 0) frameScores.push(score);
-
-      const cats = root?.category_scores;
-      if (cats && typeof cats === "object") {
-        Object.entries(cats).forEach(([k, val]) => {
-          if (typeof val === "number" && Number.isFinite(val)) {
-            if (!perCategory[k]) perCategory[k] = { sum: 0, n: 0 };
-            perCategory[k].sum += val;
-            perCategory[k].n += 1;
+      const toEntries = (x: any): any[] => {
+        if (!x) return [];
+        if (Array.isArray(x)) return x;
+        if (typeof x === "object") {
+          const keys = Object.keys(x);
+          if (keys.length && keys.every((k) => /^\d+$/.test(k))) {
+            return keys.sort((a, b) => Number(a) - Number(b)).map((k) => x[k]);
           }
-        });
+          if (Array.isArray(x.frames)) return x.frames;
+          return [x];
+        }
+        return [];
+      };
+
+      const entries = toEntries(raw).map((e) =>
+        e && typeof e === "object" && "ai" in e ? e.ai : e
+      );
+
+      const frameScores: number[] = [];
+      const perCategory: Record<string, { sum: number; n: number }> = {};
+
+      entries.forEach((root) => {
+        if (!root || typeof root !== "object") return;
+        const score = computeFrameScoreFromAi(root);
+        if (score > 0) frameScores.push(score);
+
+        const cats = root?.category_scores;
+        if (cats && typeof cats === "object") {
+          Object.entries(cats).forEach(([k, val]) => {
+            if (typeof val === "number" && Number.isFinite(val)) {
+              if (!perCategory[k]) perCategory[k] = { sum: 0, n: 0 };
+              perCategory[k].sum += val;
+              perCategory[k].n += 1;
+            }
+          });
+        }
+      });
+
+      if (!entries.length && raw && typeof raw === "object") {
+        const root: any = (raw as any).ai ?? raw;
+        const loneScore = computeFrameScoreFromAi(root);
+        if (loneScore > 0) frameScores.push(loneScore);
+        const cats = root?.category_scores;
+        if (cats && typeof cats === "object") {
+          Object.entries(cats).forEach(([k, val]) => {
+            if (typeof val === "number" && Number.isFinite(val)) {
+              perCategory[k] = { sum: val, n: 1 };
+            }
+          });
+        }
       }
-    });
 
-    // Fallback: if entries empty, inspect single root
-    if (!entries.length && raw && typeof raw === "object") {
-      const root: any = raw.ai ?? raw;
-      const loneScore = computeFrameScoreFromAi(root);
-      if (loneScore > 0) frameScores.push(loneScore);
-      const cats = root?.category_scores;
-      if (cats && typeof cats === "object") {
-        Object.entries(cats).forEach(([k, val]) => {
-          if (typeof val === "number" && Number.isFinite(val)) {
-            perCategory[k] = { sum: val, n: 1 };
-          }
-        });
-      }
-    }
+      const avg = (arr: number[]) =>
+        arr.length
+          ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length)
+          : undefined;
+      const recomputed = avg(frameScores);
+      const overall = persisted ?? recomputed ?? undefined;
 
-    const avg = (arr: number[]) =>
-      arr.length
-        ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length)
-        : undefined;
+      const categories: Record<string, number> = {};
+      Object.entries(perCategory).forEach(([k, { sum, n }]) => {
+        categories[k] = Math.round(sum / Math.max(1, n));
+      });
 
-    const recomputed = avg(frameScores);
-
-    // Final overall: persisted > recomputed > undefined
-    const overall = persisted ?? recomputed ?? undefined;
-
-    const categories: Record<string, number> = {};
-    Object.entries(perCategory).forEach(([k, { sum, n }]) => {
-      categories[k] = Math.round(sum / Math.max(1, n));
-    });
-
-    return {
-      id: v.id,
-      version: v.version,
-      overall,
-      categories,
-    };
-  }
-
-  function diffArrow(newVal?: number, oldVal?: number) {
-    if (typeof newVal !== "number" || typeof oldVal !== "number") {
-      return <Minus className="h-3.5 w-3.5 text-gray-400" />;
-    }
-    const d = newVal - oldVal;
-    if (d === 0) return <Minus className="h-3.5 w-3.5 text-gray-400" />;
-    if (d > 0) return <ArrowUpRight className="h-3.5 w-3.5 text-emerald-500" />;
-    return <ArrowDownRight className="h-3.5 w-3.5 text-rose-500" />;
-  }
-
-  function scoreTone(n?: number) {
-    if (n == null)
-      return "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300";
-    if (n >= 85)
-      return "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300";
-    if (n >= 70) return "bg-blue-500/15 text-blue-600 dark:text-blue-300";
-    if (n >= 50) return "bg-amber-500/15 text-amber-600 dark:text-amber-300";
-    return "bg-rose-500/15 text-rose-600 dark:text-rose-300";
-  }
+      return { id: v.id, version: v.version, overall, categories };
+    },
+    [computeFrameScoreFromAi]
+  );
 
   useEffect(() => {
     const supabase = createClient();
@@ -2122,11 +2329,11 @@ export default function DesignDetailPage({
   }, [loadingEval]);
 
   useEffect(() => {
-  if (!design?.id) return;
-  fetchDesignVersions(design.id)
-    .then((versions) => setAllVersions(versions))
-    .catch((e) => console.error("Failed to fetch versions", e));
-}, [design?.id]);
+    if (!design?.id) return;
+    fetchDesignVersions(design.id)
+      .then((versions) => setAllVersions(versions))
+      .catch((e) => console.error("Failed to fetch versions", e));
+  }, [design?.id]);
 
   useEffect(() => {
     if (!versions || versions.length === 0) return;
@@ -2153,7 +2360,7 @@ export default function DesignDetailPage({
 
     setCurrentVersionScores(parsedCurrent);
     setPreviousVersionScores(parsedPrevious);
-  }, [versions, selectedVersion]);
+  }, [versions, selectedVersion, parseVersionScores]);
 
   useEffect(() => {
     if (!loadingEval && design?.id) {
@@ -2184,18 +2391,20 @@ export default function DesignDetailPage({
   }, [router, fetchEvaluations, selectedVersion?.id]);
 
   useEffect(() => {
-  if (loadingEval || !design?.id) return;
-  (async () => {
-    await fetchEvaluations(selectedVersion?.id ?? null);
-    try {
-      const vs = await fetchDesignVersions(design.id);
-      setVersions(vs.map((v: any) => ({ ...v, total_score: v.total_score ?? 0 })));
-      setAllVersions(vs);
-    } catch (e) {
-      console.error("Failed to fetch versions", e);
-    }
-  })();
-}, [loadingEval, design?.id, selectedVersion?.id, fetchEvaluations]);
+    if (loadingEval || !design?.id) return;
+    (async () => {
+      await fetchEvaluations(selectedVersion?.id ?? null);
+      try {
+        const vs = await fetchDesignVersions(design.id);
+        setVersions(
+          vs.map((v: any) => ({ ...v, total_score: v.total_score ?? 0 }))
+        );
+        setAllVersions(vs);
+      } catch (e) {
+        console.error("Failed to fetch versions", e);
+      }
+    })();
+  }, [loadingEval, design?.id, selectedVersion?.id, fetchEvaluations]);
 
   useEffect(() => {
     if (!frameEvaluations.length) return;
@@ -2208,16 +2417,16 @@ export default function DesignDetailPage({
   }, [frameEvaluations.length, selectedFrameIndex]);
 
   // Use the live versions array for comparison availability
-const compareDiag = useMemo(() => {
-  const reasons: string[] = [];
-  const count = versions?.length ?? 0; // was allVersions?.length
-  if (count < 2) reasons.push(`only ${count} version(s) available`);
-  if (!currentVersionScores?.id) reasons.push("missing currentVersionScores");
-  return {
-    canCompare: reasons.length === 0,
-    why: reasons,
-  };
-}, [versions?.length, currentVersionScores?.id]);
+  const compareDiag = useMemo(() => {
+    const reasons: string[] = [];
+    const count = versions?.length ?? 0; // was allVersions?.length
+    if (count < 2) reasons.push(`only ${count} version(s) available`);
+    if (!currentVersionScores?.id) reasons.push("missing currentVersionScores");
+    return {
+      canCompare: reasons.length === 0,
+      why: reasons,
+    };
+  }, [versions?.length, currentVersionScores?.id]);
 
   useEffect(() => {
     console.groupCollapsed("[page] Compare availability");
@@ -2241,6 +2450,10 @@ const compareDiag = useMemo(() => {
     compareDiag.canCompare,
     compareDiag.why,
   ]);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [currentFrame?.thumbnail_url, thumbUrl, design?.fileKey, design?.nodeId]);
 
   if (designLoading)
     return (
@@ -2271,16 +2484,6 @@ const compareDiag = useMemo(() => {
 
   return (
     <div>
-      {/* Re-evaluate loading bar */}
-      {/* {loadingEval && (
-        <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-50 bg-white dark:bg-[#232323] shadow-lg rounded-lg px-6 py-4 border border-orange-300 flex flex-col items-center">
-          <Spinner className="w-6 h-6 mb-2" />
-          <span className="font-semibold text-orange-600">
-            AI re-evaluation in progress...
-          </span>
-          <span className="text-sm text-gray-600 mt-1"></span>
-        </div>
-      )} */}
       {compareMode && currentVersionScores && previousVersionScores && (
         <DesignComparison
           designId={design.id}
@@ -2347,110 +2550,11 @@ const compareDiag = useMemo(() => {
           />
 
           {/* Full overlay that covers the entire container */}
-          {loadingScreenActive && (
-            <div
-              className="absolute inset-0 z-30 pointer-events-auto select-none overflow-hidden"
-              role="status"
-              aria-live="polite"
-            >
-              {/* Local keyframes (scoped) */}
-              <style>{`
-              @keyframes vignettePulse {
-              0%,100% { opacity: .6; }
-              50% { opacity: .85; }
-              }
-              @keyframes shineSweep {
-              from { transform: translateX(-60%); }
-              to { transform: translateX(40%); }
-              }
-              @keyframes progressStripes {from { background-position: 0 0; }
-              to { background-position: 32px 0; }
-              }@media (prefers-reduced-motion: reduce) {
-              .anim-ok { animation: none !important; transition: none !important; }
-              }
-              `}</style>
-
-              {/* Dim + blur backdrop */}
-              <div className="absolute inset-0 bg-white/70 dark:bg-[#0f0f0f]/70 backdrop-blur-sm" />
-              {/* Soft vignette (animation dialed for readability) */}
-              <div
-                className="absolute inset-0 [mask-image:radial-gradient(ellipse_at_center,black_45%,transparent_100%)] anim-ok"
-                style={{ animation: "vignettePulse 3.5s ease-in-out infinite" }}
-              />
-              {/* Subtle diagonal sweep (softer in light mode for contrast) */}
-              <div
-                aria-hidden
-                className="absolute inset-0 z-0 anim-ok"
-                style={{
-                  background:
-                    "linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.5) 50%, transparent 70%)",
-                  animation: "shineSweep 2.2s linear infinite",
-                }}
-              />
-
-              {/* Center content: frosted card for readability */}
-              <div className="absolute inset-0 z-10 flex items-center justify-center p-6">
-                <div className="relative w-[min(92vw,560px)] rounded-2xl border border-neutral-200/80 dark:border-neutral-700/60 bg-white/90 dark:bg-neutral-900/80 backdrop-blur-md shadow-xl ring-1 ring-black/5 dark:ring-white/5 p-6">
-                  {/* Title/status line */}
-                  <div className="text-center">
-                    <div className="mx-auto inline-flex items-center justify-center gap-2">
-                      <span
-                        className="inline-block h-3 w-3 rounded-full bg-[#ED5E20] shadow-[0_0_0_3px_rgba(237,94,32,0.15)] anim-ok"
-                        style={{
-                          animation: "vignettePulse 2s ease-in-out infinite",
-                        }}
-                      />
-                      <span className="text-lg md:text-xl font-semibold text-neutral-800 dark:text-neutral-100 drop-shadow-[0_1px_0_rgba(0,0,0,.25)]">
-                        {(() => {
-                          if (!loadingEval) return "Summoning your frame ✨";
-                          const tiers: Record<string, string[]> = {
-                            t0: [
-                              "Spinning up the vibe engine…",
-                              "Booting heuristic hamster wheel…",
-                              "Pixel cauldron preheating 🔥",
-                              "Assembling UX atoms…",
-                            ],
-                            t25: [
-                              "Blending clarity + chaos 🎨",
-                              "Marinating accessibility sauce…",
-                              "Teaching the AI manners 🤖",
-                              "Refactoring your pixels' aura…",
-                            ],
-                            t50: [
-                              "Mid-cook: tasting the layout stew 👅",
-                              "Optimizing tap targets fr",
-                              "Charting cognitive load maps 🗺️",
-                              "Color contrast glow-up in progress…",
-                            ],
-                            t75: [
-                              "Polishing heuristic halos ✨",
-                              "Compressing insights into nuggets…",
-                              "Almost vibed to perfection 😌",
-                              "Wrapping semantic gifts 🎁",
-                            ],
-                            t100: [
-                              "Finalizing score drop 🔥",
-                              "Stamping UX passport ✅",
-                              "Sealing insight scrolls 📜",
-                              "Deploying vibe report…",
-                            ],
-                          };
-                          const pick = (arr: string[]) =>
-                            arr[Math.floor(Math.random() * arr.length)];
-                          if (backendProgress < 25) return pick(tiers.t0);
-                          if (backendProgress < 50) return pick(tiers.t25);
-                          if (backendProgress < 75) return pick(tiers.t50);
-                          if (backendProgress < 100) return pick(tiers.t75);
-                          return pick(tiers.t100);
-                        })()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
+          <LoadingOverlay
+            active={loadingScreenActive}
+            loadingEval={loadingEval}
+            backendProgress={backendProgress}
+          />
           {/* Center of the image here */}
           <div className="w-full h-full flex items-center justify-center">
             {loadingScreenActive ? (
@@ -2480,13 +2584,66 @@ const compareDiag = useMemo(() => {
                   thumbUrl ||
                   showFigmaThumb ||
                   "/images/design-thumbnail.png";
+
                 const frameLabelIndex =
                   typeof (currentFrame as any)?.originalIndex === "number"
                     ? (currentFrame as any).originalIndex + 1
                     : selectedFrameIndex + 1;
+
                 const imageAlt = currentFrame?.node_id
                   ? `Frame ${frameLabelIndex}`
                   : design?.project_name || "Design";
+
+                // Fallback: show centered "failed fetch" visual
+                if (imageError) {
+                  return (
+                    <div
+                      className="flex flex-col items-center justify-center text-center p-6"
+                      style={{
+                        transform: `scale(${zoom}) translate(${
+                          pan.x / zoom
+                        }px, ${pan.y / zoom}px)`,
+                        transformOrigin: "center center",
+                        cursor:
+                          zoom > 1
+                            ? isPanning
+                              ? "grabbing"
+                              : "grab"
+                            : "default",
+                      }}
+                      onMouseDown={handlePanStart}
+                    >
+                      <Image
+                        src="/images/fetch-failed_1.png"
+                        alt="Failed to load design"
+                        width={480}
+                        height={360}
+                        className="object-contain opacity-90"
+                        priority
+                      />
+
+                      <div className="mt-2 flex gap-2">
+                        {/* <button
+                type="button"
+                className="px-3 py-1.5 rounded-md text-sm bg-neutral-200 dark:bg-neutral-700 hover:bg-neutral-300 dark:hover:bg-neutral-600 transition cursor-pointer"
+                onClick={() => setImageError(false)}
+                title="Retry image load"
+              >
+                Retry
+              </button> */}
+                        <div
+                          role="status"
+                          aria-live="polite"
+                          className="px-3 py-1.5 rounded-md text-sm bg-amber-100 text-amber-800 border border-amber-300/60
+                           dark:bg-amber-400/15 dark:text-amber-200"
+                        >
+                          Please try again some later!
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
                 return (
                   <Image
                     src={imageSrc}
@@ -2511,6 +2668,7 @@ const compareDiag = useMemo(() => {
                           : "default",
                     }}
                     onMouseDown={handlePanStart}
+                    onError={() => setImageError(true)}
                     priority
                   />
                 );
@@ -2557,348 +2715,67 @@ const compareDiag = useMemo(() => {
               <div className="flex items-center justify-between mb-3 border-b pb-2">
                 <button
                   className={`text-lg font-semibold flex-1 text-center cursor-pointer
-                          ${
-                            sidebarTab === "ai"
-                              ? "text-[#ED5E20] border-b-2 border-[#ED5E20]"
-                              : "text-gray-500"
-                          }`}
+                              ${
+                                sidebarTab === "ai"
+                                  ? "text-[#ED5E20] border-b-2 border-[#ED5E20]"
+                                  : "text-gray-500"
+                              }`}
                   onClick={() => setSidebarTab("ai")}
                 >
                   AI Evaluation
                 </button>
+                {/* Readings tab */}
+
+                {/* {isOwner && (
+                  <button
+                    className={`text-lg font-semibold flex-1 text-center cursor-pointer
+                      ${
+                        sidebarTab === "readings"
+                          ? "text-[#ED5E20] border-b-2 border-[#ED5E20]"
+                          : "text-gray-500"
+                      }`}
+                    onClick={() => setSidebarTab("readings")}
+                  >
+                    Readings
+                  </button>
+                )} */}
+
+                {/* Comments Tab */}
                 <button
                   className={`text-lg font-semibold flex-1 text-center cursor-pointer
-                  ${
-                    sidebarTab === "comments"
-                      ? "text-[#ED5E20] border-b-2 border-[#ED5E20]"
-                      : "text-gray-500"
-                  }`}
+                      ${
+                        sidebarTab === "comments"
+                          ? "text-[#ED5E20] border-b-2 border-[#ED5E20]"
+                          : "text-gray-500"
+                      }`}
                   onClick={() => setSidebarTab("comments")}
                 >
                   Comments
                 </button>
               </div>
+
               {sidebarTab === "ai" && (
                 <>
-                  {showVersionProgress && (
-                    <div
-                      className="mb-5 relative group rounded-2xl border border-orange-300/50 dark:border-orange-400/30
-                      bg-gradient-to-br from-white via-orange-50/40 to-white dark:from-[#191919] dark:via-[#242424] dark:to-[#1d1d1d]
-                      shadow-[0_4px_18px_-4px_rgba(0,0,0,.18)] backdrop-blur-sm overflow-hidden"
-                    >
-                      {/* Decorative accents */}
-                      <div className="pointer-events-none absolute -top-10 -left-10 w-40 h-40 rounded-full bg-orange-400/15 blur-2xl" />
-                      <div className="pointer-events-none absolute -bottom-10 -right-10 w-48 h-48 rounded-full bg-amber-300/10 blur-2xl" />
-                      <div
-                        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"
-                        style={{
-                          background:
-                            "radial-gradient(circle at 30% 20%, rgba(255,255,255,0.35), transparent 60%)",
-                        }}
+                  {showVersionProgress &&
+                    previousVersionScores &&
+                    currentVersionScores && (
+                      <VersionProgress
+                        previous={previousVersionScores}
+                        current={currentVersionScores}
+                        collapsed={vpCollapsed}
+                        onToggle={() => setVpCollapsed((c) => !c)}
                       />
+                    )}
 
-                      <div className="relative z-10 p-4">
-                        {/* Header */}
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <div className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-tr from-orange-500 to-amber-400 text-white shadow">
-                              <Sparkles className="h-4 w-4" />
-                            </div>
-                            <h4 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100 tracking-wide">
-                              Version Progress
-                            </h4>
-                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-400/20 dark:text-orange-300 font-medium">
-                              v{previousVersionScores?.version} → v
-                              {currentVersionScores?.version}
-                            </span>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => setVpCollapsed((c) => !c)}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium
-                            bg-white/80 dark:bg-neutral-800/70 border border-orange-300/40 dark:border-orange-400/30
-                            hover:bg-orange-50 dark:hover:bg-neutral-700 transition cursor-pointer"
-                            aria-expanded={!vpCollapsed}
-                            aria-label={
-                              vpCollapsed
-                                ? "Expand version progress"
-                                : "Collapse version progress"
-                            }
-                          >
-                            {vpCollapsed ? (
-                              <Maximize2 className="h-3.5 w-3.5" />
-                            ) : (
-                              <Minimize2 className="h-3.5 w-3.5" />
-                            )}
-                            {vpCollapsed ? "Expand" : "Collapse"}
-                          </button>
-                        </div>
-
-                        {/* Collapsible content */}
-                        <div
-                          className={`transition-all duration-500 ease-in-out ${
-                            vpCollapsed
-                              ? "max-h-0 opacity-0 pointer-events-none"
-                              : "max-h-[560px] opacity-100"
-                          }`}
-                        >
-                          {/* Overall comparison */}
-                          <div className="grid grid-cols-3 gap-3 items-end mb-5 mt-3">
-                            <div className="space-y-1">
-                              <p className="text-[10px] uppercase tracking-wide font-medium text-neutral-500 dark:text-neutral-400">
-                                Previous
-                              </p>
-                              <div
-                                className={`inline-flex px-2 py-1 rounded-md text-xs font-semibold ${scoreTone(
-                                  previousVersionScores?.overall
-                                )}`}
-                              >
-                                {previousVersionScores?.overall ?? "—"}
-                              </div>
-                            </div>
-                            <div className="flex flex-col items-center">
-                              <div className="flex items-center space-x-1"></div>
-                              {(() => {
-                                const oldVal = previousVersionScores?.overall;
-                                const newVal = currentVersionScores?.overall;
-                                if (
-                                  typeof oldVal !== "number" ||
-                                  typeof newVal !== "number"
-                                ) {
-                                  return (
-                                    <p className="text-[10px] mt-1 text-neutral-500 dark:text-neutral-400 font-medium">
-                                      —
-                                    </p>
-                                  );
-                                }
-                                const delta = newVal - oldVal;
-                                const positive = delta > 0;
-                                const neutral = delta === 0;
-
-                                const badgeTone = positive
-                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 ring-emerald-400/30"
-                                  : neutral
-                                  ? "bg-neutral-500/10 text-neutral-600 dark:text-neutral-300 ring-neutral-400/30"
-                                  : "bg-rose-500/10 text-rose-600 dark:text-rose-300 ring-rose-400/30";
-
-                                const glowTone = positive
-                                  ? "bg-emerald-400/25"
-                                  : neutral
-                                  ? "bg-neutral-400/25"
-                                  : "bg-rose-400/25";
-
-                                return (
-                                  <div className="relative grid place-items-center select-none">
-                                    {/* Delta pill */}
-                                    <div
-                                      className={[
-                                        "relative inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold ring-1 shadow-sm",
-                                        "transition-transform duration-300",
-                                        "animate-[vpPopIn_.6s_ease-out_1]",
-                                        badgeTone,
-                                      ].join(" ")}
-                                      title={`Overall change: ${
-                                        delta > 0 ? "+" : ""
-                                      }${delta}`}
-                                    >
-                                      <span
-                                        className={[
-                                          "absolute inset-0 -z-10 rounded-[14px] blur-md opacity-70",
-                                          "animate-[vpPulseGlow_2.2s_ease-in-out_infinite]",
-                                          glowTone,
-                                        ].join(" ")}
-                                        aria-hidden
-                                      />
-                                      {positive ? (
-                                        <ArrowUpRight className="h-3.5 w-3.5 animate-[vpArrow_.9s_ease-in-out_infinite]" />
-                                      ) : neutral ? (
-                                        <Minus className="h-3.5 w-3.5" />
-                                      ) : (
-                                        <ArrowDownRight className="h-3.5 w-3.5 animate-[vpArrow_.9s_ease-in-out_infinite]" />
-                                      )}
-                                      <span className="text-sm tabular-nums">
-                                        {delta > 0 ? `+${delta}` : `${delta}`}
-                                      </span>
-                                      <span className="hidden sm:inline text-[10px] opacity-70">
-                                        overall
-                                      </span>
-                                    </div>
-                                    {/* Scoped keyframes (safe to duplicate) */}
-                                    <style>
-                                      {`
-                                      @keyframes vpPulseGlow {
-                                        0%, 100% { transform: scale(1); opacity: .55; }
-                                        50% { transform: scale(1.02); opacity: .95; }
-                                      }
-                                      @keyframes vpPopIn {
-                                        0% { transform: translateY(4px) scale(.98); opacity: 0; }
-                                        100% { transform: translateY(0) scale(1); opacity: 1; }
-                                      }
-                                      @keyframes vpArrow {
-                                        0%, 100% { transform: translateY(0); }
-                                        50% { transform: translateY(-1px); }
-                                      }
-                                    `}
-                                    </style>
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                            <div className="space-y-1 text-right">
-                              <p className="text-[10px] uppercase tracking-wide font-medium text-neutral-500 dark:text-neutral-400">
-                                Current
-                              </p>
-                              <div
-                                className={`inline-flex px-2 py-1 rounded-md text-xs font-semibold ${scoreTone(
-                                  currentVersionScores?.overall
-                                )}`}
-                              >
-                                {currentVersionScores?.overall ?? "—"}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Categories diff list */}
-                          <div className="space-y-2">
-                            <p className="text-[11px] font-medium tracking-wide text-neutral-600 dark:text-neutral-300">
-                              Category Changes
-                            </p>
-                            <div
-                              className="rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-700
-                              divide-y divide-neutral-200 dark:divide-neutral-800 bg-white/70 dark:bg-neutral-900/50"
-                            >
-                              {Array.from(
-                                new Set([
-                                  ...Object.keys(
-                                    previousVersionScores.categories
-                                  ),
-                                  ...Object.keys(
-                                    currentVersionScores.categories
-                                  ),
-                                ])
-                              )
-                                .sort()
-                                .map((cat) => {
-                                  const oldVal =
-                                    previousVersionScores?.categories[cat];
-                                  const newVal =
-                                    currentVersionScores?.categories[cat];
-                                  const delta =
-                                    typeof newVal === "number" &&
-                                    typeof oldVal === "number"
-                                      ? newVal - oldVal
-                                      : null;
-                                  return (
-                                    <div
-                                      key={cat}
-                                      className="grid grid-cols-6 gap-2 items-center px-2 py-1.5 text-xs
-                                      bg-white/60 dark:bg-neutral-900/40 hover:bg-orange-50/40 dark:hover:bg-neutral-800/60 transition"
-                                    >
-                                      <span className="col-span-2 capitalize text-neutral-700 dark:text-neutral-300 truncate">
-                                        {cat}
-                                      </span>
-                                      <span className="text-neutral-600 dark:text-neutral-300 text-right">
-                                        {typeof oldVal === "number"
-                                          ? oldVal
-                                          : "—"}
-                                      </span>
-                                      <span className="flex items-center justify-center">
-                                        {diffArrow(newVal, oldVal)}
-                                      </span>
-                                      <span
-                                        className={`text-right font-semibold ${
-                                          newVal > (oldVal ?? -Infinity)
-                                            ? "text-emerald-600 dark:text-emerald-400"
-                                            : newVal < (oldVal ?? Infinity)
-                                            ? "text-rose-500"
-                                            : "text-neutral-500 dark:text-neutral-400"
-                                        }`}
-                                      >
-                                        {typeof newVal === "number"
-                                          ? newVal
-                                          : "—"}
-                                      </span>
-                                      <span
-                                        className={`text-[10px] text-right ${
-                                          delta == null
-                                            ? "text-neutral-400"
-                                            : delta > 0
-                                            ? "text-emerald-500"
-                                            : delta < 0
-                                            ? "text-rose-500"
-                                            : "text-neutral-500 dark:text-neutral-400"
-                                        }`}
-                                      >
-                                        {delta == null || isNaN(delta) ? (
-                                          "—"
-                                        ) : delta === 0 ? (
-                                          <span
-                                            className="inline-flex items-center justify-end gap-1 px-1.5 py-0.5
-                                            text-neutral-600 dark:text-neutral-300"
-                                            title="No change"
-                                            aria-label="No change"
-                                          >
-                                            <Minus className="h-3 w-3 opacity-70" />
-                                          </span>
-                                        ) : (
-                                          (delta > 0 ? "+" : "") + delta
-                                        )}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
-                            </div>
-                          </div>
-
-                          {/* Footer */}
-                          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-[10px] text-neutral-600 dark:text-neutral-400">
-                            {/* Delta legend chips */}
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 ring-1 ring-emerald-400/20">
-                                <ArrowUpRight className="h-3 w-3" />
-                                Improved
-                              </span>
-                              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-300 ring-1 ring-rose-400/20">
-                                <ArrowDownRight className="h-3 w-3" />
-                                Regressed
-                              </span>
-                              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-neutral-500/10 text-neutral-600 dark:text-neutral-300 ring-1 ring-neutral-400/20">
-                                <Minus className="h-3 w-3" />
-                                No change
-                              </span>
-
-                              {/* Delta emphasis badge */}
-                              {/* <span className="ml-1 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gradient-to-r from-orange-100 to-amber-100 dark:from-orange-400/10 dark:to-amber-400/10 text-orange-700 dark:text-orange-300 ring-1 ring-orange-400/20">
-                                Δ change highlighted above
-                              </span> */}
-                            </div>
-
-                            {/* Live tracking indicator */}
-                            <div className="flex items-center gap-2">
-                              <span
-                                className="relative flex items-end gap-[3px] h-3"
-                                aria-hidden
-                              >
-                                <span className="w-[3px] rounded-sm bg-[#ED5E20]/85 animate-[bar1_1100ms_ease-in-out_infinite]" />
-                                <span className="w-[3px] rounded-sm bg-[#ED5E20]/70 animate-[bar2_950ms_ease-in-out_infinite]" />
-                                <span className="w-[3px] rounded-sm bg-[#ED5E20]/85 animate-[bar3_800ms_ease-in-out_infinite]" />
-                                <span className="w-[3px] rounded-sm bg-[#ED5E20]/60 animate-[bar2_900ms_ease-in-out_infinite]" />
-                                <span className="w-[3px] rounded-sm bg-[#ED5E20]/85 animate-[bar1_1050ms_ease-in-out_infinite]" />
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                  {/* Hide navigator during re-evaluation */}
+                  {!loadingEval && (
+                    <FrameNavigator
+                      selectedFrameIndex={selectedFrameIndex}
+                      setSelectedFrameIndex={setSelectedFrameIndex}
+                      sortedFrameEvaluations={sortedFrameEvaluations}
+                      filteredFrameEvaluations={filteredFrameEvaluations}
+                    />
                   )}
-
-                  <FrameNavigator
-                    selectedFrameIndex={selectedFrameIndex}
-                    setSelectedFrameIndex={setSelectedFrameIndex}
-                    sortedFrameEvaluations={sortedFrameEvaluations}
-                    filteredFrameEvaluations={filteredFrameEvaluations}
-                  />
 
                   <div className="flex-1 overflow-y-auto pr-5 space-y-5">
                     {/* Error State */}
@@ -2919,105 +2796,25 @@ const compareDiag = useMemo(() => {
                       />
                     )}
                   </div>
-                  {/* {isOwner && (
-                  <div className="mt-auto pt-4">
-                    <button
-                      onClick={handleOpenEvalParams}
-                      disabled={loadingEval}
-                      className="w-full px-4 py-2 text-sm rounded-md bg-[#ED5E20] text-white hover:bg-orange-600 disabled:opacity-50 cursor-pointer"
-                    >
-                      {loadingEval ? "Evaluating..." : "Re-Evaluate"}
-                    </button>
-                    <EvaluationParamsModal
-                      open={showEvalParams}
-                      onClose={() => setShowEvalParams(false)}
-                      onSubmit={(params) =>
-                        handleEvalParamsSubmit(
-                          params,
-                          handleEvaluateWithParams,
-                          design,
-                          setLoadingEval,
-                          setEvalError,
-                          setEvalResult,
-                          setFrameEvaluations,
-                          setExpectedFrameCount,
-                          setEvaluatedFramesCount,
-                          fetchEvaluations,
-                          setShowEvalParams,
-                        )
-                      }
-                      initialParams={pendingParams || {}}
-                    />
-                  </div>
-                )} */}
 
-                  {isOwner && (
+                  {isOwner && !imageError && (
                     <div className="mt-auto pt-4">
-                      <button
-                        type="button"
+                      <GradientActionButton
+                        loading={loadingEval}
+                        loadingText="Evaluating..."
                         onClick={async () => {
                           if (loadingEval) return;
-                          if (pendingParams) {
-                            await handleEvalParamsSubmit(
-                              pendingParams,
-                              handleEvaluateWithParams,
-                              design,
-                              setLoadingEval,
-                              setEvalError,
-                              setEvalResult,
-                              setFrameEvaluations,
-                              setExpectedFrameCount,
-                              setEvaluatedFramesCount,
-                              fetchEvaluations,
-                              setShowEvalParams
-                            );
-                          } else {
-                            handleOpenEvalParams();
-                          }
+                          setShowReEvalModal(true);
                         }}
-                        disabled={loadingEval}
-                        aria-busy={loadingEval}
-                        className={`cursor-pointer relative flex-1 inline-flex items-center justify-center rounded-xl text-sm transition-all duration-300 h-12 overflow-hidden focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40 group/button w-full ${
-                          loadingEval
-                            ? // use the "Cancel" button colors when evaluating (cursor disabled)
-                              "flex-1 inline-flex items-center justify-center rounded-xl text-sm font-medium border border-neutral-300/70 dark:border-neutral-600/60 bg-white/70 dark:bg-neutral-800/70 text-neutral-700 dark:text-neutral-200 shadow-sm backdrop-blur transition-colors h-12 cursor-not-allowed opacity-90"
-                            : // default gradient "Re-Evaluate" appearance
-                              "text-white font-semibold tracking-wide"
-                        }`}
+                        className="w-full"
                       >
-                        {loadingEval ? (
-                          // plain neutral appearance while evaluating
-                          <span className="relative z-10">Evaluating...</span>
-                        ) : (
-                          <>
-                            {/* Gradient background */}
-                            <span
-                              aria-hidden
-                              className="absolute inset-0 bg-gradient-to-r from-[#ED5E20] via-[#f97316] to-[#f59e0b] transition-transform duration-300 group-hover:scale-105"
-                            />
-
-                            {/* Glass effect overlay */}
-                            <span
-                              aria-hidden
-                              className="absolute inset-[2px] rounded-[10px] bg-[linear-gradient(145deg,rgba(255,255,255,0.25),rgba(255,255,255,0.06))] backdrop-blur-[2px]"
-                            />
-
-                            {/* Light sweep animation */}
-                            <span
-                              aria-hidden
-                              className="absolute inset-y-0 -left-full w-1/2 bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 transition-all duration-700 group-hover/button:translate-x-[220%] group-hover/button:opacity-70"
-                            />
-
-                            <span className="relative z-10 flex items-center gap-2">
-                              <span>Re-Evaluate</span>
-                            </span>
-                          </>
-                        )}
-                      </button>
+                        Re-Evaluate
+                      </GradientActionButton>
                     </div>
                   )}
                 </>
               )}
+
               {sidebarTab === "comments" && (
                 <div className="flex-1 flex flex-col">
                   <CommentsSection
@@ -3035,6 +2832,10 @@ const compareDiag = useMemo(() => {
                     postingComment={postingComment}
                   />
                 </div>
+              )}
+
+              {sidebarTab === "readings" && isOwner && (
+                <ReadingsPanel snapshot={design?.snapshot as any} />
               )}
             </div>
           </div>
@@ -3073,6 +2874,28 @@ const compareDiag = useMemo(() => {
           setShowEval={setShowEval}
           setFrameEvaluations={setFrameEvaluations}
           setSelectedFrameIndex={setSelectedFrameIndex}
+        />
+      )}
+
+      {isOwner && (
+        <ReEvaluateModal
+          open={showReEvalModal}
+          onClose={() => setShowReEvalModal(false)}
+          reEvalUrl={reEvalUrl}
+          setReEvalUrl={setReEvalUrl}
+          reEvalImages={reEvalImages}
+          setReEvalImages={setReEvalImages}
+          loadingEval={loadingEval}
+          reEvalUploading={reEvalUploading}
+          onRun={async () => {
+            await handleCustomReEvaluate();
+            setShowReEvalModal(false);
+          }}
+          onCancel={() => {
+            setShowReEvalModal(false);
+            setReEvalImages([]);
+            setReEvalUrl("");
+          }}
         />
       )}
     </div>

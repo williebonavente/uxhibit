@@ -164,22 +164,78 @@ export const DesignComparison: React.FC<Props> = ({
 
   const supabase = createClient();
 
-  const fetchFrames = useCallback(
+    const fetchFrames = useCallback(
     async (versionId: string) => {
+      // 1) Fetch rows for a version
       const { data, error } = await supabase
         .from("design_frame_evaluations")
         .select("id, node_id, thumbnail_url, ai_summary, ai_data, created_at")
         .eq("design_id", designId)
         .eq("version_id", versionId)
+        .order("node_id", { ascending: true }) // stable order by node_id
         .order("created_at", { ascending: true });
+
       if (error) {
-        console.error("Fetch frames error", error.message);
+        console.error("Fetch frames error", error.message, { versionId });
         return [];
       }
-      return (data || []) as FrameEvaluation[];
+
+      const rows = (data || []) as FrameEvaluation[];
+
+      // 2) Dedupe by node_id: keep the latest created_at for each node_id
+      const byNode = new Map<string, FrameEvaluation>();
+      for (const r of rows) {
+        const key = String(r.node_id || "");
+        const prev = byNode.get(key);
+        if (!prev) byNode.set(key, r);
+        else if (new Date(r.created_at).getTime() > new Date(prev.created_at).getTime()) {
+          byNode.set(key, r);
+        }
+      }
+
+      let frames = Array.from(byNode.values());
+
+      // 3) Ensure thumbnails are usable: drop empties
+      frames = frames.filter(
+        (f) => typeof f.thumbnail_url === "string" && f.thumbnail_url.length > 0
+      );
+
+      console.log("[DesignComparison] Fetched frames", {
+        versionId,
+        total: rows.length,
+        deduped: frames.length,
+        uniqueNodeIds: frames.map((f) => f.node_id),
+      });
+
+      return frames;
     },
     [designId, supabase]
   );
+
+    const fetchAlignedPair = useCallback(
+    async (curVersionId: string, prevVersionId: string) => {
+      const [cur, prev] = await Promise.all([
+        fetchFrames(curVersionId),
+        fetchFrames(prevVersionId),
+      ]);
+
+      const prevSet = new Set(prev.map((p) => String(p.node_id)));
+      const curAligned = cur.filter((c) => prevSet.has(String(c.node_id)));
+
+      // Keep prev aligned to the same node_ids and sort both by node_id
+      const curSorted = [...curAligned].sort((a, b) =>
+        String(a.node_id).localeCompare(String(b.node_id))
+      );
+      const prevMap = new Map(prev.map((p) => [String(p.node_id), p]));
+      const prevAligned = curSorted
+        .map((c) => prevMap.get(String(c.node_id)))
+        .filter(Boolean) as FrameEvaluation[];
+
+      return { cur: curSorted, prev: prevAligned };
+    },
+    [fetchFrames]
+  );
+
 
   function drawContain(
     ctx: CanvasRenderingContext2D,
@@ -384,17 +440,6 @@ export const DesignComparison: React.FC<Props> = ({
     return typeof score === "number" ? score : undefined;
   }
 
-  function HeatmapDot() {
-    const [r, g, b] = HEATMAP_RGB[heatmapColor];
-    return (
-      <span
-        className="inline-block w-2 h-2 rounded-full border border-white/40"
-        style={{ backgroundColor: `rgb(${r},${g},${b})` }}
-        aria-label={`Heatmap color: ${HEATMAP_LABELS[heatmapColor]}`}
-        title={`Heatmap color: ${HEATMAP_LABELS[heatmapColor]}`}
-      />
-    );
-  }
 
   function HeatmapOverlay({ src }: { src: string }) {
     return (
@@ -457,7 +502,7 @@ export const DesignComparison: React.FC<Props> = ({
     (async () => {
       const { data, error } = await supabase
         .from("design_versions")
-        .select("id, version, created_at, ai_data") // include ai_data
+        .select("id, version, created_at, ai_data")
         .eq("design_id", designId)
         .order("version", { ascending: false });
       if (error) {
@@ -475,24 +520,6 @@ export const DesignComparison: React.FC<Props> = ({
     };
   }, [designId, supabase]);
 
-  // useEffect(() => {
-  //   let active = true;
-  //   (async () => {
-  //     setLoading(true);
-  //     const [cur, prev] = await Promise.all([
-  //       fetchFrames(currentVersionId),
-  //       fetchFrames(previousVersionId),
-  //     ]);
-  //     if (!active) return;
-  //     setCurrentFrames(cur);
-  //     setPreviousFrames(prev);
-  //     setLoading(false);
-  //   })();
-  //   return () => {
-  //     active = false;
-  //   };
-  // }, [fetchFrames, currentVersionId, previousVersionId]);
-
   useEffect(() => {
     if (!showHeatmap) {
       setDiffUrl(null);
@@ -506,7 +533,6 @@ export const DesignComparison: React.FC<Props> = ({
       setDiffUrl(null);
       return;
     }
-    // Keep diff consistent regardless of swapSides; swap only affects display
     buildDiff(prev.thumbnail_url, cur.thumbnail_url);
   }, [
     showHeatmap,
@@ -547,30 +573,25 @@ export const DesignComparison: React.FC<Props> = ({
     };
   }, []);
 
-  // useEffect(() => {
-  //   let active = true;
-  //   (async () => {
-  //     const { data, error } = await supabase
-  //       .from("design_versions")
-  //       .select("id, version, created_at")
-  //       .eq("design_id", designId)
-  //       .order("version", { ascending: false });
-  //     if (error) {
-  //       console.warn(
-  //         "[DesignComparison] fetch versions failed:",
-  //         error.message
-  //       );
-  //       return;
-  //     }
-  //     if (!active) return;
-  //     setVersions((data || []) as any);
-  //   })();
-  //   return () => {
-  //     active = false;
-  //   };
-  // }, [designId, supabase]);
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      setIsFetchingFrames(true);
+      setFrameIndex(0);
+      const { cur, prev } = await fetchAlignedPair(
+        selectedCurrentVersionId,
+        selectedPreviousVersionId
+      );
+      if (!active) return;
+      setCurrentFrames(cur);
+      setPreviousFrames(prev);
+      setIsFetchingFrames(false);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [fetchAlignedPair, selectedCurrentVersionId, selectedPreviousVersionId]);
 
-  // Load frames for the selected versions
   useEffect(() => {
     let active = true;
     (async () => {
@@ -590,7 +611,7 @@ export const DesignComparison: React.FC<Props> = ({
     };
   }, [fetchFrames, selectedCurrentVersionId, selectedPreviousVersionId]);
 
-  // Prevent identical selection (optional guard)
+  
   useEffect(() => {
     if (
       selectedCurrentVersionId === selectedPreviousVersionId &&
@@ -622,7 +643,6 @@ export const DesignComparison: React.FC<Props> = ({
     };
   }, [fetchFrames, currentVersionId, previousVersionId]);
 
-  // Load frames when user changes versions: no full-screen overlay
   useEffect(() => {
     let active = true;
     (async () => {
@@ -659,32 +679,38 @@ export const DesignComparison: React.FC<Props> = ({
       (p) => p.node_id === currentFrames[frameIndex]?.node_id
     );
 
-  // useEffect(() => {
-  //   if (!showHeatmap) {
-  //     setDiffUrl(null);
-  //     console.log("[heatmap] Disabled");
-  //     return;
-  //   }
-  //   const cur = currentFrames[frameIndex];
-  //   const prev =
-  //     previousFrames.find((p) => p.node_id === cur?.node_id) ||
-  //     previousFrames[frameIndex];
+    useEffect(() => {
+    let active = true;
+    (async () => {
+      setLoading(true);
+      setBootstrapping(true);
+      const [cur, prev] = await Promise.all([
+        fetchFrames(currentVersionId),
+        fetchFrames(previousVersionId),
+      ]);
+      if (!active) return;
+      setCurrentFrames(cur);
+      setPreviousFrames(prev);
+      setLoading(false);
+      setBootstrapping(false);
+      console.log("[DesignComparison] bootstrap counts", {
+        currentVersionId,
+        prevVersionId: previousVersionId,
+        curCount: cur.length,
+        prevCount: prev.length,
+      });
+    })();
+    return () => {
+      active = false;
+    };
+  }, [fetchFrames, currentVersionId, previousVersionId]);
 
-  //   if (!cur || !prev) {
-  //     console.log("[heatmap] Missing frame(s)", {
-  //       curExists: !!cur,
-  //       prevExists: !!prev,
-  //     });
-  //     setDiffUrl(null);
-  //     return;
-  //   }
+  // If arrays have different lengths or misaligned node_ids, keep index within available range
+  useEffect(() => {
+    const max = Math.max(currentFrames.length, previousFrames.length);
+    if (frameIndex >= max && max > 0) setFrameIndex(max - 1);
+  }, [currentFrames.length, previousFrames.length, frameIndex]);
 
-  //   console.log("[heatmap] Building diff for frameIndex", frameIndex, {
-  //     curNode: cur.node_id,
-  //     prevNode: prev.node_id,
-  //   });
-  //   buildDiff(prev.thumbnail_url, cur.thumbnail_url);
-  // }, [showHeatmap, frameIndex, currentFrames, previousFrames, buildDiff]);
 
   return (
     <div className="fixed inset-0 z-[1000] w-screen h-screen bg-white dark:bg-[#121212] flex flex-col overscroll-contain">

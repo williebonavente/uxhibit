@@ -617,11 +617,11 @@ const ComputationalBreakdown: React.FC<ComputationalBreakdownProps> = ({
                         <div className="text-sm font-medium truncate text-gray-900 dark:text-gray-100">
                           {label}
                         </div>
-                        {overall != null && (
+                        {/* {overall != null && (
                           <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-[#ED5E20]/10 text-[#ED5E20]">
                             Overall {Math.round(overall)}%
                           </span>
-                        )}
+                        )} */}
                       </div>
                     </button>
                   );
