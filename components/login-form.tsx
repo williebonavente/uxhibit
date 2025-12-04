@@ -21,13 +21,14 @@ import { loginFormSchema } from "@/lib/validation-schemas";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 // import { getFigmaAuthUrl } from "@/lib/figma-auth";
-import { useEffect, useState } from "react";
+import { MouseEventHandler, useEffect, useState } from "react";
 import { avatarStyles } from "@/constants/randomAvatars";
 import { createClient } from "@/utils/supabase/client";
 import { Loader2 } from "lucide-react";
 import BackgroundVideo from "./background_video/backgroundVideo";
 import ReCAPTCHA from "react-google-recaptcha";
 import { getFigmaAuthUrl } from "@/lib/figma-auth";
+import { getGoogleAuthUrl } from "@/lib/google_login/google_auth";
 
 const formSchema = loginFormSchema;
 
@@ -56,12 +57,36 @@ export default function LoginForm() {
     },
   });
 
-  async function handleFigmaLogin(e: MouseEvent) {
+  // async function handleFigmaLogin(e: MouseEvent) {
+  //   e.preventDefault();
+  //   setFigmaLoading(true);
+  //   try {
+  //     // Get the Figma auth URL
+  //     const authUrl = await getFigmaAuthUrl();
+  //     if (!authUrl) {
+  //       toast.error("Failed to initialize Figma login");
+  //       setFigmaLoading(false);
+  //       return;
+  //     }
+
+  //     if (typeof window !== 'undefined') {
+  //       localStorage.setItem('preAuthPath', window.location.pathname);
+  //     }
+  //     // Redirect to Figma OAuth
+  //     window.location.href = authUrl;
+  //   } catch (error) {
+  //     setFigmaLoading(false);
+  //     console.error('Figma login error:', error);
+  //     toast.error("Failed to start Figma authentication");
+  //   }
+  // }
+
+    async function handleGoogleLogin (e: any){
     e.preventDefault();
     setFigmaLoading(true);
     try {
       // Get the Figma auth URL
-      const authUrl = await getFigmaAuthUrl();
+      const authUrl = await getGoogleAuthUrl();
       if (!authUrl) {
         toast.error("Failed to initialize Figma login");
         setFigmaLoading(false);
@@ -354,7 +379,7 @@ export default function LoginForm() {
           {/* End of Login Form submission */}
 
           {/* Figma Login */}
-          <Button
+          {/* <Button
             type="button"
             onClick={handleFigmaLogin}
             disabled={figmaLoading}
@@ -398,13 +423,60 @@ export default function LoginForm() {
                 </>
               )}
             </span>
-          </Button>
+          </Button> */}
 
+          {/* Google Login  */}
+            {/* Figma Login */}
+          <Button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={figmaLoading}
+            className={`group relative inline-flex items-center justify-center
+              w-full h-11 sm:h-12 mt-2
+              rounded-xl text-base tracking-wide
+              transition-all duration-300
+              text-white shadow-md
+              hover:shadow-lg
+              active:scale-[.97]
+              focus:outline-none focus-visible:ring-4 focus-visible:ring-[#1E1E1E]/20
+              bg-[#1E1E1E] dark:bg-[#2C2C2C]
+              ${figmaLoading ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
+              `}
+          >
+            <span
+              aria-hidden
+              className="absolute inset-[2px] rounded-[10px] 
+              bg-[linear-gradient(145deg,rgba(255,255,255,0.12),rgba(255,255,255,0.03))]
+              backdrop-blur-[2px]"
+            />
+            <span
+              aria-hidden
+              className="absolute inset-0 rounded-xl ring-1 ring-white/10 group-hover:ring-white/20"
+            />
+            <span className="relative z-10 flex items-center gap-3">
+              {figmaLoading ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" />
+                  Redirecting...
+                </>
+              ) : (
+                <>
+                  <Image
+                    src="/images/google_logo.png"
+                    alt="Figma Logo"
+                    width={20}
+                    height={10}
+                  />
+                  Continue with Google
+                </>
+              )}
+            </span>
+          </Button>
           {/* Links: Sign Up + Forgot Password */}
           <div className="mt-8 text-center text-xs sm:text-sm text-white font-light">
             Don&apos;t have an account?{" "}
             <Link
-              href="/auth/signup"
+            href={`${process.env.NEXT_PUBLIC_APP_URL}/auth/signup`}
               className="text-[#ff7f3f] hover:text-[#ED5E20] transition-colors duration-200 hover:underline font-medium"
             >
               Sign Up

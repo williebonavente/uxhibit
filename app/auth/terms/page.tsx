@@ -9,7 +9,7 @@ export default function TermsPage() {
 
   const handleAccept = () => {
     localStorage.setItem("termsAccepted", "true");
-    router.push("/auth/signup");
+    router.push(`${process.env.NEXT_PUBLIC_APP_URL}/auth/signup`);
   };
 
   const whiteCursor: React.CSSProperties = {
@@ -1727,7 +1727,7 @@ export default function TermsPage() {
             onClick={() => {
               localStorage.removeItem("termsAccepted");
               localStorage.removeItem("registrationDraft");
-              router.push("/auth/signup");
+              router.push(`${process.env.NEXT_PUBLIC_APP_URL}/auth/signup`);
             }}
             className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl text-sm font-medium
                       border border-neutral-300/70 dark:border-neutral-600/60 cursor-pointer

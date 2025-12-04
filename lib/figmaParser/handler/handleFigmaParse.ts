@@ -32,7 +32,7 @@ export async function handleFigmaParse(url: string,
   
     const force = !!options?.force;
 
-  const accessToken = userAccessToken || FIGMA_TOKEN;
+  const accessToken =  FIGMA_TOKEN || userAccessToken;
 
   if (!accessToken) {
     return NextResponse.json(

@@ -9,7 +9,6 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import "react-datepicker/dist/react-datepicker.css";
-// import DatePicker from "react-datepicker";
 
 import {
   Form,
@@ -38,8 +37,14 @@ import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import BackgroundVideo from "./background_video/backgroundVideo";
 import ReCAPTCHA from "react-google-recaptcha";
+import type { User } from "@supabase/supabase-js";
 
-export default function RegistrationForm() {
+
+type RegistrationFormProps = {
+  user: User | null;
+}
+
+export default function RegistrationForm({ user }: RegistrationFormProps) {
   const router = useRouter();
 
   const [termsAccepted, setTermsAccepted] = useState(false);
