@@ -25,20 +25,20 @@ const nextConfig: NextConfig = {
         pathname: "/storage/v1/object/sign/**",
       }
     ],
-    domains: [
-      "i.pravatar.cc",
-      "sbsxkbapdmlnyhvjvsei.supabase.co",
-      "www.figma.com"
-    ],
+    // domains: [
+    //   "i.pravatar.cc",
+    //   "sbsxkbapdmlnyhvjvsei.supabase.co",
+    //   "www.figma.com"
+    // ],
     unoptimized: true
   },
 
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // eslint: {
+  //   ignoreDuringBuilds: true,
+  // },
 
 };
 
