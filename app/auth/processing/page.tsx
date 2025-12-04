@@ -46,7 +46,7 @@ export default function ProcessingPage() {
       {/* Centered Processing Card */}
       <div className="flex flex-col items-center justify-center text-center py-24 animate-pulse relative z-10">
         <Image
-          src="/images/figma-logo.svg"
+          src="/images/google_logo.svg"
           alt="Connecting to Figma illustration"
           height={150}
           width={150}
@@ -54,7 +54,7 @@ export default function ProcessingPage() {
           priority
         />
         <h2 className="gradient-text text-lg font-semibold mb-2">
-          Connecting to Figma
+          Connecting with Google
         </h2>
         <p className="text-gray-500 text-sm mb-4">
           Please wait.
