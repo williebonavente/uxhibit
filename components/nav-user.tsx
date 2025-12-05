@@ -176,7 +176,6 @@ export function NavUser({ user }: { user: User | null }) {
     const { data: authData } = await supabase.auth.getUser();
 
     if (authData?.user?.id) {
-      // Fetch profile from 'profiles'
       const { data: profileData } = await supabase
         .from("profiles")
         .select(`id, username, first_name, middle_name, last_name, website,
@@ -224,6 +223,18 @@ export function NavUser({ user }: { user: User | null }) {
       toast.error("Failed to delete notification.");
     }
   };
+
+  const buildAvatarSrc = (raw?: string | null): string | undefined => {
+  if (!raw) return undefined;
+  const v = raw.trim();
+  if (!v) return undefined;
+  return v.startsWith("http")
+    ? v
+    : `/api/avatars?path=${encodeURIComponent(v)}`;
+};
+
+const resolvedAvatarSrc =
+  buildAvatarSrc(avatarUrl) ?? buildAvatarSrc(profile?.avatar_url);
 
   useEffect(() => {
     if (open) {
@@ -321,8 +332,6 @@ export function NavUser({ user }: { user: User | null }) {
       <div className="flex items-center justify-center mt-8h-32 gap-4">
         <Skeleton className="h-8 w-8 rounded-full" />
         <div className="grid flex-1 text-left text-sm leading-tight gap-2">
-          <Skeleton className="h-4 w-24 rounded" /> {/* Name skeleton */}
-          <Skeleton className="h-4 w-32 rounded" /> {/* Email skeleton */}
         </div>
       </div>
     );
@@ -339,14 +348,7 @@ export function NavUser({ user }: { user: User | null }) {
               >
                 <Avatar className="h-8 w-8 rounded-bl-full ">
                   <AvatarImage
-                    src={
-                      avatarUrl
-                      ?? (profile?.avatar_url
-                        ? (profile.avatar_url.startsWith("http")
-                          ? profile.avatar_url
-                          : `/api/avatars?path=${encodeURIComponent(profile.avatar_url)}`)
-                        : undefined)
-                    }
+                    src={resolvedAvatarSrc}
                     alt={fullName}
                   />
                   <AvatarFallback className="rounded-lg grayscale">{getInitials(fullname)}</AvatarFallback>
@@ -370,14 +372,7 @@ export function NavUser({ user }: { user: User | null }) {
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                   <Avatar className="h-8 w-8 rounded-bl-full">
                     <AvatarImage
-                      src={
-                        avatarUrl
-                        ?? (profile?.avatar_url
-                          ? (profile.avatar_url.startsWith("http")
-                            ? profile.avatar_url
-                            : `/api/avatars?path=${encodeURIComponent(profile.avatar_url)}`)
-                          : undefined)
-                      }
+                      src={resolvedAvatarSrc}
                       alt={fullName}
                     />
                     <AvatarFallback className="rounded-lg">{getInitials(fullname)}</AvatarFallback>
