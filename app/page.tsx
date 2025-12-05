@@ -49,7 +49,7 @@ export default function Home() {
             </Button>
             <Button
               className="cursor-pointer w-full sm:w-[100px] lg:w-[120px] h-12 sm:h-[40px] lg:h-[50px] inline-flex items-center justify-center rounded-xl border-2 border-white text-white font-semibold text-sm sm:text-base lg:text-lg bg-transparent hover:text-[#FF8700] hover:border-[#FF8700] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ED5E20]/50 active:scale-[.97]"
-              onClick={() => handleButtonClick("signup", `${process.env.NEXT_PUBLIC_APP_URL}/auth/signup`)}
+              onClick={() => handleButtonClick("signup", `auth/signup`)}
               disabled={loadingBtn === "signup"}
               style={loadingBtn === "signup" ? { opacity: 0.7, pointerEvents: "none" } : {}}
             >
