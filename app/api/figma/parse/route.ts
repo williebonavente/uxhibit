@@ -2,13 +2,11 @@ import { handleFigmaParse } from "@/lib/figmaParser/handler/handleFigmaParse";
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 
-// Cache parsed results (5 minutes)
 const CACHE_DURATION = 5 * 60 * 1000;
 const parseCache = new Map<string, { data: any; timestamp: number }>();
 
-// Simple in-memory rate limiter
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const RATE_LIMIT_WINDOW = 60000;
 const MAX_REQUESTS_PER_WINDOW = 30;
 
 function checkRateLimit(identifier: string): {

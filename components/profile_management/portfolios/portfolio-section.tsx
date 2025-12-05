@@ -161,11 +161,11 @@ export default function PortfolioSection({
                             >
                                 {currentPortfolioLink}
                             </Link>
-                            {isOwner && (
+                            {/* {isOwner && (
                                 <button onClick={() => setIsEditingLink(true)}>
                                     <Pencil size={16} />
                                 </button>
-                            )}
+                            )} */}
                         </>
                     ) : (
                         isOwner && (

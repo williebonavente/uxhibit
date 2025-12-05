@@ -25,14 +25,14 @@ import { detectButtonsInFrame } from "@/lib/ai/interactiveElements/buttons/detec
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const parseCache = new Map<string, { data: any; timestamp: number }>();
 
-export async function handleFigmaParse(url: string, 
-    userAccessToken: string,
-    options?: { force?: boolean}
+export async function handleFigmaParse(
+  url: string,
+  userAccessToken: string,
+  options?: { force?: boolean }
 ) {
-  
-    const force = !!options?.force;
+  const force = !!options?.force;
 
-  const accessToken =  FIGMA_TOKEN || userAccessToken;
+  const accessToken = userAccessToken || FIGMA_TOKEN;
 
   if (!accessToken) {
     return NextResponse.json(
@@ -43,13 +43,6 @@ export async function handleFigmaParse(url: string,
       { status: 401 }
     );
   }
-
-  // Check for required Figma API token
-  if (!FIGMA_TOKEN)
-    return NextResponse.json(
-      { error: "Missing FIGMA_ACCESS_TOKEN" },
-      { status: 500 }
-    );
 
   // Parse the Figma URL to extract fileKey and nodeId
   const parsedRaw = parseFigmaUrl(url);
@@ -83,7 +76,7 @@ export async function handleFigmaParse(url: string,
     parseCache.delete(cacheKey);
   }
 
-    const isOAuth = !!userAccessToken;
+  const isOAuth = !!userAccessToken;
   const authHeaders: HeadersInit = isOAuth
     ? { Authorization: `Bearer ${accessToken}` }
     : { "X-Figma-Token": accessToken };
@@ -114,8 +107,6 @@ export async function handleFigmaParse(url: string,
         warning: "Using cached data due to rate limit",
       });
     }
-
-    
 
     return NextResponse.json(
       {
@@ -215,11 +206,19 @@ export async function handleFigmaParse(url: string,
   let frameImageUrl: string | null = null;
 
   if (parsed.nodeId) {
-    nodeImageUrl = await fetchFigmaImage(parsed.fileKey, parsed.nodeId, accessToken);
+    nodeImageUrl = await fetchFigmaImage(
+      parsed.fileKey,
+      parsed.nodeId,
+      accessToken
+    );
   }
 
   if (extractedFrameId) {
-    frameImageUrl = await fetchFigmaImage(parsed.fileKey, extractedFrameId, accessToken);
+    frameImageUrl = await fetchFigmaImage(
+      parsed.fileKey,
+      extractedFrameId,
+      accessToken
+    );
   }
 
   // Fetch images for all frames if there are any
@@ -265,7 +264,11 @@ export async function handleFigmaParse(url: string,
 
   // Fetch frame metadata and run accessibility evaluation if there are frame IDs
   if (allFrameIds.length > 0) {
-    const metadataJson = await fetchFigmaNodeData(parsed.fileKey, allFrameIds, accessToken);
+    const metadataJson = await fetchFigmaNodeData(
+      parsed.fileKey,
+      allFrameIds,
+      accessToken
+    );
     frameMetadata = metadataJson?.nodes || {};
 
     // Evaluate accessibility for each frame
@@ -331,21 +334,23 @@ export async function handleFigmaParse(url: string,
     }
   }
 
-  const accessibilityArray = Array.isArray(accessibilityResults) ? accessibilityResults : [];
+  const accessibilityArray = Array.isArray(accessibilityResults)
+    ? accessibilityResults
+    : [];
 
-//   // Merge layout results into accessibility results for each frame
-//   if (Array.isArray(accessibilityResults)) {
-//     accessibilityResults.forEach((result) => {
-//       const layout = layoutResults[result.frameId];
-//       if (layout) {
-//         result.layoutScore = layout.score;
-//         result.layoutIssues = layout.issues;
-//         result.layoutSummary = layout.summary;
-//       }
-//     });
-//   }
+  //   // Merge layout results into accessibility results for each frame
+  //   if (Array.isArray(accessibilityResults)) {
+  //     accessibilityResults.forEach((result) => {
+  //       const layout = layoutResults[result.frameId];
+  //       if (layout) {
+  //         result.layoutScore = layout.score;
+  //         result.layoutIssues = layout.issues;
+  //         result.layoutSummary = layout.summary;
+  //       }
+  //     });
+  //   }
 
-    const responseData = {
+  const responseData = {
     fileKey: parsed.fileKey,
     nodeId: parsed.nodeId ?? null,
     name: fileJson?.name ?? null,
@@ -355,7 +360,9 @@ export async function handleFigmaParse(url: string,
     frameImages,
     themedFrameIds: themedIds,
     type: parsed.nodeId ? "single-node" : "multi-frame",
-    message: parsed.nodeId ? "Parsed a single node image." : "Parsed all frame images in the file.",
+    message: parsed.nodeId
+      ? "Parsed a single node image."
+      : "Parsed all frame images in the file.",
     detectedButtons,
     extractedFrameId,
     extractedFrameImageUrl: frameImageUrl,
@@ -368,17 +375,16 @@ export async function handleFigmaParse(url: string,
     cached: false,
   };
 
-  // Cache only if we have images
   const frameCount = Object.keys(frameImages || {}).length;
-  if (frameCount > 0) {
-    parseCache.set(cacheKey, {
-      data: responseData,
-      timestamp: Date.now(),
-    });
-    console.log(`[handleFigmaParse] Cached new data for ${cacheKey}`);
-  } else {
-    console.log(
-      `[handleFigmaParse] Not caching empty frame set for ${cacheKey}`
+  if (!userAccessToken && frameCount === 0) {
+    return NextResponse.json(
+      {
+        error: "No frames parsed. The file may require authentication.",
+        code: "NO_FRAMES_AUTH_REQUIRED",
+        message:
+          "Connect your Figma account or use a public file shared to Anyone with the link.",
+      },
+      { status: 403 }
     );
   }
 
