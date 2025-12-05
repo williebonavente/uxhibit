@@ -17,9 +17,14 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { EvalResponse } from "@/app/designs/[id]/page";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { parse } from "path";
+import Link from "next/link";
+import ReactPlayer from "react-player";
+import MakePublicHelp from "@/components/make-public-help";
+import { parseFigmaUrl } from "@/lib/figma";
+
 type ParsedMeta = {
   fileKey: string;
   nodeId?: string;
@@ -33,6 +38,7 @@ type ParsedMeta = {
 
 export default function Evaluate() {
   const pollControllerRef = useRef<AbortController | null>(null);
+  const [showMakePublic, setShowMakePublic] = useState(false);
   const isPollingRef = useRef<boolean>(false);
 
   useEffect(() => {
@@ -79,11 +85,31 @@ export default function Evaluate() {
   );
   const [initialCountdown, setInitialCountdown] = useState<number | null>(null);
   const [evalError, setEvalError] = useState<string | null>(null);
+  const [linkValid, setLinkValid] = useState<boolean | null>(null);
+
+const [linkTouched, setLinkTouched] = useState(false);
 
   const canNextFrom1 = !!age && !!occupation;
   const canParse =
     (uploadMethod === "link" && !!link && !parsing) ||
     (uploadMethod === "file" && uploadedFiles.length > 0 && !parsing);
+
+        const handleLinkChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = e.target.value;
+      setLink(val);
+      setLinkTouched(true);
+    
+      // Prefer your actual parser
+      const parsed = parseFigmaUrl?.(val);
+      if (parsed) {
+        setLinkValid(true);
+        return;
+      }
+    
+      // Fallback: basic Figma design URL shape validation
+      const figmaPattern = /^https:\/\/(www\.)?figma\.com\/(design|file)\/[A-Za-z0-9]+/i;
+      setLinkValid(figmaPattern.test(val));
+    };
 
   useEffect(() => {
     if (rateLimitCountdown === null || rateLimitCountdown <= 0) {
@@ -455,7 +481,7 @@ export default function Evaluate() {
         null;
 
       // Prepare evaluation payload
-            let evalPayload: any;
+      let evalPayload: any;
       if (method === "file") {
         const framesMap = parsed.frameImages || {};
         if (!framesMap || Object.keys(framesMap).length === 0) {
@@ -466,7 +492,7 @@ export default function Evaluate() {
         }
 
         evalPayload = {
-        method: "file",
+          method: "file",
           designId,
           versionId: saved?.version_id || undefined,
           frames: framesMap,
@@ -1252,86 +1278,231 @@ export default function Evaluate() {
                 {/* Figma Link Input */}
                 {uploadMethod === "link" && (
                   <div className="space-y-4">
-                    <div className="relative group">
-                      <div className="absolute inset-0 bg-gradient-to-r from-[#ED5E20]/20 to-orange-500/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <div className="space-y-4">
+                      {/* 1) Paste Figma Link (clean, focused card) */}
                       <div className="relative bg-white dark:bg-neutral-800/60 rounded-2xl p-6 border border-neutral-200 dark:border-neutral-700 hover:border-[#ED5E20]/50 transition-all duration-300">
-                        <div className="space-y-2">
-                          <Input
-                            type="url"
-                            value={link}
-                            onChange={(e) => setLink(e.target.value)}
-                            placeholder="https://www.figma.com/design/..."
-                            disabled={rateLimitCountdown !== null}
-                            className="w-full h-12 px-4 rounded-lg bg-accent/10 dark:bg-neutral-900/60 text-sm focus:outline-none focus:ring-2 focus:ring-[#ED5E20]/50 border-neutral-200 dark:border-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                          />
+                        <div className="mb-3 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center rounded-md bg-[#ED5E20]/10 px-2 py-0.5 text-[11px] font-semibold text-[#ED5E20]">
+                              Paste a Figma Link
+                            </span>
+                          </div>
 
-                          {/* Show full link toggle */}
-                          {link && link.length > 50 && (
-                            <div className="flex items-center justify-between px-2">
-                              <button
-                                type="button"
-                                onClick={() => setShowFullLink(!showFullLink)}
-                                className="flex items-center gap-1 text-xs text-[#ED5E20] hover:text-orange-600 transition-colors"
-                              >
-                                <svg
-                                  className="h-3 w-3"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                >
-                                  {showFullLink ? (
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />
-                                  ) : (
-                                    <>
-                                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-                                      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-                                      <line x1="1" y1="1" x2="23" y2="23" />
-                                    </>
-                                  )}
-                                </svg>
-                                {showFullLink
-                                  ? "Hide full link"
-                                  : "Show full link"}
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(link);
-                                  toast.success("Link copied to clipboard!");
-                                }}
-                                className="flex items-center gap-1 text-xs text-neutral-600 dark:text-neutral-400 hover:text-[#ED5E20] transition-colors"
-                              >
-                                <svg
-                                  className="h-3 w-3"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                >
-                                  <rect
-                                    x="9"
-                                    y="9"
-                                    width="13"
-                                    height="13"
-                                    rx="2"
-                                    ry="2"
-                                  />
-                                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                                </svg>
-                                Copy
-                              </button>
-                            </div>
+                          {link && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(link);
+                                toast.success("Link copied to clipboard!");
+                              }}
+                              className="text-xs text-neutral-600 dark:text-neutral-400 hover:text-[#ED5E20] underline cursor-pointer"
+                            >
+                              Copy
+                            </button>
                           )}
+                        </div>
 
-                          {showFullLink && link && (
-                            <div className="p-3 bg-neutral-50 dark:bg-neutral-900/80 rounded-lg border border-neutral-200 dark:border-neutral-700">
-                              <p className="text-xs font-mono text-neutral-700 dark:text-neutral-300 break-all">
-                                {link}
+                    <Input
+  type="url"
+  value={link}
+  onChange={handleLinkChange}
+  onBlur={() => setLinkTouched(true)}
+  placeholder="https://www.figma.com/design/..."
+  disabled={rateLimitCountdown !== null}
+  aria-invalid={linkTouched && linkValid === false ? true : undefined}
+  className={`w-full h-12 px-4 rounded-lg bg-accent/10 dark:bg-neutral-900/60 text-sm focus:outline-none border
+    ${linkTouched && linkValid === true ? "border-green-500 focus:ring-2 focus:ring-green-400" : ""}
+    ${linkTouched && linkValid === false ? "border-red-500 focus:ring-2 focus:ring-red-400" : "border-neutral-200 dark:border-neutral-700 focus:ring-2 focus:ring-[#ED5E20]/50"}
+    disabled:opacity-50 disabled:cursor-not-allowed`}
+
+    
+/>
+{linkTouched && linkValid && (
+  <p className="mt-1 text-xs text-green-600">Looks good — valid Figma link.</p>
+)}
+
+{linkTouched && linkValid === false && (
+  <p className="mt-1 text-xs text-red-600">Invalid link. Paste a Figma design URL.</p>
+)}
+                        {/* {link && link.length > 50 && (
+                        <div className="mt-2 flex items-center justify-between">
+                          <button
+                            type="button"
+                            onClick={() => setShowFullLink(!showFullLink)}
+                            className="flex items-center gap-1 text-xs text-[#ED5E20] hover:text-orange-600 transition-colors"
+                          >
+                            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              {showFullLink ? (
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />
+                              ) : (
+                                <>
+                                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                                  <line x1="1" y1="1" x2="23" y2="23" />
+                                </>
+                              )}
+                            </svg>
+                            {showFullLink ? "Hide full link" : "Show full link"}
+                          </button>
+                        </div>
+                      )} */}
+
+                        {/* {showFullLink && link && (
+                        <div className="mt-2 p-3 bg-neutral-50 dark:bg-neutral-900/80 rounded-lg border border-neutral-200 dark:border-neutral-700">
+                          <p className="text-xs font-mono text-neutral-700 dark:text-neutral-300 break-all">
+                            {link}
+                          </p>
+                        </div>
+                      )} */}
+                      </div>
+
+                      {/* 2) How to make your Figma design public (collapsible help) */}
+                      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800/60">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowMakePublic?.((v: boolean) => !v)
+                          }
+                          className="w-full flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-[#ED5E20]/5 transition-colors"
+                          aria-expanded={Boolean(showMakePublic)}
+                          aria-controls="make-public-panel"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-500/10 rounded-lg">
+                              <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <div className="text-left">
+                              <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                                How to make your Figma design public
+                              </p>
+                              <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                                Ensure your file is accessible before parsing
                               </p>
                             </div>
-                          )}
+                          </div>
+                          <svg
+                            className={`h-5 w-5 text-neutral-500 transition-transform ${
+                              showMakePublic ? "rotate-180" : ""
+                            }`}
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            aria-hidden="true"
+                          >
+                            <polyline points="6 9 12 15 18 9" />
+                          </svg>
+                        </button>
+
+                        <div
+                          id="make-public-panel"
+                          className={`transition-all duration-300 ease-in-out overflow-hidden ${
+                            showMakePublic
+                              ? "max-h-[1000px] opacity-100"
+                              : "max-h-0 opacity-0"
+                          }`}
+                        >
+                          <div className="px-4 pb-4">
+                            <div className="rounded-xl overflow-hidden border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900/40">
+                              <div
+                                className="relative w-full"
+                                style={{ paddingTop: "56.25%" }}
+                              >
+                                <div className="absolute inset-0">
+                                  {/* Use your ReactPlayer or native <video> as implemented */}
+                                  <ReactPlayer
+                                    src="/videos/make_it_public.mp4"
+                                    width="100%"
+                                    height="100%"
+                                    playing={false}
+                                    controls
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 flex items-start gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+                              <svg
+                                className="h-4 w-4"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                              >
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="12" y1="16" x2="12" y2="12" />
+                                <line x1="12" y1="8" x2="12.01" y2="8" />
+                              </svg>
+                              <p>
+                                In Figma, share your file and set link access to
+                                <span className="font-semibold">
+                                  {" "}
+                                  anyone with the link
+                                </span>
+                                . Learn more at{" "}
+                                <Link
+                                  href="https://help.figma.com/hc/en-us/articles/360040531773-Share-files-and-prototypes"
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[#ED5E20] hover:text-orange-600 underline"
+                                >
+                                  Figma sharing docs
+                                </Link>
+                                .
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 3) Troubleshooting (danger advisory) */}
+                      <div className="mt-1 flex items-start gap-3 p-4 bg-red-50 dark:bg-red-950/20 rounded-2xl border border-red-200 dark:border-red-800">
+                        <div className="flex-shrink-0 p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                          <svg
+                            className="h-5 w-5 text-red-600 dark:text-red-400"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="12" />
+                            <line x1="12" y1="16" x2="12.01" y2="16" />
+                          </svg>
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-sm text-red-900 dark:text-red-100 mb-1">
+                            Can’t parse or no frames found
+                          </p>
+                          <p className="text-xs text-red-700 dark:text-red-300">
+                            This can happen if the file is private/restricted or
+                            the link has no visible frames. If your design
+                            exists but isn’t accessible, switch to image upload
+                            instead.
+                          </p>
+                          <div className="mt-3 flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setUploadMethod("file")}
+                              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-[#ED5E20] to-orange-600 hover:from-orange-600 hover:to-[#ED5E20] shadow-sm cursor-pointer"
+                            >
+                              <svg
+                                className="h-3.5 w-3.5"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                              >
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="17 8 12 3 7 8" />
+                                <line x1="12" y1="3" x2="12" y2="15" />
+                              </svg>
+                              Upload Image Instead
+                            </button>
+                            <span className="text-[11px] text-red-700 dark:text-red-300">
+                              PNG/JPG/WEBP • Multiple files supported
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1585,27 +1756,20 @@ export default function Evaluate() {
                         </div>
                       )}
 
-                      {/* Info tooltip - shown when no file uploaded */}
-                      {!uploadedFile && (
-                        <div className="mt-4 flex items-start gap-2 text-xs text-neutral-500 dark:text-neutral-400">
-                          <svg
-                            className="h-4 w-4 flex-shrink-0 mt-0.5"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <circle cx="12" cy="12" r="10" />
-                            <line x1="12" y1="16" x2="12" y2="12" />
-                            <line x1="12" y1="8" x2="12.01" y2="8" />
-                          </svg>
-                          <p>
-                            Upload design images exported from Figma or other
-                            design tools. Supported formats: PNG, JPG, JPEG,
-                            WEBP. You can select multiple files at once.
-                          </p>
-                        </div>
-                      )}
+                      {/* TODO: FILE DETECTION NSFW */}
+
+                      <div className="mt-5">
+                        <MakePublicHelp
+                          title={"How to upload images"}
+                          headerDescription={
+                            "Upload your design of chioice that you want to be evaluated."
+                          }
+                          description={
+                            "A simple walk through on how to upload frames coming from Figma."
+                          }
+                          videoSrc="/videos/upload_instructions.mp4"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}

@@ -1,6 +1,16 @@
 import { z } from 'zod';
 import { parse, isValid, isBefore, isAfter } from "date-fns";
 
+
+const passwordSchema = z
+  .string()
+  .min(12, "At least 6 characters")
+  .refine((v) => /[A-Z]/.test(v), "Include at least one uppercase letter")
+  .refine((v) => /[a-z]/.test(v), "Include at least one lowercase letter")
+  .refine((v) => /\d/.test(v), "Include at least one number")
+  .refine((v) => /[^A-Za-z0-9]/.test(v), "Include at least one symbol")
+  .refine((v) => !/\s/.test(v), "No spaces allowed");
+
 export const registerFormSchema = z.object({
     username: z.string().min(3, 'User name is required'),
     first_name: z.string().min(2, "First name is required"),
@@ -24,11 +34,11 @@ export const registerFormSchema = z.object({
     gender: z.string().min(3, "Gender Must have a value"),
     // website_url: z.string(),
 
-    password: z.string().min(6, 'Password must be at least 6 characters.'),
-    confirmPassword: z.string().min(6, 'Confirm Password must be at least 6 characters.'),
+    password: passwordSchema,
+    confirmPassword: z.string(),
 }).refine(data => data.password === data.confirmPassword, {
-    message: 'Password must match',
     path: ['confirmPassword'],
+    message: 'Password must match',
 })
 
 export const loginFormSchema = z.object({

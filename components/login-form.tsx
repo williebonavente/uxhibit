@@ -195,9 +195,13 @@ export default function LoginForm() {
       toast.success("Logged in successfully!");
       setLoginLoading(false);
       setRedirecting(true);
-      setTimeout(() => {
-        router.push("/dashboard");
-      }, 200);
+      try {
+  router.push("/dashboard");
+} catch (e) {
+  setRedirecting(false);
+  setLoginLoading(false);
+}
+
     } catch (error) {
       console.error("Form submission error", error);
       // toast.error('Failed to submit the form. Please try again.')
@@ -312,7 +316,7 @@ export default function LoginForm() {
               {/* Login Button */}
               <Button
                 type="submit"
-                disabled={loginLoading || redirecting || !captchaToken}
+                disabled={loginLoading || !captchaToken}
                 className={`group relative inline-flex items-center justify-center
                   w-full h-11 sm:h-12 mt-5
                   rounded-xl text-base tracking-wide
@@ -360,18 +364,13 @@ export default function LoginForm() {
                 {/* Label */}
                 <span className="relative z-10 flex items-center gap-2">
                   {loginLoading ? (
-                    <>
-                      <Loader2 size={20} className="animate-spin" />
-                      Logging in...
-                    </>
-                  ) : redirecting ? (
-                    <>
-                      <Loader2 size={20} className="animate-spin cursor-not-allowed" />
-                      Redirecting...
-                    </>
-                  ) : (
-                    "Log In"
-                  )}
+  <>
+    <Loader2 size={20} className="animate-spin" />
+    Logging in...
+  </>
+) : (
+  "Log In"
+)} 
                 </span>
               </Button>
             </form>

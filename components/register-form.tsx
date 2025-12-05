@@ -39,16 +39,15 @@ import BackgroundVideo from "./background_video/backgroundVideo";
 import ReCAPTCHA from "react-google-recaptcha";
 import type { User } from "@supabase/supabase-js";
 
-
 type RegistrationFormProps = {
   user: User | null;
-}
+};
 
 export default function RegistrationForm({ user }: RegistrationFormProps) {
   const router = useRouter();
 
   const [termsAccepted, setTermsAccepted] = useState(false);
-    const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "";
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -59,7 +58,7 @@ export default function RegistrationForm({ user }: RegistrationFormProps) {
     localStorage.setItem("termsAccepted", String(checked));
   };
 
-    useEffect(() => {
+  useEffect(() => {
     if (!siteKey) console.warn("Missing NEXT_PUBLIC_RECAPTCHA_SITE_KEY");
   }, [siteKey]);
 
@@ -99,7 +98,7 @@ export default function RegistrationForm({ user }: RegistrationFormProps) {
       return;
     }
 
-        let verifyJson: { success: boolean } = { success: false };
+    let verifyJson: { success: boolean } = { success: false };
     try {
       const verifyResp = await fetch("/api/captcha/verify", {
         method: "POST",
@@ -114,7 +113,7 @@ export default function RegistrationForm({ user }: RegistrationFormProps) {
       return;
     }
 
-        if (!verifyJson.success) {
+    if (!verifyJson.success) {
       toast.error("CAPTCHA failed.");
       captchaRef.current?.reset();
       setCaptchaToken(null);
@@ -179,7 +178,7 @@ export default function RegistrationForm({ user }: RegistrationFormProps) {
         if (profileDetails && profileDetails.id) {
           await supabase.from("profile_contacts").insert({
             profile_details_id: profileDetails.id,
-            email: "", 
+            email: "",
             website: "",
             open_to: "",
             extra_fields: "[]",
@@ -196,7 +195,7 @@ export default function RegistrationForm({ user }: RegistrationFormProps) {
       toast.error("Failed to submit the form. Please try again.");
     } finally {
       setTimeout(() => setIsSubmitting(false), 400);
-            captchaRef.current?.reset();
+      captchaRef.current?.reset();
       setCaptchaToken(null);
     }
   }
@@ -229,10 +228,7 @@ export default function RegistrationForm({ user }: RegistrationFormProps) {
   }, [form]);
 
   return (
-    <div
-      style={whiteCursor}
-      className="relative min-h-screen flex items-center justify-center w-full overflow-hidden p-5"
-    >
+    <div style={whiteCursor} className="relative h-screen flex items-start justify-center w-full overflow-hidden px-5 pb-0 md:px-6">
       <BackgroundVideo
         src="/images/uxhibit-gif-3(webm).webm"
         type="video/webm"
@@ -242,10 +238,7 @@ export default function RegistrationForm({ user }: RegistrationFormProps) {
 
       <div className="absolute inset-0 bg-black/40" />
 
-      <div
-        className="relative z-10 flex flex-col w-full max-w-sm sm:max-w-md md:max-w-lg xl:max-w-2xl p-6 sm:p-8 md:p-10 lg:p-12
-                      bg-[#1E1E1E]/40 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20"
-      >
+        <div className="relative z-10 transform scale-90 origin-center -translate-y-2 flex flex-col w-full max-w-sm sm:max-w-md md:max-w-lg xl:max-w-2xl p-6 sm:p-8 md:p-10 lg:p-12 bg-[#1E1E1E]/40 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20">
         <div className="flex justify-center mb-5">
           <Image
             src="/images/dark-header-icon.png"
@@ -257,7 +250,7 @@ export default function RegistrationForm({ user }: RegistrationFormProps) {
         </div>
 
         <p className="text-sm sm:text-base md:text-lg text-center mb-8 text-white dark:text-[#F5F5F5]/70">
-          Create your account and start designing with UXhibit
+          Create your account and start evaluating with UXhibit
         </p>
 
         <Form {...form}>
@@ -399,68 +392,163 @@ export default function RegistrationForm({ user }: RegistrationFormProps) {
                 <FormField
                   control={form.control}
                   name="birthday"
-                  render={({ field }) => (
-                    <FormItem className="h-full">
-                      <label
-                        htmlFor="birthday"
-                        className="block text-white text-sm opacity-60"
-                      >
-                        Birthday <span className="text-[#ED5E20]">*</span>
-                      </label>
-                      <FormControl>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              className="w-full h-12 text-sm sm:text-base border text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A] rounded-lg px-3 pr-10 shadow-sm flex justify-between items-center"
+                  render={({ field }) => {
+                    // Helpers: display as MM/DD/YYYY, store as yyyy-MM-dd
+                    const toDisplay = (val: string | null) => {
+                      if (!val) return "";
+                      // val is ISO yyyy-MM-dd
+                      const [y, m, d] = val.split("-");
+                      if (!y || !m || !d) return "";
+                      return `${m.padStart(2, "0")}/${d.padStart(2, "0")}/${y}`;
+                    };
+
+                    const toISO = (mmddyyyy: string) => {
+                      const digits = mmddyyyy.replace(/[^\d]/g, "");
+                      if (digits.length !== 8) return "";
+                      const mm = digits.slice(0, 2);
+                      const dd = digits.slice(2, 4);
+                      const yyyy = digits.slice(4, 8);
+                      // Basic range checks
+                      const mNum = Number(mm);
+                      const dNum = Number(dd);
+                      const yNum = Number(yyyy);
+                      if (yNum < 1900 || yNum > new Date().getFullYear())
+                        return "";
+                      if (mNum < 1 || mNum > 12) return "";
+                      // construct date and validate
+                      const dt = new Date(`${yyyy}-${mm}-${dd}T00:00:00`);
+                      if (Number.isNaN(dt.getTime())) return "";
+                      // Prevent future dates
+                      const today = new Date();
+                      if (dt > today) return "";
+                      return `${yyyy}-${mm}-${dd}`;
+                    };
+
+                    const formatTyping = (raw: string) => {
+                      // Keep only digits and build MM/DD/YYYY progressively
+                      const digits = raw.replace(/[^\d]/g, "").slice(0, 8);
+                      if (digits.length <= 2) return digits;
+                      if (digits.length <= 4)
+                        return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+                      return `${digits.slice(0, 2)}/${digits.slice(
+                        2,
+                        4
+                      )}/${digits.slice(4)}`;
+                    };
+
+                    // New: readable helper for default month
+                    const yearsAgo = (n: number) => {
+                      const d = new Date();
+                      d.setFullYear(d.getFullYear() - n, d.getMonth(), 1); // snap to month start for consistency
+                      return d;
+                    };
+
+                    const [localDisplay, setLocalDisplay] = useState(
+                      toDisplay(field.value || "")
+                    );
+
+                    useEffect(() => {
+                      setLocalDisplay(toDisplay(field.value || ""));
+                    }, [field.value]);
+
+                    const handleChange = (
+                      e: React.ChangeEvent<HTMLInputElement>
+                    ) => {
+                      const next = formatTyping(e.target.value);
+                      setLocalDisplay(next);
+                      const iso = toISO(next);
+                      // Only update form value when we have a valid ISO date or the field is being cleared
+                      if (iso || next === "") {
+                        field.onChange(iso);
+                      }
+                    };
+
+                    const handleBlur = () => {
+                      // On blur, try to coerce to ISO; if invalid, clear
+                      const iso = toISO(localDisplay);
+                      field.onChange(iso || "");
+                      setLocalDisplay(toDisplay(iso || ""));
+                    };
+
+                    return (
+                      <FormItem className="h-full">
+                        <label
+                          htmlFor="birthday"
+                          className="block text-white text-sm opacity-60"
+                        >
+                          Birthday <span className="text-[#ED5E20]">*</span>
+                        </label>
+                        <FormControl>
+                          <div className="flex gap-2 items-center">
+                            <Input
                               id="birthday"
-                              type="button"
-                            >
-                              <span
-                                className={
-                                  field.value
-                                    ? ""
-                                    : "text-gray-400 dark:text-gray-500 opacity-60"
-                                }
-                              >
-                                {field.value
-                                  ? format(new Date(field.value), "MM/dd/yyyy")
-                                  : "MM/DD/YYYY"}
-                              </span>
-                              <CalendarIcon className="ml-2 h-5 w-5 text-gray-700 dark:text-white" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={
-                                field.value ? new Date(field.value) : undefined
-                              }
-                              onSelect={(date) =>
-                                field.onChange(
-                                  date ? format(date, "yyyy-MM-dd") : ""
-                                )
-                              }
-                              captionLayout="dropdown"
-                              hidden={{
-                                before: new Date(1900, 0, 1),
-                                after: new Date(
-                                  new Date().getFullYear(),
-                                  11,
-                                  31
-                                ),
-                              }}
-                              disabled={[
-                                { from: new Date(), to: new Date(2100, 0, 1) },
-                              ]}
-                              autoFocus
+                              inputMode="numeric"
+                              placeholder="MM/DD/YYYY"
+                              className="w-full h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
+                              value={localDisplay}
+                              onChange={handleChange}
+                              onBlur={handleBlur}
+                              autoComplete="bday"
                             />
-                          </PopoverContent>
-                        </Popover>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  type="button"
+                                  className="h-12 px-3 border text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
+                                  aria-label="Open calendar"
+                                >
+                                  <CalendarIcon className="h-5 w-5" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                className="w-auto p-0"
+                                align="start"
+                              >
+                                <Calendar
+                                  mode="single"
+                                  selected={
+                                    field.value
+                                      ? new Date(field.value)
+                                      : undefined
+                                  }
+                                  onSelect={(date) => {
+                                    const iso = date
+                                      ? format(date, "yyyy-MM-dd")
+                                      : "";
+                                    field.onChange(iso);
+                                    setLocalDisplay(toDisplay(iso));
+                                  }}
+                                  captionLayout="dropdown"
+                                  hidden={{
+                                    before: new Date(1900, 0, 1),
+                                    after: new Date(
+                                      new Date().getFullYear(),
+                                      11,
+                                      31
+                                    ),
+                                  }}
+                                  disabled={[
+                                    {
+                                      from: new Date(),
+                                      to: new Date(2100, 0, 1),
+                                    },
+                                  ]}
+                                  defaultMonth={
+                                    field.value
+                                      ? new Date(field.value)
+                                      : yearsAgo(18)
+                                  }
+                                  autoFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
 
@@ -469,52 +557,150 @@ export default function RegistrationForm({ user }: RegistrationFormProps) {
                 <FormField
                   control={form.control}
                   name="gender"
-                  render={({ field }) => (
-                    <FormItem className="h-full">
-                      <label
-                        htmlFor="gender"
-                        className="block text-white text-sm opacity-60"
-                      >
-                        Gender <span className="text-[#ED5E20]">*</span>
-                      </label>
-                      <FormControl>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value || undefined}
+                  render={({ field }) => {
+                    const [open, setOpen] = useState(false);
+                    const [query, setQuery] = useState("");
+
+                    const options = [
+                      { value: "male", label: "Male" },
+                      { value: "female", label: "Female" },
+                      { value: "non-binary", label: "Non-binary" },
+                      {
+                        value: "prefer-not-to-say",
+                        label: "Prefer not to say",
+                      },
+                    ];
+
+                    const currentLabel =
+                      options.find((o) => o.value === field.value)?.label ||
+                      field.value ||
+                      "";
+
+                    // Derive filtered options based on the query
+                    const filtered = query
+                      ? options.filter((o) =>
+                          o.label.toLowerCase().includes(query.toLowerCase())
+                        )
+                      : options;
+
+                    const commitValue = (val: string) => {
+                      field.onChange(val);
+                      setOpen(false);
+                      setQuery("");
+                    };
+
+                    return (
+                      <FormItem className="h-full">
+                        <label
+                          htmlFor="gender"
+                          className="block text-white text-sm opacity-60"
                         >
-                          <SelectTrigger
-                            id="gender"
-                            className="w-full h-12 text-sm sm:text-base border text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A] 
-                              rounded-lg px-3 shadow-sm focus:outline-none focus:ring-2 
-                              focus:ring-white/50 transition appearance-none flex items-center cursor-pointer
-                              [&_[data-placeholder]]:text-gray-400 [&_[data-placeholder]]:opacity-60"
-                            style={{ minHeight: "48px", lineHeight: "1.25rem" }}
-                          >
-                            {!field.value ? (
-                              <span className="text-gray-600 dark:text-gray-400 opacity-60">
-                                Select gender
-                              </span>
-                            ) : (
-                              <SelectValue />
-                            )}
-                          </SelectTrigger>
-                          <SelectContent
-                            className="w-full min-w-full"
-                            position="popper"
-                            sideOffset={4}
-                          >
-                            <SelectItem value="male">Male</SelectItem>
-                            <SelectItem value="female">Female</SelectItem>
-                            <SelectItem value="others">Others</SelectItem>
-                            <SelectItem value="prefer-not-to-say">
-                              Prefer not to Say
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                          Gender <span className="text-[#ED5E20]">*</span>
+                        </label>
+                        <FormControl>
+                          <Popover open={open} onOpenChange={setOpen}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                id="gender"
+                                variant="outline"
+                                type="button"
+                                className="w-full h-12 justify-between text-left border text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A] rounded-lg px-3 shadow-sm"
+                              >
+                                {currentLabel ? (
+                                  <span className="truncate">
+                                    {currentLabel}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-600 dark:text-gray-400 opacity-60">
+                                    Select or type your gender
+                                  </span>
+                                )}
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="16"
+                                  height="16"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="ml-2 opacity-70"
+                                >
+                                  <path d="m6 9 6 6 6-6" />
+                                </svg>
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-[var(--radix-popover-trigger-width)] p-2"
+                              align="start"
+                            >
+                              {/* Search/Free text input */}
+                              <Input
+                                autoFocus
+                                placeholder="Type or pick an option"
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    const text = query.trim();
+                                    if (text.length > 0) commitValue(text);
+                                  }
+                                }}
+                                className="h-10 mb-2 text-sm border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A]"
+                              />
+
+                              {/* Suggested options */}
+                              <div className="max-h-44 overflow-y-auto rounded-md border border-white/10">
+                                {filtered.length === 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const text = query.trim();
+                                      if (text.length > 0) commitValue(text);
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-white/5"
+                                  >
+                                    Use “{query}”
+                                  </button>
+                                ) : (
+                                  filtered.map((opt) => (
+                                    <button
+                                      key={opt.value}
+                                      type="button"
+                                      onClick={() => commitValue(opt.value)}
+                                      className={`w-full text-left px-3 py-2 text-sm hover:bg-white/5 ${
+                                        field.value === opt.value
+                                          ? "bg-white/10"
+                                          : ""
+                                      }`}
+                                    >
+                                      {opt.label}
+                                    </button>
+                                  ))
+                                )}
+                              </div>
+
+                              {/* Clear selection */}
+                              {field.value && (
+                                <div className="mt-2">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    className="h-9 px-2 text-xs"
+                                    onClick={() => commitValue("")}
+                                  >
+                                    Clear selection
+                                  </Button>
+                                </div>
+                              )}
+                            </PopoverContent>
+                          </Popover>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
             </div>
@@ -523,26 +709,91 @@ export default function RegistrationForm({ user }: RegistrationFormProps) {
             <FormField
               control={form.control}
               name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <label
-                    htmlFor="password"
-                    className="block text-white text-sm opacity-60"
-                  >
-                    Password <span className="text-[#ED5E20]">*</span>
-                  </label>
-                  <FormControl>
-                    <PasswordInput
-                      id="password"
-                      placeholder=""
-                      type="password"
-                      className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A] cursor-pointer"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              render={({ field }) => {
+                const value = field.value || "";
+                const [isFocused, setIsFocused] = useState(false);
+                const rules = [
+                  { ok: value.length >= 6, label: "6+ chars" },
+                  { ok: /[A-Z]/.test(value), label: "Uppercase" },
+                  { ok: /[a-z]/.test(value), label: "Lowercase" },
+                  { ok: /\d/.test(value), label: "Number" },
+                  { ok: /[^A-Za-z0-9]/.test(value), label: "Symbol" },
+                  { ok: !/\s/.test(value), label: "No spaces" },
+                ];
+                const passed = rules.filter((r) => r.ok).length;
+                const allPassed = passed === rules.length;
+
+                const showRequirements =
+                  (isFocused || value.length > 0) && !allPassed;
+
+                return (
+                  <FormItem>
+                    <div className="flex items-center gap-2">
+                      <label
+                        htmlFor="password"
+                        className="block text-white text-sm opacity-60"
+                      >
+                        Password <span className="text-[#ED5E20]">*</span>
+                      </label>
+                      {/* {allPassed && (
+                        <span className="text-[11px] px-2 py-0.5 rounded bg-green-600/20 text-green-200 border border-green-600/40">
+                          Strong
+                        </span>
+                      )} */}
+                    </div>
+                    <FormControl>
+                      <div>
+                        <PasswordInput
+                          id="password"
+                          placeholder=""
+                          type="password"
+                          className="w-full h-11 sm:h-12 text-sm sm:text-base border-white/20 text-[#1A1A1A] dark:text-white bg-white dark:bg-[#1A1A1A] cursor-pointer"
+                          {...field}
+                          onFocus={(e) => {
+                            setIsFocused(true);
+                            field.onFocus?.(e);
+                          }}
+                          onBlur={(e) => {
+                            setIsFocused(false);
+                            field.onBlur?.(e);
+                          }}
+                        />
+
+                        {showRequirements && (
+                          <div className="mt-2 text-xs">
+                            <div
+                              className={`font-medium ${
+                                allPassed
+                                  ? "text-green-400"
+                                  : passed >= 4
+                                  ? "text-yellow-400"
+                                  : "text-red-400"
+                              }`}
+                            >
+                              {/* Strength: {strength} */}
+                            </div>
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              {rules.map((r) => (
+                                <span
+                                  key={r.label}
+                                  className={`px-2 py-1 rounded border text-[11px] ${
+                                    r.ok
+                                      ? "bg-green-600/20 border-green-600/40 text-green-200"
+                                      : "bg-red-600/15 border-red-600/40 text-red-200"
+                                  }`}
+                                >
+                                  {r.label}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    {/* <FormMessage /> */}
+                  </FormItem>
+                );
+              }}
             />
 
             {/* Confirm Password */}
@@ -571,7 +822,7 @@ export default function RegistrationForm({ user }: RegistrationFormProps) {
               )}
             />
 
-                        <div className="mt-2 w-full flex justify-center cursor-pointer">
+            <div className="mt-2 w-full flex justify-center cursor-pointer">
               {siteKey ? (
                 <ReCAPTCHA
                   ref={captchaRef}
@@ -607,8 +858,23 @@ export default function RegistrationForm({ user }: RegistrationFormProps) {
                   }}
                   className="text-[#ff7f3f] hover:text-[#ED5E20] transition-colors duration-200 hover:underline font-medium"
                 >
-                  Terms and Conditions & Privacy Policy{" "}
+                  Terms and Conditions
                   <span className="text-[#ED5E20]"></span>
+                </Link>
+                <span className="mx-1">&</span>
+                <Link
+                  href="/auth/privacy-policy"
+                  onClick={() => {
+                    const values = form.getValues();
+                    localStorage.setItem(
+                      "registrationDraft",
+                      JSON.stringify(values)
+                    );
+                    router.push("/terms");
+                  }}
+                  className="text-[#ff7f3f] hover:text-[#ED5E20] transition-colors duration-200 hover:underline font-medium"
+                >
+                  Privacy Policy <span className="text-[#ED5E20]"></span>
                 </Link>
               </label>
             </div>
@@ -616,7 +882,9 @@ export default function RegistrationForm({ user }: RegistrationFormProps) {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isSubmitting || !isValid || !termsAccepted || !captchaToken}
+              disabled={
+                isSubmitting || !isValid || !termsAccepted || !captchaToken
+              }
               aria-disabled={isSubmitting || !isValid || !termsAccepted}
               // inline cursor fallback (guaranteed)
               style={{

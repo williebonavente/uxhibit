@@ -3,11 +3,21 @@
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { useState, useRef, useEffect } from "react";
 
 export default function TermsPage() {
   const router = useRouter();
 
+    const [canAccept, setCanAccept] = useState(false);
+    const [accepted, setAccepted] = useState<boolean>(
+    typeof window !== "undefined" && localStorage.getItem("termsAccepted") === "true"
+  );
+    const [isProcessing, setIsProcessing] = useState(false);
+
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+
   const handleAccept = () => {
+    setIsProcessing(true);
     localStorage.setItem("termsAccepted", "true");
     router.push(`${process.env.NEXT_PUBLIC_APP_URL}/auth/signup`);
   };
@@ -16,6 +26,22 @@ export default function TermsPage() {
     cursor:
       "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' stroke='%23ffffff' fill='none' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 3l7 17 2-7 7-2-16-8Z'/></svg>\") 2 2, pointer",
   };
+
+    useEffect(() => {
+  const el = scrollRef.current;
+  if (!el) return;
+  const onScroll = () => {
+    const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 8;
+    setCanAccept(nearBottom);
+  };
+  el.addEventListener("scroll", onScroll);
+  onScroll();
+  return () => el.removeEventListener("scroll", onScroll);
+}, []);
+
+useEffect(() => {
+  setAccepted(localStorage.getItem("termsAccepted") === "true");
+}, []);
 
   return (
     <div
@@ -47,35 +73,36 @@ export default function TermsPage() {
         </div>
 
         <h2 className="text-xl font-bold text-center gradient-text">
-          Terms and Conditions & Privacy Policy
+          Terms and Conditions
         </h2>
 
         {/* Scrollable Terms Section */}
-        <div className="text-sm sm:text-base text-white dark:text-[#F5F5F5]/70 mb-6 space-y-6 max-h-[400px] overflow-y-auto leading-relaxed mt-10">
+        <div ref={scrollRef} className="text-sm sm:text-base text-white dark:text-[#F5F5F5]/70 mb-6 space-y-6 max-h-[400px] overflow-y-auto leading-relaxed mt-10">
           {/* Agreement to Our Legal Terms */}
           <section>
             <h3 className="font-semibold text-lg mb-5">
               Agreement to Our Legal Terms
             </h3>
             <div className="pl-7 space-y-1">
-              We are <strong>Uxhibit</strong> (&quot;Company,&quot; &quot;we,&quot; &quot;us,&quot; &quot;our&quot;).
+              We are <strong>Uxhibit</strong> (&quot;Company,&quot;
+              &quot;we,&quot; &quot;us,&quot; &quot;our&quot;).
               <br />
               <br />
               We operate the website{" "}
               <a href="https://www.uxhibit.com" className="underline">
                 www.uxhibit.com
               </a>{" "}
-              (the <strong>&quot;Site&quot;</strong>) as well as other related products
-              and services that refer to these legal terms (the{" "}
+              (the <strong>&quot;Site&quot;</strong>) as well as other related
+              products and services that refer to these legal terms (the{" "}
               <strong>&quot;Legal Terms&quot;</strong>) (collectively, the{" "}
               <strong>&quot;Services&quot;</strong>).
               <br />
               <br />
               Web-based design evaluation tool that uses AI (via LLMs) to give
-              UI/UX learners feedback on their designs based on Jakob Nielsen&apos;s
-              10 Usability Heuristics. It also considers demographic factors
-              like age and occupation to make the feedback more tailored and
-              insightful.
+              UI/UX learners feedback on their designs based on Jakob
+              Nielsen&apos;s 10 Usability Heuristics. It also considers
+              demographic factors like age and occupation to make the feedback
+              more tailored and insightful.
               <br />
               <br />
               You can contact us by email at{" "}
@@ -83,13 +110,13 @@ export default function TermsPage() {
               <br />
               <br />
               These Legal Terms constitute a legally binding agreement made
-              between you, whether personally or on behalf of an entity (&quot;you&quot;),
-              and Uxhibit, concerning your access to and use of the Services.
-              You agree that by accessing the Services, you have read,
-              understood, and agreed to be bound by all of these Legal Terms. IF
-              YOU DO NOT AGREE WITH ALL OF THESE LEGAL TERMS, THEN YOU ARE
-              EXPRESSLY PROHIBITED FROM USING THE SERVICES AND YOU MUST
-              DISCONTINUE USE IMMEDIATELY.
+              between you, whether personally or on behalf of an entity
+              (&quot;you&quot;), and Uxhibit, concerning your access to and use
+              of the Services. You agree that by accessing the Services, you
+              have read, understood, and agreed to be bound by all of these
+              Legal Terms. IF YOU DO NOT AGREE WITH ALL OF THESE LEGAL TERMS,
+              THEN YOU ARE EXPRESSLY PROHIBITED FROM USING THE SERVICES AND YOU
+              MUST DISCONTINUE USE IMMEDIATELY.
               <br />
               <br />
               Supplemental terms and conditions or documents that may be posted
@@ -97,11 +124,11 @@ export default function TermsPage() {
               incorporated herein by reference. We reserve the right, in our
               sole discretion, to make changes or modifications to these Legal
               Terms at any time and for any reason. We will alert you about any
-              changes by updating the &quot;Last updated&quot; date of these Legal Terms,
-              and you waive any right to receive specific notice of each such
-              change. It is your responsibility to periodically review these
-              Legal Terms to stay informed of updates. You will be subject to,
-              and will be deemed to have been made aware of and to have
+              changes by updating the &quot;Last updated&quot; date of these
+              Legal Terms, and you waive any right to receive specific notice of
+              each such change. It is your responsibility to periodically review
+              these Legal Terms to stay informed of updates. You will be subject
+              to, and will be deemed to have been made aware of and to have
               accepted, the changes in any revised Legal Terms by your continued
               use of the Services after the date such revised Legal Terms are
               posted.
@@ -124,37 +151,195 @@ export default function TermsPage() {
           <section>
             <h3 className="font-semibold text-lg mb-2">Table of Contents</h3>
             <ol className="list-decimal pl-7 space-y-1">
-              <li>Our Services</li>
-              <li>Intellectual Property Rights</li>
-              <li>User Representations</li>
-              <li>User Registration</li>
-              <li>Prohibited Activities</li>
-              <li>User Generated Contributions</li>
-              <li>Contribution License</li>
-              <li>Guidelines for Reviews</li>
-              <li>Social Media</li>
-              <li>Third-Party Websites and Content</li>
-              <li>Services Management</li>
-              <li>Privacy Policy</li>
-              <li>Copyright Infringements</li>
-              <li>Term and Termination</li>
-              <li>Modifications and Interruptions</li>
-              <li>Governing Law</li>
-              <li>Dispute Resolution</li>
-              <li>Corrections</li>
-              <li>Disclaimer</li>
-              <li>Limitations of Liability</li>
-              <li>Indemnification</li>
-              <li>User Data</li>
-              <li>Electronic Communications, Transactions, and Signatures</li>
-              <li>Miscellaneous</li>
-              <li>Contact Us</li>
+              <li>
+                <a
+                  href="#our-services"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                  Our Services
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#user-representations"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                  User Representations
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#user-registration"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                  User Registration
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#prohibited-activities"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                  Prohibited Activities
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#user-generated-contributions"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                  User Generated Contributions
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#intellectual-property-rights"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                   Intellectual Property Rights
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#contribution-license"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                  Contribution License
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#guidelines-for-reviews"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                  Guidelines for Reviews
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#social-media"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                  Social Media
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#third-party-websites-and-content"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                  Third-Party Websites and Content
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#services-management"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                  Services Management
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#copyright-infringements"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                  Copyright Infringements
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#term-and-termination"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                  Term and Termination
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#modifications-and-interruptions"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                  Modifications and Interruptions
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#governing-law"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                  Governing Law
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#dispute-resolution"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                  Dispute Resolution
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#corrections"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                  Corrections
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#disclaimer"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                  Disclaimer
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#limitations-of-liability"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                  Limitations of Liability
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#indemnification"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                  Indemnification
+                </a>
+              </li>
+              <li>
+                <a href="#user-data" className="underline hover:text-[#ED5E20]">
+                  User Data
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#electronic-communications-transactions-and-signatures"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                  Electronic Communications, Transactions, and Signatures
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#miscellaneous"
+                  className="underline hover:text-[#ED5E20]"
+                >
+                  Miscellaneous
+                </a>
+              </li>
             </ol>
           </section>
 
           {/* Our Services */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">1. Our Services</h3>
+            <h3 id="our-services" className="font-semibold text-lg mb-2">
+              1. Our Services
+            </h3>
             <div className="pl-7 space-y-1">
               The information provided when using the Services is not intended
               for distribution to any person or entity where such distribution
@@ -164,7 +349,10 @@ export default function TermsPage() {
 
           {/* Intellectual Property Rights */}
           <section>
-            <h3 className="font-semibold text-lg mb-5">
+            <h3
+              id="intellectual-property-rights"
+              className="font-semibold text-lg mb-5"
+            >
               2. Intellectual Property Rights
             </h3>
             <div className="pl-7 space-y-1">
@@ -175,8 +363,8 @@ export default function TermsPage() {
               rights in our Services, including all source code, databases,
               functionality, software, website designs, audio, video, text,
               photographs, and graphics in the Services (collectively, the
-              &quot;Content&quot;), as well as the trademarks, service marks, and logos
-              contained therein (the &quot;Marks&quot;).
+              &quot;Content&quot;), as well as the trademarks, service marks,
+              and logos contained therein (the &quot;Marks&quot;).
               <br />
               <br />
               Our Content and Marks are protected by copyright and trademark
@@ -184,17 +372,18 @@ export default function TermsPage() {
               competition laws) and treaties around the world.
               <br />
               <br />
-              The Content and Marks are provided in or through the Services &quot;AS
-              IS&quot; for your personal, non-commercial use or internal business
-              purpose only.
+              The Content and Marks are provided in or through the Services
+              &quot;AS IS&quot; for your personal, non-commercial use or
+              internal business purpose only.
               <br />
               <br />
               <strong className="text-base">Your Use of Our Services</strong>
               <br />
               <br />
               Subject to your compliance with these Legal Terms, including the{" "}
-              <strong>&quot;PROHIBITED ACTIVITIES&quot;</strong> section below, we grant
-              you a non-exclusive, non-transferable, revocable license to
+              <strong>&quot;PROHIBITED ACTIVITIES&quot;</strong> section below,
+              we grant you a non-exclusive, non-transferable, revocable license
+              to
               <ol className="list-disc pl-7 space-y-1">
                 <li>access the Services; and</li>
                 <li>
@@ -239,19 +428,20 @@ export default function TermsPage() {
               <br />
               <br />
               Please review this section and the{" "}
-              <strong>&quot;PROHIBITED ACTIVITIES&quot;</strong>section carefully prior to
-              using our Services to understand the (a) rights you give us and
-              (b) obligations you have when you post or upload any content
-              through the Services.
+              <strong>&quot;PROHIBITED ACTIVITIES&quot;</strong>section
+              carefully prior to using our Services to understand the (a) rights
+              you give us and (b) obligations you have when you post or upload
+              any content through the Services.
               <br />
               <br />
               <strong>Submissions: </strong>By directly sending us any question,
               comment, suggestion, idea, feedback, or other information about
-              the Services (&quot;Submissions&quot;), you agree to assign to us all
-              intellectual property rights in such Submission. You agree that we
-              shall own this Submission and be entitled to its unrestricted use
-              and dissemination for any lawful purpose, commercial or otherwise,
-              without acknowledgment or compensation to you.
+              the Services (&quot;Submissions&quot;), you agree to assign to us
+              all intellectual property rights in such Submission. You agree
+              that we shall own this Submission and be entitled to its
+              unrestricted use and dissemination for any lawful purpose,
+              commercial or otherwise, without acknowledgment or compensation to
+              you.
               <br />
               <br />
               <strong>Contributions: </strong>The Services may invite you to
@@ -262,8 +452,8 @@ export default function TermsPage() {
               including but not limited to text, writings, video, audio,
               photographs, music, graphics, comments, reviews, rating
               suggestions, personal information, or other material
-              (&quot;Contributions&quot;). Any Submission that is publicly posted shall
-              also be treated as a Contribution.
+              (&quot;Contributions&quot;). Any Submission that is publicly
+              posted shall also be treated as a Contribution.
               <br />
               <br />
               You understand that Contributions may be viewable by other users
@@ -302,9 +492,9 @@ export default function TermsPage() {
               <ol className="list-disc pl-7 space-y-1">
                 <li>
                   confirm that you have read and agree with our{" "}
-                  <strong>&quot;PROHIBITED ACTIVITIES&quot;</strong>and will not post,
-                  send, publish, upload, or transmit through the Services any
-                  Submission nor post any Contribution that is illegal,
+                  <strong>&quot;PROHIBITED ACTIVITIES&quot;</strong>and will not
+                  post, send, publish, upload, or transmit through the Services
+                  any Submission nor post any Contribution that is illegal,
                   harassing, hateful, harmful, defamatory, obscene, bullying,
                   abusive, discriminatory, threatening to any person or group,
                   sexually explicit, false, inaccurate, deceitful, or
@@ -332,8 +522,8 @@ export default function TermsPage() {
               You are solely responsible for your Submissions and/or
               Contributions and you expressly agree to reimburse us for any and
               all losses that we may suffer because of your breach of (a) this
-              section, (b) any third party&apos;s intellectual property rights, or
-              (c) applicable law.
+              section, (b) any third party&apos;s intellectual property rights,
+              or (c) applicable law.
               <br />
               <br />
               <strong>We may remove or edit your Content: </strong>Although we
@@ -358,8 +548,11 @@ export default function TermsPage() {
 
           {/* User Representations */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">
-              3. User Representations
+            <h3
+              id="user-representations"
+              className="font-semibold text-lg mb-2"
+            >
+              2. User Representations
             </h3>
             <div className="pl-7 space-y-1">
               By using the Services, you represent and warrant that: (1) all
@@ -385,7 +578,9 @@ export default function TermsPage() {
 
           {/* User Registration */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">4. User Registration</h3>
+            <h3 id="user-registration" className="font-semibold text-lg mb-2">
+              3. User Registration
+            </h3>
             <div className="pl-7 space-y-1">
               You may be required to register to use the Services. You agree to
               keep your password confidential and will be responsible for all
@@ -398,8 +593,11 @@ export default function TermsPage() {
 
           {/* Prohibited Activities */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">
-              5. Prohibited Activities
+            <h3
+              id="prohibited-activities"
+              className="font-semibold text-lg mb-2"
+            >
+              4. Prohibited Activities
             </h3>
             <div className="pl-7 space-y-1">
               You may not access or use the Services for any purpose other than
@@ -475,9 +673,10 @@ export default function TermsPage() {
                   Upload or transmit (or attempt to upload or to transmit) any
                   material that acts as a passive or active information
                   collection or transmission mechanism, including without
-                  limitation, clear graphics interchange formats (&quot;gifs&quot;), 1x1
-                  pixels, web bugs, cookies, or other similar devices (sometimes
-                  referred to as &quot;spyware&quot; or &quot;passive collection mechanisms&quot; or
+                  limitation, clear graphics interchange formats
+                  (&quot;gifs&quot;), 1x1 pixels, web bugs, cookies, or other
+                  similar devices (sometimes referred to as &quot;spyware&quot;
+                  or &quot;passive collection mechanisms&quot; or
                   &quot;pcms&quot;).
                 </li>
                 <li>
@@ -536,8 +735,11 @@ export default function TermsPage() {
 
           {/* User Generated Contributions */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">
-              6. User Generated Contributions
+            <h3
+              id="user-generated-contributions"
+              className="font-semibold text-lg mb-2"
+            >
+              5. User Generated Contributions
             </h3>
             <div className="pl-7 space-y-1">
               The Services may invite you to chat, contribute to, or participate
@@ -547,10 +749,10 @@ export default function TermsPage() {
               content and materials to us or on the Services, including but not
               limited to text, writings, video, audio, photographs, graphics,
               comments, suggestions, or personal information or other material
-              (collectively. &quot;Contributions&quot;). Contributions may be viewable by
-              other users of the Services and through third-party websites. As
-              such, any Contributions you transmit may be treated as
-              non-confidential and non-proprietary. When you create or make
+              (collectively. &quot;Contributions&quot;). Contributions may be
+              viewable by other users of the Services and through third-party
+              websites. As such, any Contributions you transmit may be treated
+              as non-confidential and non-proprietary. When you create or make
               available any Contributions, you thereby represent and warrant
               that:
               <ol className="list-disc pl-7 space-y-1">
@@ -634,8 +836,11 @@ export default function TermsPage() {
 
           {/* Contribution License */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">
-              7. Contribution License
+            <h3
+              id="contribution-license"
+              className="font-semibold text-lg mb-2"
+            >
+              6. Contribution License
             </h3>
             <div className="pl-7 space-y-1">
               All content, source code, designs, and trademarks are owned or
@@ -646,8 +851,8 @@ export default function TermsPage() {
 
           {/* Intellectual Property Rights */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">
-              2. Intellectual Property Rights
+            <h3 id="" className="font-semibold text-lg mb-2">
+              7. Intellectual Property Rights
             </h3>
             <div className="pl-7 space-y-1">
               By posting your Contributions to any part of the Services or
@@ -699,7 +904,10 @@ export default function TermsPage() {
 
           {/* Guidelines for Reviews */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">
+            <h3
+              id="guidelines-for-reviews"
+              className="font-semibold text-lg mb-2"
+            >
               8. Guidelines for Reviews
             </h3>
             <div className="pl-7 space-y-1">
@@ -736,106 +944,113 @@ export default function TermsPage() {
 
           {/* Social Media */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">9. Social Media</h3>
+            <h3 id="social-media" className="font-semibold text-lg mb-2">
+              9. Social Media
+            </h3>
             <div className="pl-7 space-y-1">
               As part of the functionality of the Services, you may link your
               account with online accounts you have with third-party service
-              providers (each such account, a &quot;Third-Party Account&quot;) by either:
-              (1) providing your Third-Party Account login information through
-              the Services; or (2) allowing us to access your Third-Party
-              Account, as is permitted under the applicable terms and conditions
-              that govern your use of each Third-Party Account. You represent
-              and warrant that you are entitled to disclose your Third-Party
-              Account login information to us and/or grant us access to your
-              Third-Party Account, without breach by you of any of the terms and
-              conditions that govern your use of the applicable Third-Party
-              Account, and without obligating us to pay any fees or making us
-              subject to any usage limitations imposed by the third-party
-              service provider of the Third-Party Account. By granting us access
-              to any Third-Party Accounts, you understand that (1) we may
-              access, make available, and store (if applicable) any content that
-              you have provided to and stored in your Third-Party Account (the
-              &quot;Social Network Content&quot;) so that it is available on and through
-              the Services via your account, including without limitation any
-              friend lists and (2) we may submit to and receive from your
-              Third-Party Account additional information to the extent you are
-              notified when you link your account with the Third-Party Account.
-              Depending on the Third-Party Accounts you choose and subject to
-              the privacy settings that you have set in such Third-Party
-              Accounts, personally identifiable information that you post to
-              your Third-Party Accounts may be available on and through your
-              account on the Services. Please note that if a Third-Party Account
-              or associated service becomes unavailable or our access to such
-              Third-Party Account is terminated by the third-party service
-              provider, then Social Network Content may no longer be available
-              on and through the Services. You will have the ability to disable
-              the connection between your account on the Services and your
-              Third-Party Accounts at any time. PLEASE NOTE THAT YOUR
-              RELATIONSHIP WITH THE THIRD-PARTY SERVICE PROVIDERS ASSOCIATED
-              WITH YOUR THIRD-PARTY ACCOUNTS IS GOVERNED SOLELY BY YOUR
-              AGREEMENT(S) WITH SUCH THIRD-PARTY SERVICE PROVIDERS. We make no
-              effort to review any Social Network Content for any purpose,
-              including but not limited to, for accuracy, legality, or
-              non-infringement, and we are not responsible for any Social
-              Network Content. You acknowledge and agree that we may access your
-              email address book associated with a Third-Party Account and your
-              contacts list stored on your mobile device or tablet computer
-              solely for purposes of identifying and informing you of those
-              contacts who have also registered to use the Services. You can
-              deactivate the connection between the Services and your
-              Third-Party Account by contacting us using the contact information
-              below or through your account settings (if applicable). We will
-              attempt to delete any information stored on our servers that was
-              obtained through such Third-Party Account, except the username and
-              profile picture that become associated with your account.
+              providers (each such account, a &quot;Third-Party Account&quot;)
+              by either: (1) providing your Third-Party Account login
+              information through the Services; or (2) allowing us to access
+              your Third-Party Account, as is permitted under the applicable
+              terms and conditions that govern your use of each Third-Party
+              Account. You represent and warrant that you are entitled to
+              disclose your Third-Party Account login information to us and/or
+              grant us access to your Third-Party Account, without breach by you
+              of any of the terms and conditions that govern your use of the
+              applicable Third-Party Account, and without obligating us to pay
+              any fees or making us subject to any usage limitations imposed by
+              the third-party service provider of the Third-Party Account. By
+              granting us access to any Third-Party Accounts, you understand
+              that (1) we may access, make available, and store (if applicable)
+              any content that you have provided to and stored in your
+              Third-Party Account (the &quot;Social Network Content&quot;) so
+              that it is available on and through the Services via your account,
+              including without limitation any friend lists and (2) we may
+              submit to and receive from your Third-Party Account additional
+              information to the extent you are notified when you link your
+              account with the Third-Party Account. Depending on the Third-Party
+              Accounts you choose and subject to the privacy settings that you
+              have set in such Third-Party Accounts, personally identifiable
+              information that you post to your Third-Party Accounts may be
+              available on and through your account on the Services. Please note
+              that if a Third-Party Account or associated service becomes
+              unavailable or our access to such Third-Party Account is
+              terminated by the third-party service provider, then Social
+              Network Content may no longer be available on and through the
+              Services. You will have the ability to disable the connection
+              between your account on the Services and your Third-Party Accounts
+              at any time. PLEASE NOTE THAT YOUR RELATIONSHIP WITH THE
+              THIRD-PARTY SERVICE PROVIDERS ASSOCIATED WITH YOUR THIRD-PARTY
+              ACCOUNTS IS GOVERNED SOLELY BY YOUR AGREEMENT(S) WITH SUCH
+              THIRD-PARTY SERVICE PROVIDERS. We make no effort to review any
+              Social Network Content for any purpose, including but not limited
+              to, for accuracy, legality, or non-infringement, and we are not
+              responsible for any Social Network Content. You acknowledge and
+              agree that we may access your email address book associated with a
+              Third-Party Account and your contacts list stored on your mobile
+              device or tablet computer solely for purposes of identifying and
+              informing you of those contacts who have also registered to use
+              the Services. You can deactivate the connection between the
+              Services and your Third-Party Account by contacting us using the
+              contact information below or through your account settings (if
+              applicable). We will attempt to delete any information stored on
+              our servers that was obtained through such Third-Party Account,
+              except the username and profile picture that become associated
+              with your account.
             </div>
           </section>
 
           {/* Third-Party Websites and Content */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">
+            <h3
+              id="third-party-websites-and-content"
+              className="font-semibold text-lg mb-2"
+            >
               10. Third-Party Websites and Content
             </h3>
             <div className="pl-7 space-y-1">
               The Services may contain (or you may be sent via the Site) links
-              to other websites (&quot;Third-Party Websites&quot;) as well as articles,
-              photographs, text, graphics, pictures, designs, music, sound,
-              video, information, applications, software, and other content or
-              items belonging to or originating from third parties (&quot;Third-Party
-              Content&quot;). Such Third-Party Websites and Third-Party Content are
-              not investigated, monitored, or checked for accuracy,
-              appropriateness, or completeness by us, and we are not responsible
-              for any Third- Party Websites accessed through the Services or any
-              Third-Party Content posted on, available through, or installed
-              from the Services, including the content, accuracy. offensiveness,
-              opinions, reliability, privacy practices, or other policies of or
-              contained in the Third-Party Websites or the Third-Party Content.
-              Inclusion of, linking to, or permitting the use or installation of
-              any Third-Party Websites or any Third-Party Content does not imply
-              approval or endorsement thereof by us. If you decide to leave the
-              Services and access the Third-Party Websites or to use or install
-              any Third-Party Content, you do so at your own risk, and you
-              should be aware these Legal Terms no longer govern. You should
-              review the applicable terms and policies, including privacy and
-              data gathering practices, of any website to which you navigate
-              from the Services or relating to any applications you use or
-              install from the Services. Any purchases you make through
-              Third-Party Websites will be through other websites and from other
-              companies, and we take no responsibility whatsoever in relation to
-              such purchases which are exclusively between you and the
-              applicable third party. You agree and acknowledge that we do not
-              endorse the products or services offered on Third-Party Websites
-              and you shall hold us blameless from any harm caused by your
-              purchase of such products or services. Additionally, you shall
-              hold us blameless from any losses sustained by you or harm caused
-              to you relating to or resulting in any way from any Third-Party
-              Content or any contact with Third-Party Websites.
+              to other websites (&quot;Third-Party Websites&quot;) as well as
+              articles, photographs, text, graphics, pictures, designs, music,
+              sound, video, information, applications, software, and other
+              content or items belonging to or originating from third parties
+              (&quot;Third-Party Content&quot;). Such Third-Party Websites and
+              Third-Party Content are not investigated, monitored, or checked
+              for accuracy, appropriateness, or completeness by us, and we are
+              not responsible for any Third- Party Websites accessed through the
+              Services or any Third-Party Content posted on, available through,
+              or installed from the Services, including the content, accuracy.
+              offensiveness, opinions, reliability, privacy practices, or other
+              policies of or contained in the Third-Party Websites or the
+              Third-Party Content. Inclusion of, linking to, or permitting the
+              use or installation of any Third-Party Websites or any Third-Party
+              Content does not imply approval or endorsement thereof by us. If
+              you decide to leave the Services and access the Third-Party
+              Websites or to use or install any Third-Party Content, you do so
+              at your own risk, and you should be aware these Legal Terms no
+              longer govern. You should review the applicable terms and
+              policies, including privacy and data gathering practices, of any
+              website to which you navigate from the Services or relating to any
+              applications you use or install from the Services. Any purchases
+              you make through Third-Party Websites will be through other
+              websites and from other companies, and we take no responsibility
+              whatsoever in relation to such purchases which are exclusively
+              between you and the applicable third party. You agree and
+              acknowledge that we do not endorse the products or services
+              offered on Third-Party Websites and you shall hold us blameless
+              from any harm caused by your purchase of such products or
+              services. Additionally, you shall hold us blameless from any
+              losses sustained by you or harm caused to you relating to or
+              resulting in any way from any Third-Party Content or any contact
+              with Third-Party Websites.
             </div>
           </section>
 
           {/* Services Management */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">
+            <h3 id="services-management" className="font-semibold text-lg mb-2">
               11. Services Management
             </h3>
             <div className="pl-7 space-y-1">
@@ -856,42 +1071,23 @@ export default function TermsPage() {
             </div>
           </section>
 
-          {/* Privacy Policy */}
-          <section>
-            <h3 className="font-semibold text-lg mb-2">12. Privacy Policy</h3>
-            <div className="pl-7 space-y-1">
-              We care about data privacy and security. Please review our Privacy
-              Policy:{" "}
-              <a href="https://www.uxhibit.com" className="underline">
-                http://privacy.gov.ph/data-privacy-act/.
-              </a>{" "}
-              By using the Services, you agree to be bound by our Privacy
-              Policy, which is incorporated into these Legal Terms. Please be
-              advised the Services are hosted in the Philippines. If you access
-              the Services from any other region of the world with laws or other
-              requirements governing personal data collection, use, or
-              disclosure that differ from applicable laws in the Philippines,
-              then through your continued use of the Services, you are
-              transferring your data to the Philippines, and you expressly
-              consent to have your data transferred to and processed in the
-              Philippines.
-            </div>
-          </section>
-
           {/* Copyright Infringements */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">
-              13. Copyright Infringements
+            <h3
+              id="copyright-infringements"
+              className="font-semibold text-lg mb-2"
+            >
+              12. Copyright Infringements
             </h3>
             <div className="pl-7 space-y-1">
               We respect the intellectual property rights of others. If you
               believe that any material available on or through the Services
               infringes upon any copyright you own or control, please
               immediately notify us using the contact information provided below
-              (a &quot;Notification&quot;). A copy of your Notification will be sent to
-              the person who posted or stored the material addressed in the
-              Notification. Please be advised that pursuant to applicable law
-              you may be held liable for damages if you make material
+              (a &quot;Notification&quot;). A copy of your Notification will be
+              sent to the person who posted or stored the material addressed in
+              the Notification. Please be advised that pursuant to applicable
+              law you may be held liable for damages if you make material
               misrepresentations in a Notification. Thus, if you are not sure
               that material located on or linked to by the Services infringes
               your copyright, you should consider first contacting an attorney.
@@ -900,8 +1096,11 @@ export default function TermsPage() {
 
           {/* Term and Termination */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">
-              14. Term and Termination
+            <h3
+              id="term-and-termination"
+              className="font-semibold text-lg mb-2"
+            >
+              13. Term and Termination
             </h3>
             <div className="pl-7 space-y-1">
               These Legal Terms shall remain in full force and effect while you
@@ -929,8 +1128,11 @@ export default function TermsPage() {
 
           {/* Modifications and Interruptions */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">
-              15. Modifications and Interruptions
+            <h3
+              id="modifications-and-interruptions"
+              className="font-semibold text-lg mb-2"
+            >
+              14. Modifications and Interruptions
             </h3>
             <div className="pl-7 space-y-1">
               We reserve the right to change, modify, or remove the contents of
@@ -958,7 +1160,9 @@ export default function TermsPage() {
 
           {/* Governing Law */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">16. Governing Law</h3>
+            <h3 id="governing-law" className="font-semibold text-lg mb-2">
+              15. Governing Law
+            </h3>
             <div className="pl-7 space-y-1">
               These Legal Terms shall be governed by and defined following the
               laws of the Philippines. Uxhibit and yourself irrevocably consent
@@ -970,8 +1174,8 @@ export default function TermsPage() {
 
           {/* Dispute Resolution */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">
-              17. Dispute Resolution
+            <h3 id="dispute-resolution" className="font-semibold text-lg mb-2">
+              16. Dispute Resolution
             </h3>
             <div className="pl-7 space-y-1">
               <strong className="text-base">Informal Negotiations</strong>
@@ -979,13 +1183,13 @@ export default function TermsPage() {
               <br />
               To expedite resolution and control the cost of any dispute,
               controversy, or claim related to these Legal Terms (each a
-              &quot;Dispute&quot; and collectively, the &quot;Disputes&quot;) brought by either you
-              or us (individually, a &quot;Party&quot; and collectively, the &quot;Parties&quot;),
-              the Parties agree to first attempt to negotiate any Dispute
-              (except those Disputes expressly provided below) informally for at
-              least thirty (30) days before initiating arbitration. Such
-              informal negotiations commence upon written notice from one Party
-              to the other Party.
+              &quot;Dispute&quot; and collectively, the &quot;Disputes&quot;)
+              brought by either you or us (individually, a &quot;Party&quot; and
+              collectively, the &quot;Parties&quot;), the Parties agree to first
+              attempt to negotiate any Dispute (except those Disputes expressly
+              provided below) informally for at least thirty (30) days before
+              initiating arbitration. Such informal negotiations commence upon
+              written notice from one Party to the other Party.
               <br />
               <br />
               <strong className="text-base">Binding Arbitration</strong>
@@ -1042,7 +1246,9 @@ export default function TermsPage() {
 
           {/* Corrections */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">18. Corrections</h3>
+            <h3 id="corrections" className="font-semibold text-lg mb-2">
+              17. Corrections
+            </h3>
             <div className="pl-7 space-y-1">
               There may be information on the Services that contains
               typographical errors, inaccuracies, or omissions, including
@@ -1055,7 +1261,9 @@ export default function TermsPage() {
 
           {/* Disclaimer */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">19. Disclaimer</h3>
+            <h3 id="disclaimer" className="font-semibold text-lg mb-2">
+              18. Disclaimer
+            </h3>
             <div className="pl-7 space-y-1">
               THE SERVICES ARE PROVIDED ON AN AS-IS AND AS-AVAILABLE BASIS. YOU
               AGREE THAT YOUR USE OF THE SERVICES WILL BE AT YOUR SOLE RISK. TO
@@ -1093,8 +1301,11 @@ export default function TermsPage() {
 
           {/* Limitations of Liability */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">
-              20. Limitations of Liability
+            <h3
+              id="limitations-of-liability"
+              className="font-semibold text-lg mb-2"
+            >
+              19. Limitations of Liability
             </h3>
             <div className="pl-7 space-y-1">
               IN NO EVENT WILL WE OR OUR DIRECTORS, EMPLOYEES, OR AGENTS BE
@@ -1108,15 +1319,17 @@ export default function TermsPage() {
 
           {/* Indemnification */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">21. Indemnification</h3>
+            <h3 id="indemnification" className="font-semibold text-lg mb-2">
+              20. Indemnification
+            </h3>
             <div className="pl-7 space-y-1">
               You agree to defend, indemnify, and hold us harmless, including
               our subsidiaries, affiliates, and all of our respective officers,
               agents, partners, and employees, from and against any loss,
               damage, liability, claim, or demand, including reasonable
-              attorneys&apos; fees and expenses, made by any third party due to or
-              arising out of: (1) your Contributions; (2) use of the Services;
-              (3) breach of these Legal Terms; (4) any breach of your
+              attorneys&apos; fees and expenses, made by any third party due to
+              or arising out of: (1) your Contributions; (2) use of the
+              Services; (3) breach of these Legal Terms; (4) any breach of your
               representations and warranties set forth in these Legal Terms; (5)
               your violation of the rights of a third party. including but not
               limited to intellectual property rights; or (6) any overt harmful
@@ -1133,7 +1346,9 @@ export default function TermsPage() {
 
           {/* User Data */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">22. User Data</h3>
+            <h3 id="user-data" className="font-semibold text-lg mb-2">
+              21. User Data
+            </h3>
             <div className="pl-7 space-y-1">
               We will maintain certain data that you transmit to the Services
               for the purpose of managing the performance of the Services, as
@@ -1149,8 +1364,11 @@ export default function TermsPage() {
 
           {/* Electronic Communications, Transactions, and Signatures */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">
-              23. Electronic Communications, Transactions, and Signatures
+            <h3
+              id="electronic-communications-transactions-and-signatures"
+              className="font-semibold text-lg mb-2"
+            >
+              22. Electronic Communications, Transactions, and Signatures
             </h3>
             <div className="pl-7 space-y-1">
               Visiting the Services, sending us emails, and completing online
@@ -1172,7 +1390,9 @@ export default function TermsPage() {
 
           {/* Miscellaneous */}
           <section>
-            <h3 className="font-semibold text-lg mb-2">24. Miscellaneous</h3>
+            <h3 id="miscellaneous" className="font-semibold text-lg mb-2">
+              23. Miscellaneous
+            </h3>
             <div className="pl-7 space-y-1">
               These Legal Terms and any policies or operating rules posted by us
               on the Services or in respect to the Services constitute the
@@ -1195,527 +1415,6 @@ export default function TermsPage() {
               and all defenses you may have based on the electronic form of
               these Legal Terms and the lack of signing by the parties hereto to
               execute these Legal Terms.
-            </div>
-          </section>
-
-          {/* Contact Us */}
-          <section>
-            <h3 className="font-semibold text-lg mb-2">25. Contact Us</h3>
-            <div className="pl-7 space-y-1">
-              In order to resolve a complaint regarding the Services or to
-              receive further information regarding use of the Services, please
-              contact us at
-              <br />
-              <br />
-            </div>
-          </section>
-
-          {/* Privacy Notice */}
-          <section>
-            <h3 className="font-semibold text-lg mb-5">Privacy Notice</h3>
-            <div className="pl-7 space-y-1">
-              Last updated 10/02/2025
-              <br />
-              <br />
-              This Privacy Notice for UXhibit (&quot;<strong>we</strong>,&quot; &quot;
-              <strong>us</strong>,&quot; or &quot;<strong>our</strong>&quot;), describes how
-              and why we might access, collect, store, use, and/or share (&quot;
-              <strong>process</strong>&quot;) your personal information when you use
-              our services (&quot;<strong>Services</strong>&quot;), including when you:{" "}
-              <strong>Questions or concerns?</strong> Reading this Privacy
-              Notice will help you understand your privacy rights and choices.
-              We are responsible for making decisions about how your personal
-              information is processed. If you do not agree with our policies
-              and practices, please do not use our Services. as well as other
-              related products and services that refer to these legal terms (the{" "}
-              <strong>&quot;Legal Terms&quot;</strong>) (collectively, the{" "}
-              <strong>&quot;Services&quot;</strong>).
-              <br />
-              <br />
-            </div>
-          </section>
-
-          {/* Summary of Keypoints */}
-          <section>
-            <h3 className="font-semibold text-lg mb-5">Summary of Keypoints</h3>
-            <div className="pl-7 space-y-1">
-              <i>
-                This summary provides key points from our Privacy Notice, but
-                you can find out more details about any of these topics by
-                clicking the link following each key point or by using our table
-                of contents below to find the section you are looking for.
-              </i>
-              <br />
-              <br />
-              <strong>What personal Information do we process?</strong> When you
-              visit, use, or navigate our Services, we may process personal
-              information depending on how you interact with us and the
-              Services, the choices you make, and the products and features you
-              use. Learn more about personal information you disclose to us.
-              <br />
-              <br />
-              <strong>
-                Do we process any sensitive personal Information?
-              </strong>{" "}
-              Some of the information may be considered &quot;special&quot; or &quot;sensitive&quot;
-              in certain jurisdictions, for example your racial or ethnic
-              origins, sexual orientation, and religious beliefs. We do not
-              process sensitive personal information.
-              <br />
-              <br />
-              <strong>
-                Do we collect any Information from third parties?
-              </strong>{" "}
-              We may collect information from public databases, marketing
-              partners, social media platforms, and other outside sources. Learn
-              more about information collected from other sources.
-              <br />
-              <br />
-              <strong>How do we process your Information?</strong> We process
-              your information to provide, improve, and administer our Services,
-              communicate with you, for security and fraud prevention, and to
-              comply with law. We may also process your information for other
-              purposes with your consent. We process your information only when
-              we have a valid legal reason to do so. Learn more about how we
-              process your information.
-              <br />
-              <br />
-              <strong>
-                In what situations and with which parties do we share personal
-                information?
-              </strong>{" "}
-              We may share information in specific situations and with specific
-              third parties. Learn more about when and with whom we share your
-              personal information.
-              <br />
-              <br />
-              <strong>What are your rights?</strong> Depending on where you are
-              located geographically, the applicable privacy law may mean you
-              have certain rights regarding your personal information. Learn
-              more about your privacy rights.
-              <br />
-              <br />
-              <strong>How do you exercise your rights?</strong> The easiest way
-              to exercise your rights is by submitting a data subject access
-              request, or by contacting us. We will consider and act upon any
-              request in accordance with applicable data protection laws.
-              <br />
-              <br />
-              <i>
-                Want to learn more about what we do with any information we
-                collect?
-              </i>{" "}
-              Review the Privacy Notice in full.
-            </div>
-          </section>
-
-          {/* Table of Contents */}
-          <section>
-            <h3 className="font-semibold text-lg mb-2">Table of Contents</h3>
-            <ol className="list-decimal pl-7 space-y-1">
-              <li>What Information Do We Collect?</li>
-              <li>How Do We Process Your Information?</li>
-              <li>When and With Whom Do We Share Your Personal Information?</li>
-              <li>Do We Use Cookies and Other Tracking Technologies?</li>
-              <li>How Do We Handle Your Account Logins?</li>
-              <li>Is Your Information Transferred Internationally?</li>
-              <li>How Long Do We Keep Your Information?</li>
-              <li>Do We Collect Information from Minors?</li>
-              <li>What Are Your Privacy Rights?</li>
-              <li>Controls for Do-Not-Track Features</li>
-              <li>Do We Make Updates to This Notice?</li>
-              <li>How Can You Contact Us About This Notice?</li>
-              <li>
-                How Can You Review, Update, or Delete the Data We Collect from
-                You?
-              </li>
-            </ol>
-          </section>
-
-          {/* What Information Do We Collect? */}
-          <section>
-            <h3 className="font-semibold text-lg mb-2">
-              1. What Information Do We Collect?
-            </h3>
-            <div className="pl-7 space-y-1">
-              <strong>Personal information you disclose to us</strong>
-              <br />
-              <br />
-              <i>
-                <strong>In Short:</strong> We collect only the information that
-                you provide directly and the minimal technical data required for
-                system functionality.
-              </i>
-              <br />
-              <br />
-              When you participate in UXhibit, we may collect basic demographic
-              information (such as your age group and learning background), your
-              design submissions (fig files), and your responses to the research
-              instrument like User Experience Questionnaire (UEQ) and user
-              feedback surveys. This information is collected only for the
-              purpose of evaluating the effectiveness of the system and for
-              academic research reporting.
-              <br />
-              <br />
-              We do not collect sensitive categories of personal data (such as
-              health status, political opinions, religious beliefs, financial
-              information, or biometric data).
-              <br />
-              <br />
-              The UXhibit system may also gather minimal technical information,
-              such as IP address, device type, operating system, and browser
-              type. This is used only to ensure proper system functionality,
-              maintain security, and improve usability of the platform. Unlike
-              commercial platforms, this technical information will not be used
-              for profiling or marketing.
-              <br />
-              <br />
-            </div>
-          </section>
-
-          {/* How Do We Process Your Information? */}
-          <section>
-            <h3 className="font-semibold text-lg mb-2">
-              2. How Do We Process Your Information?
-            </h3>
-            <div className="pl-7 space-y-1">
-              <i>
-                <strong>In Short:</strong> Your data is processed only for
-                research and educational purposes.
-              </i>
-              <br />
-              <br />
-              Participant information is processed for the following:
-              <br />
-              <br />
-              <ol className="list-disc pl-7 space-y-1">
-                <li>
-                  To provide AI-driven usability feedback on submitted designs.
-                </li>
-                <li>
-                  To generate anonymized reports for defense, panel review, and
-                  academic presentations.
-                </li>
-                <li>Conduct surveys like UEQ to measure system usability.</li>
-                <li>
-                  Analyze design revisions and learning progress for research
-                  findings.
-                </li>
-                <li>
-                  To maintain system security and improve platform performance.
-                </li>
-              </ol>
-              <br />
-              We do not process your information for advertising, marketing, or
-              commercial purposes. Any use outside of these stated purposes will
-              only be conducted with your explicit consent.
-              <br />
-              <br />
-            </div>
-          </section>
-
-          {/* When and With Whom Do We Share Your Personal Information? */}
-          <section>
-            <h3 className="font-semibold text-lg mb-2">
-              3. When and With Whom Do We Share Your Personal Information?
-            </h3>
-            <div className="pl-7 space-y-1">
-              <i>
-                <strong>In Short:</strong> Your data will not be shared outside
-                the research team and adviser.
-              </i>
-              <br />
-              <br />
-              Participant information is processed for the following:
-              <br />
-              <br />
-              <ol className="list-disc pl-7 space-y-1">
-                <li>
-                  <strong>Research Team:</strong> Your information will only be
-                  accessible to the student researchers and their adviser.
-                </li>
-                <li>
-                  <strong>Defense and Academic Review:</strong> Aggregated,
-                  anonymized results may be shared with capstone panelists and
-                  academic reviewers.
-                </li>
-                <li>
-                  <strong>University Research Purposes:</strong> Data may be
-                  included in final reports or published in academic venues, but
-                  without any identifying details.
-                </li>
-                <li>
-                  <strong>No Third-Party Sharing:</strong> We do not sell,
-                  trade, or transfer personal information to outside companies,
-                  affiliates, or partners.
-                </li>
-              </ol>
-              <br />
-              We do not process your information for advertising, marketing, or
-              commercial purposes. Any use outside of these stated purposes will
-              only be conducted with your explicit consent.
-              <br />
-              <br />
-            </div>
-          </section>
-
-          {/* Do We Use Cookies and Other Tracking Technologies? */}
-          <section>
-            <h3 className="font-semibold text-lg mb-2">
-              4. Do We Use Cookies and Other Tracking Technologies?
-            </h3>
-            <div className="pl-7 space-y-1">
-              <i>
-                <strong>In Short:</strong> We may use cookies and other tracking
-                technologies to collect and store your information.
-              </i>
-              <br />
-              <br />
-              We may use cookies and similar tracking technologies (like web
-              beacons and pixels) to gather information when you interact with
-              our Services. Some online tracking technologies help us maintain
-              the security of our Services, prevent crashes, fix bugs, save your
-              preferences, and assist with basic site functions.
-              <br />
-              <br />
-              We also permit third parties and service providers to use online
-              tracking technologies on our Services for analytics and
-              advertising, including to help manage and display advertisements,
-              tailor advertisements to your interests, or send abandoned
-              shopping cart reminders (depending on your communication
-              preferences). The third parties and service providers use their
-              technology to provide advertising about products and services
-              tailored to your interests which may appear either on our Service
-              or on other websites.
-              <br />
-              <br />
-              Specific information about how we use such technologies and how
-              you can refuse certain cookies is set out in our Cookie Notice.
-              <br />
-              <br />
-            </div>
-          </section>
-
-          {/* How Do We Handle Your Account Logins? */}
-          <section>
-            <h3 className="font-semibold text-lg mb-2">
-              5. How Do We Handle Your Account Logins?
-            </h3>
-            <div className="pl-7 space-y-1">
-              <i>
-                <strong>In Short:</strong> If you choose to register or log in
-                to our Services using a Google or Figma account, we may have
-                access to certain information about you.
-              </i>
-              <br />
-              <br />
-              Our Services allow you to register and log in using your Google or
-              Figma account credentials. When you choose to do this, we will
-              receive certain profile information from these providers. The
-              profile information we receive may vary depending on the provider
-              but will often include your name, email address, and profile
-              picture, as well as other information you choose to make public on
-              such platforms.
-              <br />
-              <br />
-              We will use the information we receive only for the purposes
-              described in this Privacy Notice or that are otherwise made clear
-              to you on the relevant Services. Please note that we do not
-              control, and are not responsible for, the use of your personal
-              information by Google or Figma. We recommend that you review their
-              privacy notices to understand how they collect, use, and share
-              your personal information, and how you can set your privacy
-              preferences on their platforms.
-              <br />
-              <br />
-            </div>
-          </section>
-
-          {/* Is Your Information Transferred Internationally? */}
-          <section>
-            <h3 className="font-semibold text-lg mb-2">
-              6. Is Your Information Transferred Internationally?
-            </h3>
-            <div className="pl-7 space-y-1">
-              <i>
-                <strong>In Short:</strong> No, your data will remain in the
-                Philippines unless stored securely in encrypted cloud services.
-              </i>
-              <br />
-              <br />
-              All information collected through UXhibit will be stored and
-              processed within the Philippines. In cases where cloud services
-              like Google Drive are used, the data will remain encrypted and
-              accessible only to the research team. We do not transfer your data
-              to any foreign organizations or third parties.
-              <br />
-              <br />
-            </div>
-          </section>
-
-          {/* How Long Do We Keep Your Information? */}
-          <section>
-            <h3 className="font-semibold text-lg mb-2">
-              7. How Long Do We Keep Your Information?
-            </h3>
-            <div className="pl-7 space-y-1">
-              <i>
-                <strong>In Short:</strong> Only as long as needed to finish the
-                study and reporting requirements.
-              </i>
-              <br />
-              <br />
-              Participant data will be retained securely for the duration of the
-              study and for one (1) year after its completion to comply with
-              university reporting and defense requirements. After this period,
-              all electronic files will be permanently deleted from storage
-              devices and cloud systems, and any physical notes will be
-              shredded. This ensures that no personal data will be stored
-              indefinitely.
-              <br />
-              <br />
-            </div>
-          </section>
-
-          {/* Do We Collect Information from Minors? */}
-          <section>
-            <h3 className="font-semibold text-lg mb-2">
-              8. Do We Collect Information from Minors?
-            </h3>
-            <div className="pl-7 space-y-1">
-              <i>
-                <strong>In Short:</strong> Yes, but only with proper consent.
-              </i>
-              <br />
-              <br />
-              UXhibit’s study population includes learners aged 13-28 (Gen Z).
-              For participants aged 13-17, both parental/guardian consent and
-              participant assent are required before joining the study. We do
-              not knowingly collect information from children under the age of
-              13, and any such information provided in error will be promptly
-              deleted.
-              <br />
-              <br />
-            </div>
-          </section>
-
-          {/* What Are Your Privacy Rights? */}
-          <section>
-            <h3 className="font-semibold text-lg mb-2">
-              9. What Are Your Privacy Rights?
-            </h3>
-            <div className="pl-7 space-y-1">
-              <i>
-                <strong>In Short:</strong> You may request access, correction,
-                or withdrawal of your data.
-              </i>
-              <br />
-              <br />
-              Participants have the right to:
-              <br />
-              <br />
-              <ul className="list-disc pl-7 space-y-1">
-                <li>Review the data they submitted.</li>
-                <li>Request corrections to any inaccurate information.</li>
-                <li>
-                  Withdraw their data up to two (2) weeks after participation.
-                </li>
-              </ul>
-              <br />
-              Withdrawal will not have any penalty or academic consequences.
-              However, once data has been anonymized and included in the
-              analysis, removal may no longer be possible.
-              <br />
-              <br />
-            </div>
-          </section>
-
-          {/* Controls for Do-Not-Track Features */}
-          <section>
-            <h3 className="font-semibold text-lg mb-2">
-              10. Controls for Do-Not-Track Features
-            </h3>
-            <div className="pl-7 space-y-1">
-              <i>
-                <strong>In Short:</strong> UXhibit does not use tracking
-                technologies.
-              </i>
-              <br />
-              <br />
-              UXhibit does not support commercial tracking or advertising
-              features such as Do-Not-Track (DNT) signals. Since the platform
-              does not use cookies, targeted advertising, or tracking analytics,
-              no additional tracking controls are required.
-              <br />
-              <br />
-            </div>
-          </section>
-
-          {/* Do We Make Updates to This Notice? */}
-          <section>
-            <h3 className="font-semibold text-lg mb-2">
-              11. Do We Make Updates to This Notice?
-            </h3>
-            <div className="pl-7 space-y-1">
-              <i>
-                <strong>In Short:</strong> Yes, we may revise this notice if the
-                study protocol changes.
-              </i>
-              <br />
-              <br />
-              This Privacy Notice may be updated to reflect changes in research
-              procedures, ethics requirements, or university guidelines. Any
-              updates will include a “Revised” date at the top of the document.
-              Significant changes will be communicated to participants via email
-              or through announcements during research activities.
-              <br />
-              <br />
-            </div>
-          </section>
-
-          {/* How Can You Contact Us About This Notice? */}
-          <section>
-            <h3 className="font-semibold text-lg mb-2">
-              12. How Can You Contact Us About This Notice?
-            </h3>
-            <div className="pl-7 space-y-1">
-              If you have questions or concerns about this Privacy Notice or how
-              your data is handled, you may contact:
-              <br />
-              <br />
-              <ul className="list-disc pl-7 space-y-1">
-                <li>
-                  Lead Researcher: Matthew E. Cucio (matthew.cucio@gmail.com)
-                </li>
-                <li>
-                  Co-Researchers: Kail Luisse D. Balbalec, Vanness M. Lao,
-                  Willie M. Bonavente
-                </li>
-                <li>
-                  Institution: Polytechnic University of the Philippines -
-                  College of Computer and Information Science
-                </li>
-                <li>Mobile Number: 09212750244</li>
-              </ul>
-              <br />
-            </div>
-          </section>
-
-          {/* How Can You Review, Update, or Delete the Data We Collect from You? */}
-          <section>
-            <h3 className="font-semibold text-lg mb-2">
-              13. How Can You Review, Update, or Delete the Data We Collect from
-              You?
-            </h3>
-            <div className="pl-7 space-y-1">
-              Participants can request to review, update, or delete their
-              submitted data by directly contacting the research team. Data
-              withdrawal requests are honored within two weeks of participation.
-              After this period, anonymized data may already be integrated into
-              reports and cannot be removed.
-              <br />
-              <br />
-              <strong className="text-base">Uxhibit</strong>
             </div>
           </section>
         </div>
@@ -1743,10 +1442,10 @@ export default function TermsPage() {
             Decline
           </Button>
 
-          {/* Accept Button */}
-          <Button
+              <Button
             type="submit"
             onClick={handleAccept}
+            disabled={!canAccept || isProcessing}
             className="group relative flex-1 inline-flex items-center justify-center
                       rounded-xl text-sm text-white font-semibold tracking-wide
                       transition-all duration-300 h-full overflow-hidden
@@ -1770,7 +1469,9 @@ export default function TermsPage() {
               aria-hidden
               className="absolute inset-0 rounded-xl ring-1 ring-white/30 group-hover:ring-white/50"
             />
-            <span className="relative z-10">Accept</span>
+              <span className="relative z-10">
+    {!canAccept ? "Scroll to enable" : isProcessing ? "Processing..." : "Accept"}
+  </span>
           </Button>
         </div>
       </div>

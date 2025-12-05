@@ -31,7 +31,15 @@ export function AccountInfoModal({
   const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [signedAvatarUrl, setSignedAvatarUrl] = useState<string | null>(null);
+  const [birthdayDisplay, setBirthdayDisplay] = useState(
+  profile?.birthday ? format(new Date(profile.birthday), "MM/dd/yyyy") : ""
+);
 
+useEffect(() => {
+  setBirthdayDisplay(
+    profile?.birthday ? format(new Date(profile.birthday), "MM/dd/yyyy") : ""
+  );
+}, [profile?.birthday]);
   const router = useRouter();
 
   function generateUsername(profile: Profile) {
@@ -315,28 +323,101 @@ export function AccountInfoModal({
                     Gender
                   </label>
                   <Input
-                    className="h-10"
-                    value={profile.gender?.trim() || ""}
-                    onChange={(e) =>
-                      setProfile({ ...profile, gender: e.target.value })
-                    }
-                    placeholder="Specify your gender"
-                  />
+  className="h-10"
+  value={profile.gender?.trim() || ""}
+  onChange={(e) => {
+    const raw = e.target.value;
+
+    // 1) Remove anything not A–Z or space (strips emojis/symbols/digits/punct.)
+    let sanitized = raw.replace(/[^A-Za-z\s]/g, "");
+
+    // 2) Collapse multiple spaces → single space
+    sanitized = sanitized.replace(/\s+/g, " ");
+
+    // 3) Trim ends
+    sanitized = sanitized.trim();
+
+    // 4) Optional: cap length to avoid excessively long input
+    sanitized = sanitized.slice(0, 40);
+
+    // 5) Optional: Title Case (comment out if you want raw case)
+    sanitized = sanitized
+      .toLowerCase()
+      .replace(/\b[a-z]/g, (c) => c.toUpperCase());
+
+    setProfile({ ...profile, gender: sanitized });
+  }}
+  placeholder="Specify your gender"
+/> 
                 </div>
 
                 <div className="flex-1">
                   <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
                     Birthday
                   </label>
-                  <Input
-                    value={
-                      profile?.birthday
-                        ? format(new Date(profile.birthday), "MM/dd/yyyy")
-                        : ""
-                    }
-                    readOnly
-                    placeholder="Birthday not set"
-                    className="h-10 bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
+                                    <Input
+                    placeholder="MM/DD/YYYY"
+                    value={birthdayDisplay}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const digits = raw.replace(/[^\d]/g, "").slice(0, 8);
+                  
+                      // Progressive display as MM/DD/YYYY
+                      const nextDisplay =
+                        digits.length <= 2
+                          ? digits
+                          : digits.length <= 4
+                          ? `${digits.slice(0, 2)}/${digits.slice(2)}`
+                          : `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+                      setBirthdayDisplay(nextDisplay);
+                  
+                      // If 8 digits and valid, update ISO in profile immediately
+                      if (digits.length === 8) {
+                        const mm = digits.slice(0, 2);
+                        const dd = digits.slice(2, 4);
+                        const yyyy = digits.slice(4, 8);
+                        const dt = new Date(`${yyyy}-${mm}-${dd}T00:00:00`);
+                  
+                        const valid =
+                          Number(mm) >= 1 &&
+                          Number(mm) <= 12 &&
+                          !Number.isNaN(dt.getTime()) &&
+                          Number(yyyy) >= 1900 &&
+                          dt <= new Date();
+                  
+                        if (valid) {
+                          setProfile({ ...profile, birthday: `${yyyy}-${mm}-${dd}` });
+                        } else {
+                          // Keep profile.birthday unchanged until valid
+                        }
+                      }
+                    }}
+                    onBlur={() => {
+                      // Coerce display into ISO on blur; clear if invalid
+                      const digits = birthdayDisplay.replace(/[^\d]/g, "").slice(0, 8);
+                      if (digits.length === 8) {
+                        const mm = digits.slice(0, 2);
+                        const dd = digits.slice(2, 4);
+                        const yyyy = digits.slice(4, 8);
+                        const dt = new Date(`${yyyy}-${mm}-${dd}T00:00:00`);
+                        const valid =
+                          Number(mm) >= 1 &&
+                          Number(mm) <= 12 &&
+                          !Number.isNaN(dt.getTime()) &&
+                          Number(yyyy) >= 1900 &&
+                          dt <= new Date();
+                  
+                        if (valid) {
+                          setProfile({ ...profile, birthday: `${yyyy}-${mm}-${dd}` });
+                          setBirthdayDisplay(`${mm}/${dd}/${yyyy}`);
+                          return;
+                        }
+                      }
+                      // Invalid or incomplete — clear
+                      setProfile({ ...profile, birthday: "" });
+                      setBirthdayDisplay("");
+                    }}
+                    className="h-10 bg-white dark:bg-[#141414]"
                   />
                 </div>
               </div>
