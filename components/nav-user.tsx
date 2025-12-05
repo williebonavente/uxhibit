@@ -114,19 +114,22 @@ export function NavUser({ user }: { user: User | null }) {
         .select(`id, username, first_name, middle_name, last_name,
           website, avatar_url, gender, bio, birthday `)
         .eq('id', user?.id)
-        .single();
+        .maybeSingle();
 
       const { data: detailsData, error: detailsError } = await supabase
         .from('profile_details')
         .select('role')
         .eq('profile_id', user?.id)
-        .single();
+        .maybeSingle();
 
-      if ((profileError && status !== 406 && Object.keys(profileError).length > 0) || detailsError) {
-        console.error("Profile Error:", JSON.stringify(profileError));
-        console.error("Details Error:", JSON.stringify(detailsError));
-        throw new Error(profileError?.message || detailsError?.message || "Unknown error");
-      }
+        if (profileError && status !== 406 && Object.keys(profileError).length > 0) {
+  console.error("Profile Error:", JSON.stringify(profileError));
+  throw new Error(profileError?.message || "Unknown profile error");
+}
+// Note: ignore detailsError PGRST116 (no row); log for visibility
+if (detailsError && detailsError.code !== "PGRST116") {
+  console.error("Details Error:", JSON.stringify(detailsError));
+}
 
       if (profileData) {
         const fullname = [profileData.first_name, profileData.middle_name, profileData.last_name].filter(Boolean).join(" ");
@@ -202,7 +205,7 @@ export function NavUser({ user }: { user: User | null }) {
           gender: profileData.gender,
           birthday: profileData.birthday,
           bio: profileData.bio,
-          role: detailsData?.role ?? "",
+        role: typeof detailsData?.role === "string" ? detailsData.role : "",
         });
         setFullName(fullname);
         setOpen(true);
