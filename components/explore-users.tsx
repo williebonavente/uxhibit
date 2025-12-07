@@ -27,7 +27,7 @@ type DesignInfo = {
   created_at: string;
 };
 
-type UserInfo = {
+export type UserInfo = {
   user_id: string;
   name: string;
   user_avatar: string;
@@ -37,7 +37,7 @@ type UserInfo = {
   designs: DesignInfo[];
 };
 
-type UserAvatarProps = {
+export type UserAvatarProps = {
   avatarPath: string | null;
   alt: string;
   className?: string;
@@ -60,7 +60,6 @@ export function useSignedAvatarUrl(avatarPath: string | null) {
       setSignedUrl(null);
       return;
     }
-    // If it's already a full URL, use it directly
     if (avatarPath.startsWith("http")) {
       setSignedUrl(avatarPath);
       return;
@@ -169,7 +168,7 @@ export default function ExplorePage() {
         return {
           user_id: user.id,
           name: [user.first_name, user.middle_name, user.last_name].filter(Boolean).join(" "),
-          user_avatar: user.avatar_url,
+          user_avatar: user.avatar_url || "/images/default_avatar.png",
           role,
           bio,
           website,
@@ -365,7 +364,6 @@ export default function ExplorePage() {
 
       <div className="flex flex-col items-center space-y-8">
         {filteredUsers.flatMap((user) =>
-          // Sort designs by published_at DESC (latest first)
           [...user.designs]
             .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
             .map((design) => (
@@ -375,7 +373,7 @@ export default function ExplorePage() {
               >
                 {/* Post Header */}
                 <div className="flex items-center gap-3 p-4 bg-white dark:bg-[#1A1A1A]">
-                  <UserProfilePopover user={user} />
+                  <UserProfilePopover user={user || "/images/default_avatar.png"} />
                 </div>
                 {/* Design Card */}
                 <DesignCard

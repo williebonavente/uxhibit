@@ -38,9 +38,7 @@ function getRandomAvatar(userId: string) {
   return `${randomStyle}${userId}`;
 }
 
-
 export default function LoginForm() {
-
   const [loginLoading, setLoginLoading] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const [figmaLoading, setFigmaLoading] = useState(false);
@@ -81,7 +79,7 @@ export default function LoginForm() {
   //   }
   // }
 
-    async function handleGoogleLogin (e: any){
+  async function handleGoogleLogin(e: any) {
     e.preventDefault();
     setFigmaLoading(true);
     try {
@@ -93,29 +91,29 @@ export default function LoginForm() {
         return;
       }
 
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('preAuthPath', window.location.pathname);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("preAuthPath", window.location.pathname);
       }
       // Redirect to Figma OAuth
       window.location.href = authUrl;
     } catch (error) {
       setFigmaLoading(false);
-      console.error('Figma login error:', error);
+      console.error("Figma login error:", error);
       toast.error("Failed to start Figma authentication");
     }
   }
 
   useEffect(() => {
     // Check for auth errors
-    const params = new URLSearchParams(window.location.search)
-    const error = params.get('error')
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get("error");
 
-    if (error === 'invalid_callback') {
+    if (error === "invalid_callback") {
       toast.error("Invalid authentication callback");
-    } else if (error === 'auth_failed') {
-      toast.error("Figma authentication failed.")
+    } else if (error === "auth_failed") {
+      toast.error("Figma authentication failed.");
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
     if (!siteKey) {
@@ -124,7 +122,6 @@ export default function LoginForm() {
   }, [siteKey]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    
     if (!captchaToken) {
       toast.error("Complete CAPTCHA");
       return;
@@ -144,50 +141,64 @@ export default function LoginForm() {
           result.error === "Invalid login credentials"
             ? "Incorrect email or password. Please try again."
             : result.error === "User not found"
-              ? "No account found with this email."
-              : result.error === "Email not confirmed"
-                ? "Please Confirm Your Email!"
-                : result.error
+            ? "No account found with this email."
+            : result.error === "Email not confirmed"
+            ? "Please Confirm Your Email!"
+            : result.error
         );
         return;
       }
 
       // After successful login, ensure profile exists
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
       if (user) {
         // Fetch the user's profile
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("id, avatar_url, first_name, middle_name, last_name, username, gender")
+          .select(
+            "id, avatar_url, first_name, middle_name, last_name, username, gender"
+          )
           .eq("id", user.id)
           .single();
 
         if (profileError) {
           console.error(`Profile Error: ${profileError.message}`);
-        } else if (profile && (!profile.avatar_url || profile.avatar_url.trim() === "")) {
+        } else if (
+          profile &&
+          (!profile.avatar_url || profile.avatar_url.trim() === "")
+        ) {
           // If avatar_url is missing or empty, generate and set a default avatar
           const avatarUrl = getRandomAvatar(user.id);
 
           // Compose names from user_metadata if missing
-          const first_name = profile.first_name ?? user.user_metadata?.first_name ?? "";
-          const middle_name = profile.middle_name ?? user.user_metadata?.middle_name ?? "";
-          const last_name = profile.last_name ?? user.user_metadata?.last_name ?? "";
+          const first_name =
+            profile.first_name ?? user.user_metadata?.first_name ?? "";
+          const middle_name =
+            profile.middle_name ?? user.user_metadata?.middle_name ?? "";
+          const last_name =
+            profile.last_name ?? user.user_metadata?.last_name ?? "";
 
-          const { error: upsertError } = await supabase.from("profiles").upsert({
-            id: user.id,
-            first_name,
-            middle_name,
-            last_name,
-            username: profile.username ?? user.user_metadata?.username ?? "",
-            gender: profile.gender ?? user.user_metadata?.gender ?? "",
-            avatar_url: avatarUrl,
-            updated_at: new Date().toISOString(),
-          });
+          const { error: upsertError } = await supabase
+            .from("profiles")
+            .upsert({
+              id: user.id,
+              first_name,
+              middle_name,
+              last_name,
+              username: profile.username ?? user.user_metadata?.username ?? "",
+              gender: profile.gender ?? user.user_metadata?.gender ?? "",
+              avatar_url: avatarUrl,
+              updated_at: new Date().toISOString(),
+            });
           if (upsertError) {
             console.error("Profile upsert error: ", upsertError.message);
-            toast.error(`Failed to save profile avatar. ${upsertError.message}`);
+            toast.error(
+              `Failed to save profile avatar. ${upsertError.message}`
+            );
           }
         }
       }
@@ -196,12 +207,11 @@ export default function LoginForm() {
       setLoginLoading(false);
       setRedirecting(true);
       try {
-  router.push("/dashboard");
-} catch (e) {
-  setRedirecting(false);
-  setLoginLoading(false);
-}
-
+        router.push("/dashboard");
+      } catch (e) {
+        setRedirecting(false);
+        setLoginLoading(false);
+      }
     } catch (error) {
       console.error("Form submission error", error);
       // toast.error('Failed to submit the form. Please try again.')
@@ -222,7 +232,6 @@ export default function LoginForm() {
         style={whiteCursor}
         className="relative min-h-screen flex items-center justify-center w-full overflow-hidden p-5"
       >
-
         <BackgroundVideo
           src="/images/uxhibit-gif-3(webm).webm"
           type="video/webm"
@@ -234,16 +243,17 @@ export default function LoginForm() {
         <div className="absolute inset-0 bg-black/40" />
 
         {/* Centered Login Card */}
-        <div className="relative z-10 flex flex-col w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-md xl:max-w-lg p-6 sm:p-8 md:p-10 lg:p-12 
-                        bg-[#1E1E1E]/40 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20">
-
+        <div
+          className="relative z-10 flex flex-col w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-md xl:max-w-lg p-6 sm:p-8 md:p-10 lg:p-12 
+                        bg-[#1E1E1E]/40 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20"
+        >
           {/* Centered Logo */}
           <div className="flex justify-center">
             <Image
               src="/images/dark-header-icon.png"
               alt="Uxhibit Logo"
-              width={2280}   // original width
-              height={899}   // original height
+              width={2280} // original width
+              height={899} // original height
               className="w-auto h-16 sm:h-20 md:h-24 mb-5"
             />
           </div>
@@ -283,7 +293,7 @@ export default function LoginForm() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                      <FormMessage />
+                    <FormMessage />
                     <FormControl>
                       <PasswordInput
                         id="password"
@@ -297,7 +307,7 @@ export default function LoginForm() {
                 )}
               />
 
-                      {/* CAPTCHA */}
+              {/* CAPTCHA */}
               <div className="mt-4 flex justify-center">
                 {siteKey ? (
                   <ReCAPTCHA
@@ -325,7 +335,11 @@ export default function LoginForm() {
                   hover:shadow-[0_6px_26px_-6px_rgba(237,94,32,0.65)]
                   active:scale-[.97]
                   focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/4
-                  ${loginLoading || redirecting ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
+                  ${
+                    loginLoading || redirecting
+                      ? "cursor-not-allowed opacity-50"
+                      : "cursor-pointer"
+                  }
                   `}
               >
                 {/* Glow / gradient base */}
@@ -364,13 +378,13 @@ export default function LoginForm() {
                 {/* Label */}
                 <span className="relative z-10 flex items-center gap-2">
                   {loginLoading ? (
-  <>
-    <Loader2 size={20} className="animate-spin" />
-    Logging in...
-  </>
-) : (
-  "Log In"
-)} 
+                    <>
+                      <Loader2 size={20} className="animate-spin" />
+                      Logging in...
+                    </>
+                  ) : (
+                    "Log In"
+                  )}
                 </span>
               </Button>
             </form>
@@ -425,13 +439,12 @@ export default function LoginForm() {
           </Button> */}
 
           {/* Google Login  */}
-            {/* Figma Login */}
           <Button
             type="button"
             onClick={handleGoogleLogin}
             disabled={figmaLoading}
             className={`group relative inline-flex items-center justify-center
-              w-full h-11 sm:h-12 mt-2
+              w-full h-11 sm:h-12 mt-4
               rounded-xl text-base tracking-wide
               transition-all duration-300
               text-white shadow-md
@@ -439,7 +452,11 @@ export default function LoginForm() {
               active:scale-[.97]
               focus:outline-none focus-visible:ring-4 focus-visible:ring-[#1E1E1E]/20
               bg-[#1E1E1E] dark:bg-[#2C2C2C]
-              ${figmaLoading ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
+              ${
+                figmaLoading
+                  ? "opacity-60 cursor-not-allowed"
+                  : "cursor-pointer"
+              }
               `}
           >
             <span
@@ -475,7 +492,7 @@ export default function LoginForm() {
           <div className="mt-8 text-center text-xs sm:text-sm text-white font-light">
             Don&apos;t have an account?{" "}
             <Link
-            href={`${process.env.NEXT_PUBLIC_APP_URL}/auth/signup`}
+              href={`${process.env.NEXT_PUBLIC_APP_URL}/auth/signup`}
               className="text-[#ff7f3f] hover:text-[#ED5E20] transition-colors duration-200 hover:underline font-medium"
             >
               Sign Up

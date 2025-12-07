@@ -13,7 +13,13 @@ import { generateHeuristicReportSimple } from "@/lib/systemGeneratedReport/pdfGe
 import { toast } from "sonner";
 import { IconLoader2, IconDownload } from "@tabler/icons-react";
 import { createClient } from "@/utils/supabase/client";
-
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 
 const HEURISTICS = [
   { heuristic: "01", fullName: "Visibility of System Status" },
@@ -24,9 +30,24 @@ const HEURISTICS = [
   { heuristic: "06", fullName: "Recognition Rather than Recall" },
   { heuristic: "07", fullName: "Flexibility and Efficiency of Use" },
   { heuristic: "08", fullName: "Aesthetic and Minimalist Design" },
-  { heuristic: "09", fullName: "Help Users Recognize, Diagnose, and Recover from Errors" },
+  {
+    heuristic: "09",
+    fullName: "Help Users Recognize, Diagnose, and Recover from Errors",
+  },
   { heuristic: "10", fullName: "Help and Documentation" },
 ];
+
+type DesignRow = {
+  id: string;
+  title: string | null;
+};
+
+type DesignVersion = {
+  id: string;
+  design_id: string;
+  created_at: string;
+}
+
 const HeuristicDashboard = () => {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
@@ -40,40 +61,65 @@ const HeuristicDashboard = () => {
     fullName: string;
   };
 
+  const [versions, setVersions] = useState<DesignVersion[]>([]);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [heuristicData, setHeuristicData] = useState<HeuristicChartData[]>([]);
+  const [designs, setDesigns] = useState<DesignRow[]>([]);
+  const [selectedDesignId, setSelectedDesignId] = useState<string | null>(null);
 
+  const supabase = createClient();
+  
     useEffect(() => {
     const fetchHeuristicData = async () => {
       const supabase = createClient();
   
-      // 1. Get current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      console.log("[DEBUG] User fetch:", { user, userError });
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+  
       if (userError || !user) {
         toast.error("User not logged in");
         return;
       }
       const currentUserId = user.id;
-      console.log("[DEBUG] Current User ID:", currentUserId);
   
-      // 2. Get all design IDs for the user
-      const { data: designs, error: designsError } = await supabase
+      // Get all designs for the user
+      const { data: designsData, error: designsError } = await supabase
         .from("designs")
-        .select("id")
+        .select("id, owner_id, title")
         .eq("owner_id", currentUserId);
   
-      console.log("[DEBUG] Designs fetch:", { designs, designsError });
       if (designsError) {
         toast.error("Error fetching designs");
         return;
       }
   
-      type DesignRow = { id: string };
-      const designIds = (designs as DesignRow[] || []).map((d) => d.id).filter(Boolean);
-      console.log("[DEBUG] Extracted designIds:", designIds);
+      type DesignRow = {
+        id: string;
+        owner_id: string | null;
+        title: string | null;
+      };
+      const rawList = (designsData as DesignRow[] | null) ?? [];
   
-      // 3. Fetch all versions for these designs, ordered by created_at DESC
-      let latestVersions: any[] = [];
+      const designList = rawList.map((d) => ({
+        id: d.id,
+        title: d.title ?? "Untitled",
+      }));
+  
+      setDesigns(designList);
+  
+      // Determine which design to use
+      let designIds: string[] = [];
+      if (selectedDesignId) {
+        designIds = [selectedDesignId];
+      } else if (designList.length > 0) {
+        const firstId = designList[0].id;
+        setSelectedDesignId((prev) => prev ?? firstId);
+        designIds = [firstId];
+      }
+  
+      let versionList: any[] = [];
       if (designIds.length > 0) {
         const { data: versionsData, error: versionsError } = await supabase
           .from("design_versions")
@@ -81,117 +127,142 @@ const HeuristicDashboard = () => {
           .in("design_id", designIds)
           .order("created_at", { ascending: false });
   
-        console.log("[DEBUG] Versions fetch:", { versionsData, versionsError });
-  
         if (versionsError) {
           toast.error("Error fetching design versions");
-          console.log("[DEBUG] VersionsError message:", versionsError.message);
-        } else if (!versionsData || versionsData.length === 0) {
+          return;
+        }
+  
+        if (!versionsData || versionsData.length === 0) {
           console.log("[DEBUG] No design_versions found for these designIds.");
         } else {
-          // Pick the latest version for each design_id
-          const seen: Record<string, boolean> = {};
-          latestVersions = (versionsData as any[] || []).filter((version) => {
-            if (!seen[version.design_id]) {
-              seen[version.design_id] = true;
-              return true;
-            }
-            return false;
-          });
-          console.log("[DEBUG] Latest versions per design:", latestVersions);
+          // versionsData is already sorted newest → oldest
+          versionList = versionsData as any[];
+  
+          // Build version list for dropdown
+          const mappedVersions: DesignVersion[] = versionList.map((v) => ({
+            id: v.id,
+            design_id: v.design_id,
+            created_at: v.created_at,
+          }));
+          setVersions(mappedVersions);
+  
+          // Default to the latest version (first item in sorted list)
+          if (!selectedVersionId && mappedVersions.length > 0) {
+            setSelectedVersionId(mappedVersions[0].id);
+          }
         }
-      } else {
-        console.log("[DEBUG] No designIds found, skipping versions fetch.");
       }
   
-      // 4. Extract issues from latest versions
+      // Use either the selected version or (if none) the latest
+            // Use either the selected version or (if none) ALL versions
+      let versionsToProcess: any[] = [];
+      
+      if (selectedVersionId && versionList.length > 0) {
+        const selected = versionList.find((v) => v.id === selectedVersionId);
+        versionsToProcess = selected ? [selected] : [];
+      } else {
+        // no specific version selected → accumulate across all versions
+        versionsToProcess = versionList;
+      } 
+  
       const allIssues: { heuristic: string; severity: string }[] = [];
-
-            latestVersions.forEach((version, idx) => {
+  
+      versionsToProcess.forEach((version, idx) => {
         let aiData = version.ai_data;
         if (typeof aiData === "string") {
           try {
             aiData = JSON.parse(aiData);
           } catch (e) {
-            console.warn(`[DEBUG] Failed to parse aiData for version ${idx}:`, aiData, e);
+            console.warn(
+              `[DEBUG] Failed to parse aiData for version ${idx}:`,
+              aiData,
+              e
+            );
             aiData = {};
           }
         }
-        console.log(`[DEBUG] Parsed aiData for version ${idx}:`, aiData);
-      
-        // If aiData is an array, extract issues from each item
+  
         if (Array.isArray(aiData)) {
           aiData.forEach((item, itemIdx) => {
-            const issues = Array.isArray(item?.ai?.issues) ? item.ai.issues : [];
-            console.log(`[DEBUG] issues property for version ${idx}, ai item ${itemIdx}:`, issues);
-            issues.forEach((issue: any, issueIdx: number) => {
+            const breakdown = Array.isArray(item?.ai?.heuristic_breakdown)
+              ? item.ai.heuristic_breakdown
+              : [];
+  
+            breakdown.forEach((entry: any) => {
+              if (!entry || typeof entry.code !== "string") return;
+  
+              const heuristicCode = entry.code.replace(/^H/, "").padStart(2, "0");
+              const score = Number(entry.score ?? 0);
+              const max = Number(entry.max_points ?? 4);
+              const ratio = max > 0 ? score / max : 0;
+  
+              let severity: "high" | "medium" | "low";
+              if (ratio <= 0.25) severity = "high";
+              else if (ratio <= 0.5) severity = "medium";
+              else severity = "low";
+  
               if (
-                issue &&
-                typeof issue.heuristic === "string" &&
-                typeof issue.severity === "string"
+                !allIssues.some(
+                  (i) => i.heuristic === heuristicCode && i.severity === severity
+                )
               ) {
-                if (!allIssues.some(i => i.heuristic === issue.heuristic && i.severity === issue.severity)) {
-                  allIssues.push({
-                    heuristic: issue.heuristic,
-                    severity: issue.severity.toLowerCase(),
-                  });
-                  console.log(`[DEBUG] Added issue ${issueIdx} for version ${idx}, ai item ${itemIdx}:`, issue);
-                } else {
-                  console.log(`[DEBUG] Duplicate issue skipped for version ${idx}, ai item ${itemIdx}, issue ${issueIdx}:`, issue);
-                }
-              } else {
-                console.log(`[DEBUG] Skipped issue ${issueIdx} for version ${idx}, ai item ${itemIdx}:`, issue);
+                allIssues.push({ heuristic: heuristicCode, severity });
               }
             });
           });
         } else {
-          // Fallback for object structure
-          const issues = Array.isArray(aiData?.ai?.issues) ? aiData.ai.issues : [];
-          console.log(`[DEBUG] issues property for version ${idx}:`, issues);
-          issues.forEach((issue: any, issueIdx: number) => {
+          const breakdown = Array.isArray(aiData?.ai?.heuristic_breakdown)
+            ? aiData.ai.heuristic_breakdown
+            : [];
+  
+          breakdown.forEach((entry: any) => {
+            if (!entry || typeof entry.code !== "string") return;
+  
+            const heuristicCode = entry.code.replace(/^H/, "").padStart(2, "0");
+            const score = Number(entry.score ?? 0);
+            const max = Number(entry.max_points ?? 4);
+            const ratio = max > 0 ? score / max : 0;
+  
+            let severity: "high" | "medium" | "low";
+            if (ratio <= 0.25) severity = "high";
+            else if (ratio <= 0.5) severity = "medium";
+            else severity = "low";
+  
             if (
-              issue &&
-              typeof issue.heuristic === "string" &&
-              typeof issue.severity === "string"
+              !allIssues.some(
+                (i) => i.heuristic === heuristicCode && i.severity === severity
+              )
             ) {
-              if (!allIssues.some(i => i.heuristic === issue.heuristic && i.severity === issue.severity)) {
-                allIssues.push({
-                  heuristic: issue.heuristic,
-                  severity: issue.severity.toLowerCase(),
-                });
-                console.log(`[DEBUG] Added issue ${issueIdx} for version ${idx}:`, issue);
-              } else {
-                console.log(`[DEBUG] Duplicate issue skipped for version ${idx}, issue ${issueIdx}:`, issue);
-              }
-            } else {
-              console.log(`[DEBUG] Skipped issue ${issueIdx} for version ${idx}:`, issue);
+              allIssues.push({ heuristic: heuristicCode, severity });
             }
           });
         }
       });
   
-      console.log("[DEBUG] All extracted issues:", allIssues);
-  
-      // 5. Count by heuristic and severity
-      const counts: Record<string, { total: number; high: number; medium: number; low: number }> = {};
-      HEURISTICS.forEach(h => {
+      const counts: Record<
+        string,
+        { total: number; high: number; medium: number; low: number }
+      > = {};
+      HEURISTICS.forEach((h) => {
         counts[h.heuristic] = { total: 0, high: 0, medium: 0, low: 0 };
       });
   
-      allIssues.forEach((issue, idx) => {
-        if (issue.heuristic) {
+      allIssues.forEach((issue) => {
+        if (issue.heuristic && counts[issue.heuristic]) {
           counts[issue.heuristic].total += 1;
-          if (issue.severity === "high" || issue.severity === "medium" || issue.severity === "low") {
-            counts[issue.heuristic][issue.severity as "high" | "medium" | "low"] += 1;
+          if (
+            issue.severity === "high" ||
+            issue.severity === "medium" ||
+            issue.severity === "low"
+          ) {
+            counts[issue.heuristic][
+              issue.severity as "high" | "medium" | "low"
+            ] += 1;
           }
-          console.log(`[DEBUG] Counting issue ${idx}:`, issue);
         }
       });
   
-      console.log("[DEBUG] Final heuristic counts:", counts);
-  
-      // 6. Build chart data for your UI
-      const chartData = HEURISTICS.map(h => ({
+      const chartData = HEURISTICS.map((h) => ({
         heuristic: h.heuristic,
         name: h.fullName,
         value: counts[h.heuristic].total,
@@ -201,13 +272,11 @@ const HeuristicDashboard = () => {
         fullName: h.fullName,
       }));
   
-      console.log("[DEBUG] Chart data:", chartData);
-  
       setHeuristicData(chartData);
     };
   
     fetchHeuristicData();
-  }, []);
+  }, [selectedDesignId, selectedVersionId]);
 
   const getSeverityColor = (value: number) => {
     if (value <= 20) return "text-green-600 dark:text-green-400";
@@ -240,26 +309,106 @@ const HeuristicDashboard = () => {
   return (
     <div className="space-y-5 ">
       <div className="border-b-2 p-2">
-        <h1 className="text-2xl font-medium">
-          Heuristic Violation Frequency
-        </h1>
+        <h1 className="text-2xl font-medium">Heuristic Violation Frequency</h1>
       </div>
+
       <div className="p-2 m-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-        <p className="text-sm sm:text-base text-gray-700 dark:text-gray-200 w-full sm:mb-0 font-['Poppins']">
-          {/* TODO: Message is too long! */}
-          This section shows which usability heuristics you&apos;re violating
-          most often. The radar chart breaks down how frequently these issues
-          occur in your projects, with color-coded severity levels (minor vs.
-          major). It helps you spot patterns, understand recurring design
-          challenges, and improve your designs more effectively.
-        </p>
+        <div className="flex-1 flex flex-col gap-3">
+          <p className="text-sm sm:text-base text-gray-700 dark:text-gray-200 w-full sm:mb-0 font-['Poppins']">
+            This section shows which usability heuristics you&apos;re violating
+            most often. The radar chart breaks down how frequently these issues
+            occur in your projects, with color-coded severity levels (minor vs.
+            major). It helps you spot patterns, understand recurring design
+            challenges, and improve your designs more effectively.
+          </p>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-4">
+  {/* Project select */}
+  <div className="flex items-center gap-3">
+    <label
+      htmlFor="project-select"
+      className="text-sm sm:text-base text-gray-700 dark:text-gray-200 font-['Poppins']"
+    >
+      Project:
+    </label>
+
+    <Select
+      value={selectedDesignId || ""}
+      onValueChange={(value) => {
+        setSelectedDesignId(value || null);
+        setSelectedVersionId(null); // reset version when project changes
+      }}
+    >
+      <SelectTrigger
+        id="project-select"
+        className="min-w-[220px] h-11 px-4 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#120F12] text-sm text-gray-900 dark:text-gray-100 font-['Poppins'] focus:outline-none focus:ring-2 focus:ring-[#ED5E20]"
+      >
+        <SelectValue placeholder="Select a project" />
+      </SelectTrigger>
+      <SelectContent>
+        {designs.length === 0 ? (
+          <SelectItem value="__no_projects" disabled>
+            No projects found
+          </SelectItem>
+        ) : (
+          designs.map((d) => (
+            <SelectItem key={d.id} value={d.id}>
+              {d.title}
+            </SelectItem>
+          ))
+        )}
+      </SelectContent>
+    </Select>
+  </div>
+
+  {/* Version select */}
+  <div className="flex items-center gap-3">
+    <label
+      htmlFor="version-select"
+      className="text-sm sm:text-base text-gray-700 dark:text-gray-200 font-['Poppins']"
+    >
+      Version:
+    </label>
+
+    <Select
+      value={selectedVersionId || ""}
+      onValueChange={(value) => setSelectedVersionId(value || null)}
+      disabled={versions.length === 0}
+    >
+      <SelectTrigger
+        id="version-select"
+        className="min-w-[220px] h-11 px-4 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#120F12] text-sm text-gray-900 dark:text-gray-100 font-['Poppins'] focus:outline-none focus:ring-2 focus:ring-[#ED5E20]"
+      >
+        <SelectValue
+          placeholder={
+            versions.length === 0 ? "No versions" : "Select a version"
+          }
+        />
+      </SelectTrigger>
+      <SelectContent>
+       {versions.map((v, index) => {
+      const versionLabel = `v${versions.length - index}`; // latest = highest number
+      const timeLabel = new Date(v.created_at).toLocaleString();
+    
+      return (
+        <SelectItem key={v.id} value={v.id}>
+          {versionLabel} — {timeLabel}
+        </SelectItem>
+      );
+    })} 
+      </SelectContent>
+    </Select>
+  </div>
+</div>
+        </div>
+
         <button
           onClick={handleExportReport}
           disabled={isGeneratingPDF}
-          className={`w-full sm:w-auto px-6 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors font-['Poppins'] font-medium sm:ml-6 cursor-pointer ${isGeneratingPDF
-            ? "bg-gray-400 cursor-not-allowed"
-            : "bg-[#ED5E20] hover:bg-[#d44e0f]"
-            } text-white`}
+          className={`w-full sm:w-auto px-6 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors font-['Poppins'] font-medium sm:ml-6 cursor-pointer ${
+            isGeneratingPDF
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-[#ED5E20] hover:bg-[#d44e0f]"
+          } text-white`}
         >
           <span>
             {isGeneratingPDF ? (

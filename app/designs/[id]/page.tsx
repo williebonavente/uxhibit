@@ -572,8 +572,6 @@ async function handleCustomReEvaluate() {
   }
 }
 
-
-
   function startResizing() {
     setIsResizing(true);
   }
@@ -2455,6 +2453,20 @@ async function handleCustomReEvaluate() {
     setImageError(false);
   }, [currentFrame?.thumbnail_url, thumbUrl, design?.fileKey, design?.nodeId]);
 
+    const isOwner =
+    currentUserId && design?.id && currentUserId === design?.owner_id;
+
+        useEffect(() => {
+      if (typeof window === "undefined") return;
+      const params = new URLSearchParams(window.location.search);
+      const shouldOpen = params.get("reEval") === "1";
+    
+      if (shouldOpen && isOwner && !imageError) {
+        setShowReEvalModal(true);
+      }
+    }, [isOwner, imageError]);
+
+
   if (designLoading)
     return (
       <div className="flex flex-col items-center justify-center h-screen animate-pulse">
@@ -2476,9 +2488,6 @@ async function handleCustomReEvaluate() {
         <p>Design not found.</p>
       </div>
     );
-
-  const isOwner =
-    currentUserId && design?.id && currentUserId === design?.owner_id;
 
   const loadingScreenActive = loadingEval || designLoading;
 

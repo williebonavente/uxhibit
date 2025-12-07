@@ -729,6 +729,33 @@ function DesignCard({
 }: any) {
   const [isEditing, setIsEditing] = useState(false);
 
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    open: boolean;
+  }>({ x: 0, y: 0, open:false });
+
+
+  const handleContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      open: true,
+    })
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu((prev) => ({ ...prev, open: false }));
+  }
+
+      const handleReevaluate = () => {
+    window.location.href = `/designs/${design.id}?reEval=1`;
+    closeContextMenu();
+  };
+
   return (
     <div
       className="group bg-white dark:bg-[#1A1A1A] rounded-xl p-2 shadow-md flex flex-col h-full relative cursor-pointer"
@@ -737,6 +764,7 @@ function DesignCard({
           window.location.href = `/designs/${design.id}`;
         }
       }}
+      onContextMenu={handleContextMenu}
     >
       {/* Thumbnail */}
       <div className="relative w-full aspect-video rounded-lg border overflow-hidden mb-3">
@@ -873,6 +901,57 @@ function DesignCard({
 
       {showOverlay && (
         <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm" />
+      )}
+
+            {contextMenu.open && (
+        <>
+          {/* backdrop so clicking elsewhere closes the menu */}
+          <div
+            className="fixed inset-0 z-40"
+            onClick={(e) => {
+              e.stopPropagation();
+              closeContextMenu();
+            }}
+          />
+                    <div
+            className="fixed z-50 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-gray-700 rounded-md shadow-lg text-sm min-w-[180px] py-1"
+            style={{ top: contextMenu.y, left: contextMenu.x }}
+            onClick={(e) => e.stopPropagation()}
+          >
+          {/* meny buttons  */}
+                    <button
+            className="w-full text-left px-3 py-2 cursor-pointer
+                       hover:bg-gray-100 dark:hover:bg-gray-800
+                       hover:text-[#ED5E20] hover:font-medium"
+            onClick={handleReevaluate}
+          >
+            Re-evaluate design
+          </button>
+          
+          <button
+            className="w-full text-left px-3 py-2 cursor-pointer
+                       hover:bg-gray-100 dark:hover:bg-gray-800"
+            onClick={() => {
+              window.location.href = `/designs/${design.id}`;
+              closeContextMenu();
+            }}
+          >
+            Open design
+          </button>
+          
+          <button
+            className="w-full text-left px-3 py-2 cursor-pointer
+                       hover:bg-red-50 dark:hover:bg-red-900/40
+                       hover:text-red-600"
+            onClick={() => {
+              handleDelete(design.id, design.is_published);
+              closeContextMenu();
+            }}
+          >
+            Delete
+          </button> 
+          </div>
+        </>
       )}
     </div>
   );

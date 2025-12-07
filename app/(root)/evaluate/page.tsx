@@ -1765,7 +1765,7 @@ const [linkTouched, setLinkTouched] = useState(false);
                             "Upload your design of chioice that you want to be evaluated."
                           }
                           description={
-                            "A simple walk through on how to upload frames coming from Figma."
+                            "A simple walk through on how to upload frames from Figma."
                           }
                           videoSrc="/videos/upload_instructions.mp4"
                         />

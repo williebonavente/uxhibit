@@ -409,7 +409,7 @@ const resolvedAvatarSrc =
                   <IconSettings />
                   Settings
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowReportBug(true)}>
                   <Bug />
                   Report a Bug
                 </DropdownMenuItem>
@@ -424,22 +424,24 @@ const resolvedAvatarSrc =
           </DropdownMenu>
         </SidebarMenuItem>
       </SidebarMenu>
-      <ReportBugModal
+
+            <ReportBugModal
         open={showReportBug}
         onClose={() => setShowReportBug(false)}
         user={
           profile
             ? {
-              avatarUrl:
-                profile.avatar_url && profile.avatar_url.startsWith("http")
-                  ? profile.avatar_url
-                  : profile.avatar_url
+                avatarUrl:
+                  profile.avatar_url && profile.avatar_url.startsWith("http")
+                    ? profile.avatar_url
+                    : profile.avatar_url
                     ? `/api/avatars?path=${encodeURIComponent(profile.avatar_url)}`
                     : "",
-              fullName,
-            }
+                fullName,
+              }
             : null
         }
+        imageUrls={[]}
       />
       <AccountInfoModal
         open={open}

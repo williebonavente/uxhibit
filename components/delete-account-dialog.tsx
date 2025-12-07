@@ -7,6 +7,58 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+
+function confirmFinalDelete(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const toastId = toast(
+      <div className="items-center justify-center text-center text-black dark:text-white">
+        <div className="flex flex-col items-center justify-center text-center">
+          <Image
+            src="/images/let-go-of-this-design.svg"
+            alt="Delete account illustration"
+            height={150}
+            width={150}
+            className="object-contain mt-3 mb-3"
+            priority
+          />
+          <h2 className="text-lg font-semibold text-[#ED5E20] mb-2">
+            Are you absolutely sure?
+          </h2>
+          <p className="text-gray-500 text-sm mb-4">
+            This will permanently delete your account and all associated data.
+          </p>
+        </div>
+        <div className="flex justify-center items-center gap-2 mt-2 mb-3">
+          <button
+            className="px-6 py-2 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300 text-sm font-semibold cursor-pointer"
+            onClick={() => {
+              toast.dismiss(toastId);
+              resolve(false);
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            className="px-6 py-2 rounded-lg bg-[#ED5E20] hover:bg-[#d44e0f] text-sm font-semibold text-white cursor-pointer"
+            onClick={() => {
+              toast.dismiss(toastId);
+              resolve(true);
+            }}
+          >
+            Yes, delete my account
+          </button>
+        </div>
+      </div>,
+      {
+        position: "top-center",
+        duration: 999999,
+        className:
+          "bg-white dark:bg-[#120F12] text-black dark:text-white rounded-2xl items-center justify-center text-center",
+      }
+    );
+  });
+}
+
 export default function DeleteAccountPage({
   open,
   setOpen,
@@ -18,20 +70,21 @@ export default function DeleteAccountPage({
   setOpen: Dispatch<SetStateAction<boolean>>;
   userId: string | undefined;
   email: string | undefined;
-  authProvider?: "password" | "figma" | string;
+  authProvider?: "password" | "google" | string;
 }) {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirmText, setConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Only render the dialog if open is true
   if (!open) return null;
 
   const isPasswordUser = (authProvider ?? "password") === "password";
   const deleteDisabled =
     isDeleting ||
-    (isPasswordUser ? !password : confirmText.trim().toUpperCase() !== "DELETE");
+    (isPasswordUser
+      ? !password
+      : confirmText.trim().toUpperCase() !== "DELETE");
 
   return (
     <div
@@ -86,9 +139,17 @@ export default function DeleteAccountPage({
               toast.error("Please enter your password.");
               return;
             }
-            if (!isPasswordUser && confirmText.trim().toUpperCase() !== "DELETE") {
+            if (
+              !isPasswordUser &&
+              confirmText.trim().toUpperCase() !== "DELETE"
+            ) {
               toast.error('Type "DELETE" to confirm.');
               return;
+            }
+
+            const confirmed = await confirmFinalDelete();
+            if (!confirmed) {
+              return ;
             }
 
             setIsDeleting(true);
@@ -172,7 +233,11 @@ export default function DeleteAccountPage({
               className={`group relative flex-1 inline-flex items-center justify-center
                                         rounded-xl text-sm text-white font-semibold tracking-wide
                                         transition-all duration-300 h-full overflow-hidden
-                                        focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40 ${deleteDisabled ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}
+                                        focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ED5E20]/40 ${
+                                          deleteDisabled
+                                            ? "cursor-not-allowed opacity-70"
+                                            : "cursor-pointer"
+                                        }`}
             >
               {/* Glow / gradient base */}
               <span
@@ -192,9 +257,11 @@ export default function DeleteAccountPage({
                   aria-hidden
                   className="absolute -left-1 -right-1 top-0 h-full overflow-hidden rounded-xl"
                 >
-                  <span className="absolute inset-y-0 -left-full w-1/2 translate-x-0 
+                  <span
+                    className="absolute inset-y-0 -left-full w-1/2 translate-x-0 
                           bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 
-                          transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70" />
+                          transition-all duration-700 group-hover:translate-x-[220%] group-hover:opacity-70"
+                  />
                 </span>
               )}
 
