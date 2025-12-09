@@ -17,6 +17,7 @@ import { createClient } from "@/utils/supabase/client";
 // import { LoadingInspiration } from "./animation/loading-fetching";
 import Image from "next/image";
 import PublishConfirmModal from "@/app/designs/[id]/dialogs/PublishConfirmModal";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 type DesignRow = {
   is_published: boolean;
@@ -49,6 +50,9 @@ export default function DesignsGallery({
   const [showOverlay, setShowOverlay] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const PAGE_SIZE = 8;
 
   const [filter, setFilter] = useState<"all" | "published" | "unpublished">(
     "all"
@@ -101,20 +105,25 @@ export default function DesignsGallery({
   const loadDesigns = useCallback(async () => {
     if (!currentUserId) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from("designs")
-      .select(
-        `id,
-              title,
-              thumbnail_url,
-              file_key,
-              node_id,
-              current_version_id,
-              published_designs(is_active, num_of_hearts, num_of_views) 
-              `
-      )
-      .eq("owner_id", profileId) // using the profileId, not the currentUserId
-      .order("updated_at", { ascending: false });
+    const from = (page - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+    const { data, error, count } = await supabase
+  .from("designs")
+  .select(
+    `id,
+      title,
+      thumbnail_url,
+      file_key,
+      node_id,
+      current_version_id,
+      published_designs(is_active, num_of_hearts, num_of_views)
+    `,
+    { count: "exact" }
+  )
+  .eq("owner_id", profileId)
+  .order("updated_at", { ascending: false })
+  .range(from, to);
+
     if (error) {
       console.error(error.message);
       setDesigns([]);
@@ -158,8 +167,11 @@ export default function DesignsGallery({
       }
     });
     setDesigns(withThumbs);
+    if (typeof count === "number") {
+      setTotal(count);
+    }
     setLoading(false);
-  }, [supabase, resolveThumbnail, currentUserId, profileId]);
+  }, [supabase, resolveThumbnail, currentUserId, profileId, page]);
 
   useEffect(() => {
     if (currentUserId) {
@@ -184,6 +196,12 @@ export default function DesignsGallery({
     }, 55 * 60 * 1000);
     return () => clearInterval(interval);
   }, [loadDesigns]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [])
+  
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const handleDelete = (id: string, isPublished: boolean) => {
     setShowOverlay(true);
@@ -696,6 +714,34 @@ export default function DesignsGallery({
           ))}
         </div>
       )}
+
+{totalPages > 1 && (
+  <div className="mt-6 flex justify-end">
+    <div className="inline-flex items-center gap-2 rounded-full bg-black/5 dark:bg-white/5 px-3 py-1.5 backdrop-blur">
+      <button
+        className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-transparent bg-gradient-to-r from-slate-200 to-slate-100 dark:from-slate-800 dark:to-slate-700 px-3 py-1 text-xs font-medium text-slate-700 dark:text-slate-100 shadow-sm hover:from-slate-300 hover:to-slate-200 dark:hover:from-slate-700 dark:hover:to-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        onClick={() => setPage((p) => Math.max(1, p - 1))}
+        disabled={page === 1}
+      >
+        <ChevronLeft className="w-3 h-3" />
+        <span>Prev</span>
+      </button>
+
+      <span className="text-xs text-slate-600 dark:text-slate-300 px-2">
+        Page <span className="font-semibold">{page}</span> / {totalPages}
+      </span>
+
+      <button
+        className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-transparent bg-gradient-to-r from-[#ED5E20] to-orange-500 px-3 py-1 text-xs font-medium text-white shadow-sm hover:from-[#ff6b26] hover:to-orange-400 disabled:opacity-50 disabled:cursor-not-allowed"
+        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+        disabled={page === totalPages}
+      >
+        <span>Next</span>
+        <ChevronRight className="w-3 h-3" />
+      </button>
+    </div>
+  </div>
+)}
 
       {/* Publish/Unpublish Modal */}
       {selectedDesign && (

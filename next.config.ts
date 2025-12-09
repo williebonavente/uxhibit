@@ -39,6 +39,9 @@ const nextConfig: NextConfig = {
   // eslint: {
   //   ignoreDuringBuilds: true,
   // },
+  experimental: {
+    proxyClientMaxBodySize: '50mb',
+  }
 
 };
 

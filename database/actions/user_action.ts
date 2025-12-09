@@ -1,35 +1,44 @@
-import { createClient } from "@/utils/supabase/client";
+import { getUserCryptoKey, encryptProfileFields } from "@/lib/encryption/profileEncryption";
 
-// TODO: To be deleted
-export async function fetchUserName() {
-    const supabase = createClient();
-    const { data: authData } = await supabase.auth.getUser();
-    if (authData?.user?.id) {
-        const { data } = await supabase
-            .from("learner_profile")
-            .select("name")
-            .eq("id", authData.user.id)
-            .single();
-        return data?.name || null;
-    }
-
-    return null;
+function generateSaltB64() {
+  const bytes = new Uint8Array(16); 
+  crypto.getRandomValues(bytes);
+  return Buffer.from(bytes).toString("base64");
 }
 
+export async function updateProfile(supabase: any, userId: string, updates: {
+  first_name?: string | null;
+  middle_name?: string | null;
+  last_name?: string | null;
+  bio?: string | null;
+  gender?: string | null;
+  birthday?: string | null;
+  username?: string | null;
+  role?: string | null;
+  
+}) {
+  const { data: existing, error } = await supabase
+    .from("profiles")
+    .select("id, encryption_salt")
+    .eq("id", userId)
+    .single();
 
-export async function fetchUserEmail() {
-    const supabase = createClient();
-    const { data: authData } = await supabase.auth.getUser();
-    if (authData?.user?.id) {
-        const { data } = await supabase
-            .from("learner_profile")
-            .select("email")
-            .eq("id", authData.user.id)
-            .single()
-        return data?.email || null;
-    }
-    return null;
+  if (error) throw error;
+
+  const encryption_salt = existing?.encryption_salt ?? generateSaltB64();
+
+  const key = await getUserCryptoKey(userId, encryption_salt);
+
+  const encrypted = await encryptProfileFields(key, updates);
+
+  // 4. Save encrypted data + salt
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update({
+      ...encrypted,
+      encryption_salt,
+    })
+    .eq("id", userId);
+
+  if (updateError) throw updateError;
 }
-
-
-
