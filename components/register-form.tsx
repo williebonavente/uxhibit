@@ -228,7 +228,10 @@ export default function RegistrationForm({ user }: RegistrationFormProps) {
   }, [form]);
 
   return (
-    <div style={whiteCursor} className="relative h-screen flex items-start justify-center w-full overflow-hidden px-5 pb-0 md:px-6">
+    <div
+      style={whiteCursor}
+      className="relative min-h-screen flex items-center justify-center w-full overflow-hidden px-4 py-6 sm:px-6 sm:py-10 lg:px-10 lg:py-16"
+    >
       <BackgroundVideo
         src="/images/uxhibit-gif-3(webm).webm"
         type="video/webm"
@@ -238,18 +241,24 @@ export default function RegistrationForm({ user }: RegistrationFormProps) {
 
       <div className="absolute inset-0 bg-black/40" />
 
-        <div className="relative z-10 transform scale-90 origin-center -translate-y-2 flex flex-col w-full max-w-sm sm:max-w-md md:max-w-lg xl:max-w-2xl p-6 sm:p-8 md:p-10 lg:p-12 bg-[#1E1E1E]/40 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20">
+      <div className="
+          relative z-10 flex flex-col w-full
+      max-w-sm sm:max-w-md md:max-w-lg xl:max-w-2xl
+      px-4 sm:px-6 md:px-8 lg:px-10
+      py-6 sm:py-8 md:py-10
+      bg-[#1E1E1E]/40 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20
+      ">
         <div className="flex justify-center mb-5">
           <Image
             src="/images/dark-header-icon.png"
             alt="Uxhibit Logo"
             width={2280}
             height={899}
-            className="w-auto h-16 sm:h-20 md:h-24"
+            className="w-auto h-14 sm:h-16 md:h-20 lg:h-24"
           />
         </div>
 
-        <p className="text-sm sm:text-base md:text-lg text-center mb-8 text-white dark:text-[#F5F5F5]/70">
+        <p className="text-xs sm:text-sm md:text-base lg:text-lg text-center mb-6 sm:mb-8 text-white/80">
           Create your account and start evaluating with UXhibit
         </p>
 
