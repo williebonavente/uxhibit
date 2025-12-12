@@ -35,7 +35,7 @@ export default async function RootLayout({
     }
   `}
         </style>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
           <Toaster position="top-center"></Toaster>
           {children}
         </ThemeProvider>
