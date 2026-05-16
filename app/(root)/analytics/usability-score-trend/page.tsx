@@ -28,9 +28,15 @@ function ChartTooltip({ active, payload, label }: any) {
   const point = payload[0].payload;
   return (
     <div className="bg-white dark:bg-slate-900 border rounded-md px-3 py-2 text-sm shadow">
-      <div className="font-medium text-slate-900 dark:text-slate-100">Version {point.version}</div>
-      <div className="text-slate-600 dark:text-slate-300">Score: {point.score}</div>
-      <div className="text-xs text-slate-500 dark:text-slate-400">Label: {label}</div>
+      <div className="font-medium text-slate-900 dark:text-slate-100">
+        Version {point.version}
+      </div>
+      <div className="text-slate-600 dark:text-slate-300">
+        Score: {point.score}
+      </div>
+      <div className="text-xs text-slate-500 dark:text-slate-400">
+        Label: {label}
+      </div>
     </div>
   );
 }
@@ -41,6 +47,8 @@ export default function UsabilityScoreTrendPage() {
     { version: string; score: number; label: string }[]
   >([]);
   const [loading, setLoading] = useState(true);
+
+  const hasData = !loading && trendData.length > 0;
 
   useEffect(() => {
     const fetchTrendData = async () => {
@@ -107,34 +115,40 @@ export default function UsabilityScoreTrendPage() {
         <div>
           <h1 className="text-2xl font-semibold">Usability Score Trend</h1>
           <p className="text-sm text-slate-600 dark:text-slate-300 max-w-xl mt-2">
-            Track how your designs improve over time. Each submission is evaluated using
-            Nielsen's heuristics — this chart helps you spot regressions and improvements.
+            Track how your designs improve over time. Each submission is
+            evaluated using Nielsen's heuristics — this chart helps you spot
+            regressions and improvements.
           </p>
         </div>
-
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <Button onClick={handleExportReport} disabled={isGeneratingPDF || trendData.length === 0}>
-            {isGeneratingPDF ? (
-              <span className="flex items-center gap-2">
-                <IconLoader2 className="animate-spin w-4 h-4" />
-                Generating...
-              </span>
-            ) : (
-              <span className="flex items-center gap-2">
-                <IconDownload className="w-4 h-4" />
-                Export
-              </span>
-            )}
-          </Button>
-          <Badge variant="secondary">{trendData.length} submissions</Badge>
-        </div>
+        {hasData && (
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            {" "}
+            <Button onClick={handleExportReport} disabled={isGeneratingPDF}>
+              {" "}
+              {isGeneratingPDF ? (
+                <span className="flex items-center gap-2">
+                  {" "}
+                  <IconLoader2 className="animate-spin w-4 h-4" /> Generating...{" "}
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  {" "}
+                  <IconDownload className="w-4 h-4" /> Export{" "}
+                </span>
+              )}{" "}
+            </Button>{" "}
+            <Badge variant="secondary">{trendData.length} submissions</Badge>{" "}
+          </div>
+        )}
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Improvements</span>
-            <div className="text-sm text-slate-500 dark:text-slate-400">Usability Score (0–10)</div>
+            <div className="text-sm text-slate-500 dark:text-slate-400">
+              Usability Score (0–10)
+            </div>
           </CardTitle>
         </CardHeader>
 
@@ -152,11 +166,22 @@ export default function UsabilityScoreTrendPage() {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trendData} margin={{ top: 12, right: 24, left: 8, bottom: 12 }}>
+                <AreaChart
+                  data={trendData}
+                  margin={{ top: 12, right: 24, left: 8, bottom: 12 }}
+                >
                   <defs>
                     <linearGradient id="scoreGrad" x1="0" x2="0" y1="0" y2="1">
-                      <stop offset="5%" stopColor="#ED5E20" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="#ED5E20" stopOpacity={0.08} />
+                      <stop
+                        offset="5%"
+                        stopColor="#ED5E20"
+                        stopOpacity={0.35}
+                      />
+                      <stop
+                        offset="95%"
+                        stopColor="#ED5E20"
+                        stopOpacity={0.08}
+                      />
                     </linearGradient>
                   </defs>
 
@@ -198,8 +223,12 @@ export default function UsabilityScoreTrendPage() {
           </div>
 
           <div className="mt-4 flex items-center justify-between">
-            <div className="text-sm text-slate-600 dark:text-slate-400">Version</div>
-            <div className="text-sm text-slate-500 dark:text-slate-400">Last updated: N/A</div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">
+              Version
+            </div>
+            <div className="text-sm text-slate-500 dark:text-slate-400">
+              Last updated: N/A
+            </div>
           </div>
         </CardContent>
       </Card>

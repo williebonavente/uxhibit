@@ -9,7 +9,7 @@ import {
   Radar,
   ResponsiveContainer,
 } from "recharts";
-import { generateHeuristicReportSimple } from "@/lib/systemGeneratedReport/pdfGenerator";
+import { generateHeuristicReport } from "@/lib/systemGeneratedReport/heuristicReport";
 import { toast } from "sonner";
 import { IconLoader2, IconDownload } from "@tabler/icons-react";
 import { createClient } from "@/utils/supabase/client";
@@ -20,6 +20,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import { array } from "zod";
 
 const HEURISTICS = [
   { heuristic: "01", fullName: "Visibility of System Status" },
@@ -68,7 +69,7 @@ const HeuristicDashboard = () => {
   const [selectedDesignId, setSelectedDesignId] = useState<string | null>(null);
 
   const supabase = createClient();
-  
+
     useEffect(() => {
     const fetchHeuristicData = async () => {
       const supabase = createClient();
@@ -84,184 +85,124 @@ const HeuristicDashboard = () => {
       }
       const currentUserId = user.id;
   
-      // Get all designs for the user
-      const { data: designsData, error: designsError } = await supabase
-        .from("designs")
-        .select("id, owner_id, title")
-        .eq("owner_id", currentUserId);
+      // Single joined query: design_versions + designs (inner join by FK)
+      const { data: versionsData, error: versionsError } = await supabase
+        .from("design_versions")
+        .select(`
+          id, design_id, ai_data, created_at,
+          designs!inner (
+            id, title, owner_id
+          )
+        `)
+        .eq("designs.owner_id", currentUserId)
+        .order("created_at", { ascending: false });
   
-      if (designsError) {
-        toast.error("Error fetching designs");
+      if (versionsError) {
+        toast.error("Error fetching design versions");
         return;
       }
   
-      type DesignRow = {
+      const versionRows = (versionsData ?? []) as Array<{
         id: string;
-        owner_id: string | null;
-        title: string | null;
-      };
-      const rawList = (designsData as DesignRow[] | null) ?? [];
+        design_id: string;
+        ai_data: unknown;
+        created_at: string;
+        designs: { id: string; title: string | null; owner_id: string };
+      }>;
   
-      const designList = rawList.map((d) => ({
-        id: d.id,
-        title: d.title ?? "Untitled",
-      }));
-  
+      // Build unique project list from joined rows
+      const designMap = new Map<string, { id: string; title: string }>();
+      versionRows.forEach((v) => {
+        const d = v.designs;
+        if (d && d.id) {
+          designMap.set(d.id, { id: d.id, title: d.title ?? "Untitled" });
+        }
+      });
+      const designList = Array.from(designMap.values());
       setDesigns(designList);
   
-      // Determine which design to use
-      let designIds: string[] = [];
-      if (selectedDesignId) {
-        designIds = [selectedDesignId];
-      } else if (designList.length > 0) {
-        const firstId = designList[0].id;
-        setSelectedDesignId((prev) => prev ?? firstId);
-        designIds = [firstId];
+      // Determine effective project (selected or first)
+      let effectiveDesignId = selectedDesignId;
+      if (!effectiveDesignId && designList.length > 0) {
+        effectiveDesignId = designList[0].id;
+        setSelectedDesignId((prev) => prev ?? effectiveDesignId);
       }
   
-      let versionList: any[] = [];
-      if (designIds.length > 0) {
-        const { data: versionsData, error: versionsError } = await supabase
-          .from("design_versions")
-          .select("id, design_id, ai_data, created_at")
-          .in("design_id", designIds)
-          .order("created_at", { ascending: false });
+      // Filter versions for the selected project (or use all if none)
+      const versionList = effectiveDesignId
+        ? versionRows.filter((v) => v.design_id === effectiveDesignId)
+        : versionRows;
   
-        if (versionsError) {
-          toast.error("Error fetching design versions");
-          return;
-        }
+      // Build version list for dropdown
+      const mappedVersions: DesignVersion[] = versionList.map((v) => ({
+        id: v.id,
+        design_id: v.design_id,
+        created_at: v.created_at,
+      }));
+      setVersions(mappedVersions);
   
-        if (!versionsData || versionsData.length === 0) {
-          console.log("[DEBUG] No design_versions found for these designIds.");
-        } else {
-          // versionsData is already sorted newest → oldest
-          versionList = versionsData as any[];
-  
-          // Build version list for dropdown
-          const mappedVersions: DesignVersion[] = versionList.map((v) => ({
-            id: v.id,
-            design_id: v.design_id,
-            created_at: v.created_at,
-          }));
-          setVersions(mappedVersions);
-  
-          // Default to the latest version (first item in sorted list)
-          if (!selectedVersionId && mappedVersions.length > 0) {
-            setSelectedVersionId(mappedVersions[0].id);
-          }
-        }
+      // Default to the latest version if none selected
+      if (!selectedVersionId && mappedVersions.length > 0) {
+        setSelectedVersionId(mappedVersions[0].id);
       }
   
-      // Use either the selected version or (if none) the latest
-            // Use either the selected version or (if none) ALL versions
-      let versionsToProcess: any[] = [];
-      
+      // Use either the selected version or ALL versions (aggregate)
+      let versionsToProcess: typeof versionList = [];
       if (selectedVersionId && versionList.length > 0) {
         const selected = versionList.find((v) => v.id === selectedVersionId);
         versionsToProcess = selected ? [selected] : [];
       } else {
-        // no specific version selected → accumulate across all versions
         versionsToProcess = versionList;
-      } 
+      }
   
-      const allIssues: { heuristic: string; severity: string }[] = [];
-  
-      versionsToProcess.forEach((version, idx) => {
-        let aiData = version.ai_data;
-        if (typeof aiData === "string") {
-          try {
-            aiData = JSON.parse(aiData);
-          } catch (e) {
-            console.warn(
-              `[DEBUG] Failed to parse aiData for version ${idx}:`,
-              aiData,
-              e
-            );
-            aiData = {};
-          }
-        }
-  
-        if (Array.isArray(aiData)) {
-          aiData.forEach((item, itemIdx) => {
-            const breakdown = Array.isArray(item?.ai?.heuristic_breakdown)
-              ? item.ai.heuristic_breakdown
-              : [];
-  
-            breakdown.forEach((entry: any) => {
-              if (!entry || typeof entry.code !== "string") return;
-  
-              const heuristicCode = entry.code.replace(/^H/, "").padStart(2, "0");
-              const score = Number(entry.score ?? 0);
-              const max = Number(entry.max_points ?? 4);
-              const ratio = max > 0 ? score / max : 0;
-  
-              let severity: "high" | "medium" | "low";
-              if (ratio <= 0.25) severity = "high";
-              else if (ratio <= 0.5) severity = "medium";
-              else severity = "low";
-  
-              if (
-                !allIssues.some(
-                  (i) => i.heuristic === heuristicCode && i.severity === severity
-                )
-              ) {
-                allIssues.push({ heuristic: heuristicCode, severity });
-              }
-            });
-          });
-        } else {
-          const breakdown = Array.isArray(aiData?.ai?.heuristic_breakdown)
-            ? aiData.ai.heuristic_breakdown
-            : [];
-  
-          breakdown.forEach((entry: any) => {
-            if (!entry || typeof entry.code !== "string") return;
-  
-            const heuristicCode = entry.code.replace(/^H/, "").padStart(2, "0");
-            const score = Number(entry.score ?? 0);
-            const max = Number(entry.max_points ?? 4);
-            const ratio = max > 0 ? score / max : 0;
-  
-            let severity: "high" | "medium" | "low";
-            if (ratio <= 0.25) severity = "high";
-            else if (ratio <= 0.5) severity = "medium";
-            else severity = "low";
-  
-            if (
-              !allIssues.some(
-                (i) => i.heuristic === heuristicCode && i.severity === severity
-              )
-            ) {
-              allIssues.push({ heuristic: heuristicCode, severity });
-            }
-          });
-        }
-      });
-  
-      const counts: Record<
-        string,
-        { total: number; high: number; medium: number; low: number }
-      > = {};
+      // Initialize counts
+      const counts: Record<string, { total: number; high: number; medium: number; low: number }> = {};
       HEURISTICS.forEach((h) => {
         counts[h.heuristic] = { total: 0, high: 0, medium: 0, low: 0 };
       });
   
-      allIssues.forEach((issue) => {
-        if (issue.heuristic && counts[issue.heuristic]) {
-          counts[issue.heuristic].total += 1;
-          if (
-            issue.severity === "high" ||
-            issue.severity === "medium" ||
-            issue.severity === "low"
-          ) {
-            counts[issue.heuristic][
-              issue.severity as "high" | "medium" | "low"
-            ] += 1;
+      // Walk versions and increment counts per breakdown entry
+      versionsToProcess.forEach((version, idx) => {
+        let aiData: any = version.ai_data;
+        if (typeof aiData === "string") {
+          try {
+            aiData = JSON.parse(aiData);
+          } catch (e) {
+            console.warn(`[DEBUG] Failed to parse aiData for version ${idx}:`, aiData, e);
+            aiData = {};
           }
         }
+  
+        const entries =
+          Array.isArray(aiData)
+            ? aiData.flatMap((item: any) =>
+                Array.isArray(item?.ai?.heuristic_breakdown) ? item.ai.heuristic_breakdown : []
+              )
+            : Array.isArray(aiData?.ai?.heuristic_breakdown)
+            ? aiData.ai.heuristic_breakdown
+            : [];
+  
+        entries.forEach((entry: any) => {
+          if (!entry || typeof entry.code !== "string") return;
+  
+          const heuristicCode = entry.code.replace(/^H/, "").padStart(2, "0");
+          const score = Number(entry.score ?? 0);
+          const max = Number(entry.max_points ?? 4);
+          const ratio = max > 0 ? score / max : 0;
+  
+          let severity: "high" | "medium" | "low";
+          if (ratio <= 0.25) severity = "high";
+          else if (ratio <= 0.5) severity = "medium";
+          else severity = "low";
+  
+          if (counts[heuristicCode]) {
+            counts[heuristicCode].total += 1;
+            counts[heuristicCode][severity] += 1;
+          }
+        });
       });
   
+      // Build chart data
       const chartData = HEURISTICS.map((h) => ({
         heuristic: h.heuristic,
         name: h.fullName,
@@ -290,17 +231,41 @@ const HeuristicDashboard = () => {
     return "bg-red-100 dark:bg-red-900/30";
   };
 
+    const toReportData = (arr: HeuristicChartData[]) =>
+    arr.map((d) => ({
+      key: d.heuristic.startsWith('H') ? d.heuristic : `H${d.heuristic}`,
+      name: d.fullName || d.name,
+      score: Math.max(0, Math.min(100, Math.round(d.value))),
+    }));
+    
+    const selectedIdx = versions.findIndex(v => v.id === selectedVersionId);
+    const verLabel = selectedIdx >= 0 ? `${versions.length - selectedIdx}` : undefined;
   const handleExportReport = async () => {
     setIsGeneratingPDF(true);
     try {
-      toast.success("PDF report generated successfully.");
-      await generateHeuristicReportSimple(heuristicData);
-      // Show success message (optional)
-      // TODO: Adding loading message
-    } catch (error) {
-      toast.error(error as string);
-      console.error("Error generating report:", error);
-      alert("Failed to generate PDF report. Please try again.");
+      const payload = {
+        data: toReportData(heuristicData),
+        options: {
+          title: 'Heuristic Violation Report',
+          project: designs.find((d) => d.id === selectedDesignId)?.title ?? 'UXhibit',
+          version: verLabel,
+        },
+      };
+      const res = await fetch('/api/reports/heuristics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error('Report request failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'uxhibit-heuristics.pdf';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
     } finally {
       setIsGeneratingPDF(false);
     }

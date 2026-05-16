@@ -1,14 +1,38 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width,initial-scale=1.0">
-    <title>Components App</title>
-    <!-- Used by Next.js to inject CSS. -->
-    <div id="__next_css__DO_NOT_USE__"></div>
-  </head>
-  <body>
+<!doctype html>
+
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>Cypress Component Testing</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Baseline so things look sane -->
+  <style>
+    :root { color-scheme: light; }
+    html, body {
+      background: #000000;
+      margin: 0;
+      font-family: system-ui, -apple-system, "Poppins", Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    }
+    p {
+        color: #000000;
+    }
+  </style>
+
+  <!-- Tailwind CDN (no Next style-loader needed) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts: Poppins (avoid local /fonts in CT) -->
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@100;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Optional: animate.css as a replacement for tw-animate-css -->
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@4.1.1/animate.min.css">
+</head>
+
+<body>
     <div data-cy-root></div>
-  </body>
+</body>
+
 </html>

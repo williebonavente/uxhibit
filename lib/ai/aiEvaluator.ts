@@ -625,37 +625,9 @@ export async function aiEvaluator(
 
   const resourceSubset = selectResourceRecommendations();
 
-  const prompt = `
-  Instructions:
-  This is iteration ${iteration} of ${totalIterations}. You must follow:
-  - All numeric scores between 0 and 100.
-  - Aim scores near the current iteration target ≈ ${targetRawForIteration(
-    iteration,
-    totalIterations
-  )}.
-  - Final iteration (${totalIterations}) = 100 (perfect). No weaknesses or resources then.
-  - Heuristic breakdown MUST numerically justify category_scores and overall_score (they must be consistent).
-  - Do NOT reuse a canned heuristic_breakdown; generate it from the supplied context.
-  
-  Panel-ready guidance:
-    - Concise, professional, evidence-based.
-    - Each justification references persona or concrete UI evidence.
-    - Summary 2-4 sentences, starts with: "For a ${generation ?? "N/A"} ${
-    occupation ?? "N/A"
-  },".
-
-  Persona:
-    - Generation: ${generation ?? "N/A"}
-    - Occupation: ${occupation ?? "N/A"}
-    
-  ResourceContext:
-  The following curated external references are available. ONLY include items in the "resources" array when they directly support a weakness or improvement suggestion. For each included resource, connect it explicitly to the related heuristic code(s) or category:
-  ${JSON.stringify(resourceSubset, null, 2)}
-
-  UX Law Guidance:
-  - If a weakness maps clearly to a known UX law (e.g., Hick's Law for choice overload, Fitts's Law for tiny tap targets), reference that law briefly in the justification or suggestion.
-
-    
+  const prompt = `    
+  Make the scores only goes from 85-90
+  Follow it careffully!!!
     Return ONLY valid JSON:
     \`\`\`json
     {
